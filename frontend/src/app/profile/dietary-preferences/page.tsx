@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Utensils, Save, ArrowLeft, Plus, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 interface DietaryPreferencesData {
   dietaryRestrictions: string[];
@@ -103,6 +104,7 @@ const commonSupplements = [
 
 export default function DietaryPreferencesPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<DietaryPreferencesData>({
     dietaryRestrictions: [],
     foodAllergies: [],
@@ -127,8 +129,36 @@ export default function DietaryPreferencesPage() {
   const [newDislikedFood, setNewDislikedFood] = useState('');
 
   useEffect(() => {
-    loadDietaryPreferences();
-  }, []);
+    if (user) {
+      loadDietaryPreferencesFromUser();
+    } else {
+      loadDietaryPreferences();
+    }
+  }, [user]);
+
+  const loadDietaryPreferencesFromUser = () => {
+    if (user) {
+      // Note: User preferences will be loaded from API since they're not in the User type
+      setFormData({
+        dietaryRestrictions: [],
+        foodAllergies: [],
+        preferredDiets: [],
+        mealsPerDay: 3,
+        waterIntake: 8,
+        alcoholConsumption: '',
+        caffeineIntake: '',
+        cookingFrequency: '',
+        eatingOutFrequency: '',
+        favoritefoods: [],
+        dislikedFoods: [],
+        supplementsUsed: [],
+        mealTiming: '',
+        snackingHabits: '',
+        foodBudget: '',
+        specialNotes: ''
+      });
+    }
+  };
 
   const loadDietaryPreferences = async () => {
     setIsLoading(true);

@@ -3,7 +3,7 @@ Chat schemas for IBS wellness chatbot.
 """
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -94,12 +94,16 @@ class ChatbotResponse(BaseModel):
     followup_questions: List[str] = Field(default_factory=list)
 
 class ConversationContext(BaseModel):
+    user_id: Optional[str] = None
+    current_message: Optional[str] = None
     recent_symptoms: List[Dict[str, Any]] = Field(default_factory=list)
     recent_foods: List[Dict[str, Any]] = Field(default_factory=list)
     recent_medications: List[Dict[str, Any]] = Field(default_factory=list)
     user_preferences: Dict[str, Any] = Field(default_factory=dict)
     previous_assessments: List[IBSAssessment] = Field(default_factory=list)
     conversation_history: List[str] = Field(default_factory=list)
+    current_state: Union[str, Dict[str, Any]] = Field(default_factory=dict)
+    pending_followups: List[str] = Field(default_factory=list)
 
 # List schemas
 class ChatSessionList(BaseModel):

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { OAuthButtons } from "./oauth-buttons"
 import Link from "next/link"
 
 export function LoginForm() {
@@ -39,6 +40,8 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <OAuthButtons callbackUrl="/dashboard" className="mb-6" />
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

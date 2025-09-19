@@ -58,6 +58,9 @@ export default function ChatInterface({ className }: ChatInterfaceProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Get API base URL from environment
+  const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
@@ -76,7 +79,7 @@ export default function ChatInterface({ className }: ChatInterfaceProps) {
   const initializeChat = async () => {
     try {
       // Create a new chat session
-      const response = await fetch('/api/v1/chat/sessions', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +123,7 @@ export default function ChatInterface({ className }: ChatInterfaceProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/v1/chat/sessions/${currentSession.id}/messages`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions/${currentSession.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

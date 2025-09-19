@@ -7,8 +7,8 @@ to determine IBS severity and provide personalized insights.
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, desc, select
 
 from app.models.user import User
 from app.models.symptom import SymptomLog, SeverityEnum, BristolStoolTypeEnum
@@ -21,10 +21,10 @@ from app.core.logging import StructuredLogger
 class IBSDetectionService:
     """Service for detecting IBS severity based on user data patterns."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         
-    def assess_ibs_severity(self, user: User, days: int = 30) -> IBSAssessment:
+    async def assess_ibs_severity(self, user: User, days: int = 30) -> IBSAssessment:
         """
         Assess IBS severity based on recent user data.
         
@@ -39,9 +39,9 @@ class IBSDetectionService:
         start_date = end_date - timedelta(days=days)
         
         # Gather data for analysis
-        symptoms_data = self._get_symptoms_data(user.id, start_date, end_date)
-        food_reactions_data = self._get_food_reactions_data(user.id, start_date, end_date)
-        medication_data = self._get_medication_data(user.id, start_date, end_date)
+        symptoms_data = await self._get_symptoms_data(user.id, start_date, end_date)
+        food_reactions_data = await self._get_food_reactions_data(user.id, start_date, end_date)
+        medication_data = await self._get_medication_data(user.id, start_date, end_date)
         
         # Calculate individual scores
         symptoms_score = self._calculate_symptoms_score(symptoms_data)
@@ -87,15 +87,18 @@ class IBSDetectionService:
         
         return assessment
     
-    def _get_symptoms_data(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
+    async def _get_symptoms_data(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
         """Get symptom logs for the specified period."""
-        symptoms = self.db.query(SymptomLog).filter(
+        stmt = select(SymptomLog).filter(
             and_(
                 SymptomLog.user_id == user_id,
                 SymptomLog.logged_at >= start_date,
                 SymptomLog.logged_at <= end_date
             )
-        ).order_by(desc(SymptomLog.logged_at)).all()
+        ).order_by(desc(SymptomLog.logged_at))
+        
+        result = await self.db.execute(stmt)
+        symptoms = result.scalars().all()
         
         return [
             {
@@ -109,15 +112,18 @@ class IBSDetectionService:
             for symptom in symptoms
         ]
     
-    def _get_food_reactions_data(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
+    async def _get_food_reactions_data(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
         """Get food reaction data for the specified period."""
-        reactions = self.db.query(FoodReaction).filter(
+        stmt = select(FoodReaction).filter(
             and_(
                 FoodReaction.user_id == user_id,
                 FoodReaction.consumed_at >= start_date,
                 FoodReaction.consumed_at <= end_date
             )
-        ).order_by(desc(FoodReaction.consumed_at)).all()
+        ).order_by(desc(FoodReaction.consumed_at))
+        
+        result = await self.db.execute(stmt)
+        reactions = result.scalars().all()
         
         return [
             {
@@ -130,15 +136,18 @@ class IBSDetectionService:
             for reaction in reactions
         ]
     
-    def _get_medication_data(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
+    async def _get_medication_data(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
         """Get medication adherence data for the specified period."""
-        medications = self.db.query(MedicationLog).filter(
+        stmt = select(MedicationLog).filter(
             and_(
                 MedicationLog.user_id == user_id,
                 MedicationLog.taken_at >= start_date,
                 MedicationLog.taken_at <= end_date
             )
-        ).order_by(desc(MedicationLog.taken_at)).all()
+        ).order_by(desc(MedicationLog.taken_at))
+        
+        result = await self.db.execute(stmt)
+        medications = result.scalars().all()
         
         return [
             {

@@ -17,7 +17,7 @@ from pathlib import Path
 from app.core.config import settings
 # from app.core.logging import setup_logging  # Comment out for now
 from app.core.database import engine, create_tables
-from app.api.v1 import auth, symptoms, diet, medications, chat, ml_predictions, real_time_predictions, users, onboarding
+from app.api.v1 import auth, symptoms, diet, medications, chat, ml_predictions, real_time_predictions, users, onboarding, firebase, oauth
 # from app.core.exceptions import IBSException  # Comment out for now
 
 
@@ -154,6 +154,8 @@ async def root():
 from app.api.v1 import api_router
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(real_time_predictions.router, prefix="/api/v1")
+app.include_router(firebase.router, prefix="/api/v1")
+app.include_router(oauth.router, prefix="/api/v1")
 
 # Static files (if needed)
 static_dir = Path("static")

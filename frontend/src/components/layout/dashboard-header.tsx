@@ -4,7 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProfileDropdown } from '@/components/ui/profile-dropdown';
-import { Heart, BarChart3, PlusCircle, Calendar, Bell, MessageCircle, User } from 'lucide-react';
+import { NotificationIcon } from '@/components/ui/notification-icon';
+import { useNotificationState } from '@/hooks/useNotificationState';
+import { Heart, BarChart3, PlusCircle, Calendar, MessageCircle, User } from 'lucide-react';
 
 interface DashboardHeaderProps {
   title?: string;
@@ -18,6 +20,14 @@ export function DashboardHeader({
   backHref = "/dashboard" 
 }: DashboardHeaderProps) {
   const pathname = usePathname();
+  
+  // Initialize notification state
+  const {
+    notifications,
+    markAsRead,
+    markAllAsRead,
+    dismissNotification,
+  } = useNotificationState();
 
   const navigationItems = [
     {
@@ -103,11 +113,18 @@ export function DashboardHeader({
           {/* Right Section - Notifications and Profile */}
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200">
-              <Bell className="w-5 h-5" />
-              {/* Notification badge */}
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationIcon
+              notifications={notifications}
+              onMarkAsRead={markAsRead}
+              onMarkAllAsRead={markAllAsRead}
+              onDismiss={dismissNotification}
+              onNotificationClick={(notification) => {
+                // Handle notification click - could navigate to specific pages
+                if (notification.actionUrl) {
+                  window.location.href = notification.actionUrl;
+                }
+              }}
+            />
 
             {/* Profile Dropdown */}
             <ProfileDropdown />

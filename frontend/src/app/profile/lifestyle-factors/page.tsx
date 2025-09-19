@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Activity, Save, ArrowLeft, Plus, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 interface LifestyleFactorsData {
   exerciseFrequency: string;
@@ -153,6 +154,7 @@ const mentalHealthOptions = [
 
 export default function LifestyleFactorsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<LifestyleFactorsData>({
     exerciseFrequency: '',
     exerciseTypes: [],
@@ -184,8 +186,45 @@ export default function LifestyleFactorsPage() {
   const [newHobby, setNewHobby] = useState('');
 
   useEffect(() => {
-    loadLifestyleFactors();
-  }, []);
+    if (user) {
+      loadLifestyleFactorsFromUser();
+    } else {
+      loadLifestyleFactors();
+    }
+  }, [user]);
+
+  const loadLifestyleFactorsFromUser = () => {
+    if (user) {
+      // Note: User preferences will be loaded from API since they're not in the User type
+      setFormData(prev => ({
+        ...prev,
+        exerciseFrequency: '',
+        exerciseTypes: [],
+        exerciseDuration: 30,
+        exerciseIntensity: '',
+        sleepHours: 8,
+        sleepQuality: '',
+        bedtime: '',
+        wakeupTime: '',
+        stressLevel: 5,
+        stressManagement: [],
+        workSchedule: '',
+        workStressLevel: 5,
+        smokingStatus: '',
+        smokingFrequency: '',
+        socialSupport: '',
+        hobbies: [],
+        screenTime: 4,
+        outdoorTime: 1,
+        travelFrequency: '',
+        livingEnvironment: '',
+        petOwnership: '',
+        relaxationActivities: [],
+        mentalHealthSupport: '',
+        specialNotes: ''
+      }));
+    }
+  };
 
   const loadLifestyleFactors = async () => {
     setIsLoading(true);

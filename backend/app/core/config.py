@@ -78,8 +78,30 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
     
-    # OpenAI
+    # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    OPENAI_MAX_TOKENS: int = 1000
+    
+    # OAuth Configuration
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+
+    # Firebase Admin
+    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_PRIVATE_KEY_ID: Optional[str] = None
+    FIREBASE_PRIVATE_KEY: Optional[str] = None
+    FIREBASE_CLIENT_EMAIL: Optional[str] = None
+    FIREBASE_CLIENT_ID: Optional[str] = None
+    FIREBASE_AUTH_URI: str = "https://accounts.google.com/o/oauth2/auth"
+    FIREBASE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"
+    FIREBASE_AUTH_PROVIDER_X509_CERT_URL: str = "https://www.googleapis.com/oauth2/v1/certs"
+    FIREBASE_CLIENT_X509_CERT_URL: Optional[str] = None
+    FIREBASE_UNIVERSE_DOMAIN: str = "googleapis.com"
+    FIREBASE_TYPE: str = "service_account"
+    FIREBASE_AUDIENCE: Optional[str] = None
     
     class Config:
         env_file = ".env"

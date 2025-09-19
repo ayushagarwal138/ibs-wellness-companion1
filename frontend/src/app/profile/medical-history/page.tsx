@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Heart, Save, ArrowLeft, Plus, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 interface MedicalHistoryData {
   diagnosisYear: number;
@@ -69,6 +70,7 @@ const treatmentOptions = [
 
 export default function MedicalHistoryPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<MedicalHistoryData>({
     diagnosisYear: new Date().getFullYear(),
     ibsType: '',
@@ -90,8 +92,33 @@ export default function MedicalHistoryPage() {
   const [newCondition, setNewCondition] = useState('');
 
   useEffect(() => {
-    loadMedicalHistory();
-  }, []);
+    if (user) {
+      loadMedicalHistoryFromUser();
+    } else {
+      loadMedicalHistory();
+    }
+  }, [user]);
+
+  const loadMedicalHistoryFromUser = () => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        diagnosisYear: user.diagnosis_date ? new Date(user.diagnosis_date).getFullYear() : new Date().getFullYear(),
+        ibsType: user.ibs_type || '',
+        // Other fields will be loaded from API as they're not in the User type
+        severityLevel: '',
+        knownTriggers: [],
+        commonSymptoms: [],
+        symptomPatterns: [],
+        medications: [],
+        allergies: [],
+        otherConditions: [],
+        familyHistory: '',
+        previousTreatments: [],
+        doctorNotes: ''
+      }));
+    }
+  };
 
   const loadMedicalHistory = async () => {
     setIsLoading(true);

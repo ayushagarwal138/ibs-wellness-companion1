@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { User, Save, ArrowLeft } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 interface BasicInfoData {
   firstName: string;
@@ -31,6 +32,7 @@ interface BasicInfoData {
 
 export default function BasicInfoPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<BasicInfoData>({
     firstName: '',
     lastName: '',
@@ -51,8 +53,31 @@ export default function BasicInfoPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadBasicInfo();
-  }, []);
+    if (user) {
+      loadBasicInfoFromUser();
+    }
+  }, [user]);
+
+  const loadBasicInfoFromUser = () => {
+    if (user) {
+      setFormData({
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        email: user.email || '',
+        phone: user.phone_number || '',
+        dateOfBirth: user.date_of_birth || '',
+        gender: user.gender || '',
+        height_cm: user.height_cm || undefined,
+        weight_kg: user.weight_kg || undefined,
+        emergencyContact: '',
+        emergencyPhone: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: ''
+      });
+    }
+  };
 
   const loadBasicInfo = async () => {
     setIsLoading(true);

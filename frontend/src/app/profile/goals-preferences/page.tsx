@@ -16,6 +16,7 @@ import { Slider } from "@/components/ui/slider";
 
 import { Target, Save, ArrowLeft, Plus, X, Bell, Calendar, TrendingUp } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 interface GoalsPreferencesData {
   healthGoals: string[];
@@ -146,6 +147,7 @@ const dataRetentionOptions = [
 
 export default function GoalsPreferencesPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<GoalsPreferencesData>({
     healthGoals: [],
     symptomManagementGoals: [],
@@ -192,8 +194,54 @@ export default function GoalsPreferencesPage() {
   const [newLongTermGoal, setNewLongTermGoal] = useState('');
 
   useEffect(() => {
-    loadGoalsPreferences();
-  }, []);
+    if (user) {
+      loadGoalsPreferencesFromUser();
+    } else {
+      loadGoalsPreferences();
+    }
+  }, [user]);
+
+  const loadGoalsPreferencesFromUser = () => {
+    if (user) {
+      // Note: User preferences will be loaded from API since they're not in the User type
+      setFormData(prev => ({
+        ...prev,
+        healthGoals: [],
+        symptomManagementGoals: [],
+        lifestyleGoals: [],
+        shortTermGoals: [],
+        longTermGoals: [],
+        motivationLevel: 7,
+        preferredTrackingMethods: [],
+        reminderPreferences: {
+          medicationReminders: true,
+          mealLogging: true,
+          symptomTracking: true,
+          exerciseReminders: false,
+          waterIntakeReminders: false,
+          sleepReminders: false,
+        },
+        notificationSettings: {
+          pushNotifications: true,
+          emailNotifications: false,
+          smsNotifications: false,
+          weeklyReports: true,
+          monthlyReports: true,
+        },
+        appPreferences: {
+          theme: 'auto',
+          language: 'en',
+          measurementUnits: 'metric',
+          defaultDashboardView: 'overview',
+        },
+        supportPreferences: [],
+        prioritySymptoms: [],
+        successMetrics: [],
+        challengeAreas: [],
+        specialNotes: ''
+      }));
+    }
+  };
 
   const loadGoalsPreferences = async () => {
     setIsLoading(true);

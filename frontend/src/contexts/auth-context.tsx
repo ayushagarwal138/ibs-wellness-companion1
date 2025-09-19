@@ -3,6 +3,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
+import { firebaseAuthService } from '@/lib/firebase-auth'
+import { analyticsService } from '@/lib/analytics'
+import { notificationService } from '@/lib/notifications'
 
 interface User {
   id: string
@@ -111,6 +114,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true)
+      
+      // First authenticate with Firebase
+      const firebaseUser = await firebaseAuthService.signIn(email, password)
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
@@ -131,6 +138,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       
       setUser(data.user)
+      
+      // Set up analytics and notifications for the user
+      analyticsService.setUser(data.user.id, {
+        email: data.user.email,
+        first_name: data.user.first_name,
+        last_name: data.user.last_name,
+        ibs_type: data.user.ibs_type,
+      })
+      
+      // Initialize notifications
+      await notificationService.requestPermission()
+      
+      // Track login event
+      analyticsService.trackUserAction('login', 'authentication', 'success')
+      
       toast.success('Login successful!')
       
       // Check onboarding status after login
@@ -145,6 +167,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }, 100)
     } catch (error: any) {
+      // Track failed login
+      analyticsService.trackUserAction('login', 'authentication', 'failed')
       toast.error(error.message || 'Login failed')
       throw error
     } finally {
@@ -160,6 +184,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const nameParts = fullName.trim().split(' ')
       const firstName = nameParts[0] || ''
       const lastName = nameParts.slice(1).join(' ') || ''
+      
+      // First register with Firebase
+      const firebaseUser = await firebaseAuthService.signUp(email, password)
       
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
@@ -187,6 +214,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       
       setUser(data.user)
+      
+      // Set up analytics for new user
+      analyticsService.setUser(data.user.id, {
+        email: data.user.email,
+        first_name: data.user.first_name,
+        last_name: data.user.last_name,
+        registration_date: new Date().toISOString(),
+      })
+      
+      // Track registration event
+      analyticsService.trackUserAction('register', 'authentication', 'success')
+      
       toast.success('Registration successful!')
       
       // After registration, always redirect to onboarding
@@ -194,6 +233,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         router.push('/onboarding')
       }, 100)
     } catch (error: any) {
+      // Track failed registration
+      analyticsService.trackUserAction('register', 'authentication', 'failed')
       toast.error(error.message || 'Registration failed')
       throw error
     } finally {
@@ -203,6 +244,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     try {
+      // Track logout event before clearing user data
+      if (user) {
+        analyticsService.trackUserAction('logout', 'authentication', 'success')
+      }
+      
       if (typeof window !== 'undefined') {
         const token = localStorage.getItem('access_token')
         if (token) {
@@ -214,6 +260,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           })
         }
       }
+      
+      // Sign out from Firebase
+      await firebaseAuthService.signOut()
+      
     } catch (error) {
       console.error('Logout error:', error)
     } finally {

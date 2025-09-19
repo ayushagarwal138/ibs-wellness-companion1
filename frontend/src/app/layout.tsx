@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "../styles/globals.css";
+import { ClientSessionProvider } from "@/components/providers/session-provider";
 import { AuthProvider } from "@/contexts/auth-context";
 import { Toaster } from "react-hot-toast";
+import AnalyticsProvider from "@/components/analytics/AnalyticsProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,8 +21,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          {children}
+        <ClientSessionProvider>
+          <AuthProvider>
+            <AnalyticsProvider>
+              {children}
+            </AnalyticsProvider>
+          </AuthProvider>
           <Toaster 
             position="top-right"
             toastOptions={{
@@ -45,7 +51,7 @@ export default function RootLayout({
               },
             }}
           />
-        </AuthProvider>
+        </ClientSessionProvider>
       </body>
     </html>
   );
