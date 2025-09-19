@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProfileDropdown } from '@/components/ui/profile-dropdown';
-import { Heart, BarChart3, PlusCircle, Calendar, Bell, MessageCircle } from 'lucide-react';
+import { Heart, BarChart3, PlusCircle, Calendar, Bell, MessageCircle, User } from 'lucide-react';
 
 interface DashboardHeaderProps {
   title?: string;
@@ -25,6 +25,12 @@ export function DashboardHeader({
       href: '/dashboard',
       icon: BarChart3,
       active: pathname === '/dashboard',
+    },
+    {
+      name: 'Profile',
+      href: '/profile',
+      icon: User,
+      active: pathname === '/profile' || pathname.startsWith('/profile/'),
     },
     {
       name: 'Log Symptoms',

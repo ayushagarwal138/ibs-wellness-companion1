@@ -54,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
-  const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'
+  const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8001'
 
   // Ensure component is mounted before accessing localStorage
   useEffect(() => {

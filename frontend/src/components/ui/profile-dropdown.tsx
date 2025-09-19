@@ -3,10 +3,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export function ProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
+  const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -86,23 +88,23 @@ export function ProfileDropdown() {
             <button
               onClick={() => {
                 setIsOpen(false);
-                // TODO: Navigate to profile settings
+                router.push('/profile/settings');
               }}
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200"
             >
-              <User className="w-4 h-4 mr-3" />
+              <Settings className="w-4 h-4 mr-3" />
               Profile Settings
             </button>
 
             <button
               onClick={() => {
                 setIsOpen(false);
-                // TODO: Navigate to account settings
+                window.location.href = '/profile';
               }}
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200"
             >
               <Settings className="w-4 h-4 mr-3" />
-              Account Settings
+              View Profile
             </button>
           </div>
 

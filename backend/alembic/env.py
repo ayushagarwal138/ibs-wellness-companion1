@@ -12,22 +12,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 # Import our models and settings
 from app.core.config import settings
-from app.models import *  # This imports all our models
-
-# Import Base separately to avoid async engine issues
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import MetaData
-
-class Base(DeclarativeBase):
-    metadata = MetaData(
-        naming_convention={
-            "ix": "ix_%(column_0_label)s",
-            "uq": "uq_%(table_name)s_%(column_0_name)s",
-            "ck": "ck_%(table_name)s_%(constraint_name)s",
-            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-            "pk": "pk_%(table_name)s"
-        }
-    )
+from app.models.user import User  # Import specific models to avoid async issues
+from app.core.database import Base  # Import the actual Base from database
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -82,9 +68,14 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    # Use synchronous engine for alembic
+    from sqlalchemy import create_engine
+    
+    # Convert async URL to sync URL for alembic
+    sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+    
+    connectable = create_engine(
+        sync_url,
         poolclass=pool.NullPool,
     )
 

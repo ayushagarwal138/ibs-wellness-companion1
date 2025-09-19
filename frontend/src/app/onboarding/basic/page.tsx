@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import OnboardingQuestionnaire from '@/components/onboarding/onboarding-questionnaire';
 
-export default function OnboardingPage() {
+export default function BasicOnboardingPage() {
   const { user, loading, checkOnboardingStatus } = useAuth();
   const router = useRouter();
 
@@ -42,10 +42,10 @@ export default function OnboardingPage() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome to IBS Wellness Companion
+              Basic Information
             </h1>
             <p className="text-lg text-gray-600">
-              Let's personalize your experience with a quick questionnaire
+              Tell us about yourself to get started
             </p>
           </div>
           

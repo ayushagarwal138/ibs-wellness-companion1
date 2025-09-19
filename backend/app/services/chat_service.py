@@ -9,8 +9,9 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, select
 
 from app.models.user import User
 from app.models.chat import ChatSession, ChatMessage
@@ -27,7 +28,7 @@ from app.core.logging import StructuredLogger
 class ChatService:
     """Service for managing IBS chatbot conversations."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.ibs_detection = IBSDetectionService(db)
         self.recommendation_service = RecommendationService(db)
@@ -48,7 +49,7 @@ class ChatService:
             "How are your symptoms affecting your daily activities?"
         ]
     
-    def create_session(self, user: User, title: Optional[str] = None) -> ChatSessionResponse:
+    async def create_session(self, user: User, title: Optional[str] = None) -> ChatSessionResponse:
         """Create a new chat session for the user."""
         session_data = ChatSessionCreate(
             title=title or f"Chat Session - {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
@@ -66,42 +67,42 @@ class ChatService:
         )
         
         self.db.add(db_session)
-        self.db.commit()
-        self.db.refresh(db_session)
+        await self.db.commit()
+        await self.db.refresh(db_session)
         
         # Send welcome message
         welcome_message = self._get_welcome_message(user)
-        self._add_system_message(db_session.id, user.id, welcome_message)
+        await self._add_system_message(db_session.id, user.id, welcome_message)
         
         return ChatSessionResponse(
-            id=db_session.id,
-            user_id=db_session.user_id,
+            id=str(db_session.id),
+            user_id=str(db_session.user_id),
             title=db_session.title,
             started_at=db_session.started_at,
             ended_at=db_session.ended_at,
             is_active=db_session.is_active,
             metadata=db_session.session_metadata,
-            created_at=db_session.created_at
+            created_at=db_session.created_at or db_session.started_at
         )
     
-    def send_message(self, user: User, session_id: str, message: str, 
+    async def send_message(self, user: User, session_id: str, message: str, 
                     include_assessment: bool = True) -> ChatbotResponse:
         """Process user message and generate chatbot response."""
         
         # Get or create session
-        session = self._get_or_create_session(user, session_id)
+        session = await self._get_or_create_session(user, session_id)
         
         # Store user message
-        user_message = self._add_user_message(session.id, user.id, message)
+        user_message = await self._add_user_message(session.id, user.id, message)
         
         # Get conversation context
-        context = self._build_conversation_context(user, session.id)
+        context = await self._build_conversation_context(user, session.id)
         
         # Generate response based on message content and context
-        response_data = self._generate_response(user, message, context, include_assessment)
+        response_data = await self._generate_response(user, message, context, include_assessment)
         
         # Store assistant response
-        assistant_message = self._add_assistant_message(
+        assistant_message = await self._add_assistant_message(
             session.id, user.id, response_data["message"], response_data.get("metadata", {})
         )
         
@@ -117,14 +118,17 @@ class ChatService:
             followup_questions=response_data.get("followup_questions", [])
         )
     
-    def get_session_history(self, user: User, session_id: str, limit: int = 50) -> List[ChatMessageResponse]:
+    async def get_session_history(self, user: User, session_id: str, limit: int = 50) -> List[ChatMessageResponse]:
         """Get chat history for a session."""
-        messages = self.db.query(ChatMessage).filter(
+        stmt = select(ChatMessage).filter(
             and_(
                 ChatMessage.session_id == session_id,
                 ChatMessage.user_id == user.id
             )
-        ).order_by(ChatMessage.sent_at).limit(limit).all()
+        ).order_by(ChatMessage.sent_at).limit(limit)
+        
+        result = await self.db.execute(stmt)
+        messages = result.scalars().all()
         
         return [
             ChatMessageResponse(
@@ -140,11 +144,14 @@ class ChatService:
             for msg in messages
         ]
     
-    def get_user_sessions(self, user: User, limit: int = 20) -> List[ChatSessionResponse]:
+    async def get_user_sessions(self, user: User, limit: int = 20) -> List[ChatSessionResponse]:
         """Get user's chat sessions."""
-        sessions = self.db.query(ChatSession).filter(
+        stmt = select(ChatSession).filter(
             ChatSession.user_id == user.id
-        ).order_by(desc(ChatSession.started_at)).limit(limit).all()
+        ).order_by(desc(ChatSession.started_at)).limit(limit)
+        
+        result = await self.db.execute(stmt)
+        sessions = result.scalars().all()
         
         return [
             ChatSessionResponse(
@@ -160,56 +167,62 @@ class ChatService:
             for session in sessions
         ]
     
-    def _get_or_create_session(self, user: User, session_id: Optional[str]) -> ChatSession:
+    async def _get_or_create_session(self, user: User, session_id: Optional[str]) -> ChatSession:
         """Get existing session or create new one."""
         if session_id:
-            session = self.db.query(ChatSession).filter(
+            stmt = select(ChatSession).filter(
                 and_(
                     ChatSession.id == session_id,
                     ChatSession.user_id == user.id,
                     ChatSession.is_active == True
                 )
-            ).first()
+            )
+            result = await self.db.execute(stmt)
+            session = result.scalar_one_or_none()
             
             if session:
                 return session
         
         # Create new session
-        session_response = self.create_session(user)
-        return self.db.query(ChatSession).filter(ChatSession.id == session_response.id).first()
+        session_response = await self.create_session(user)
+        stmt = select(ChatSession).filter(ChatSession.id == session_response.id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one()
     
-    def _build_conversation_context(self, user: User, session_id: str) -> ConversationContext:
+    async def _build_conversation_context(self, user: User, session_id: str) -> ConversationContext:
         """Build conversation context from user data and chat history."""
         
         # Get recent symptoms (last 30 days)
-        recent_symptoms = self._get_recent_user_data(user.id, "symptoms", 30)
+        recent_symptoms = await self._get_recent_user_data(user.id, "symptoms", 30)
         
         # Get recent food reactions (last 30 days)
-        recent_foods = self._get_recent_user_data(user.id, "food_reactions", 30)
+        recent_foods = await self._get_recent_user_data(user.id, "food_reactions", 30)
         
         # Get recent medications (last 30 days)
-        recent_medications = self._get_recent_user_data(user.id, "medications", 30)
+        recent_medications = await self._get_recent_user_data(user.id, "medications", 30)
         
         # Get conversation history (last 10 messages)
-        messages = self.db.query(ChatMessage).filter(
+        stmt = select(ChatMessage).filter(
             ChatMessage.session_id == session_id
-        ).order_by(desc(ChatMessage.sent_at)).limit(10).all()
+        ).order_by(desc(ChatMessage.sent_at)).limit(10)
+        result = await self.db.execute(stmt)
+        messages = result.scalars().all()
         
         conversation_history = [msg.content for msg in reversed(messages)]
         
         # Get previous assessments
-        previous_assessments = self._get_previous_assessments(user.id)
+        previous_assessments = await self._get_previous_assessments(user.id)
         
         return ConversationContext(
             recent_symptoms=recent_symptoms,
             recent_foods=recent_foods,
             recent_medications=recent_medications,
-            user_preferences=self._get_user_preferences(user),
+            user_preferences=await self._get_user_preferences(user),
             previous_assessments=previous_assessments,
             conversation_history=conversation_history
         )
     
-    def _generate_response(self, user: User, message: str, context: ConversationContext, 
+    async def _generate_response(self, user: User, message: str, context: ConversationContext, 
                          include_assessment: bool) -> Dict[str, Any]:
         """Generate chatbot response based on message and context."""
         
@@ -524,7 +537,7 @@ class ChatService:
         name = user.first_name or "there"
         return f"Hello {name}! I'm your IBS wellness assistant. I can help you understand your symptoms, identify triggers, and provide personalized recommendations. How can I help you today?"
     
-    def _add_user_message(self, session_id: str, user_id: str, content: str) -> ChatMessage:
+    async def _add_user_message(self, session_id: str, user_id: str, content: str) -> ChatMessage:
         """Add user message to database."""
         message = ChatMessage(
             id=str(uuid.uuid4()),
@@ -536,11 +549,11 @@ class ChatService:
         )
         
         self.db.add(message)
-        self.db.commit()
-        self.db.refresh(message)
+        await self.db.commit()
+        await self.db.refresh(message)
         return message
     
-    def _add_assistant_message(self, session_id: str, user_id: str, content: str, metadata: Dict = None) -> ChatMessage:
+    async def _add_assistant_message(self, session_id: str, user_id: str, content: str, metadata: Dict = None) -> ChatMessage:
         """Add assistant message to database."""
         message = ChatMessage(
             id=str(uuid.uuid4()),
@@ -553,11 +566,11 @@ class ChatService:
         )
         
         self.db.add(message)
-        self.db.commit()
-        self.db.refresh(message)
+        await self.db.commit()
+        await self.db.refresh(message)
         return message
     
-    def _add_system_message(self, session_id: str, user_id: str, content: str) -> ChatMessage:
+    async def _add_system_message(self, session_id: str, user_id: str, content: str) -> ChatMessage:
         """Add system message to database."""
         message = ChatMessage(
             id=str(uuid.uuid4()),
@@ -569,26 +582,26 @@ class ChatService:
         )
         
         self.db.add(message)
-        self.db.commit()
-        self.db.refresh(message)
+        await self.db.commit()
+        await self.db.refresh(message)
         return message
     
-    def _get_recent_user_data(self, user_id: str, data_type: str, days: int) -> List[Dict[str, Any]]:
+    async def _get_recent_user_data(self, user_id: str, data_type: str, days: int) -> List[Dict[str, Any]]:
         """Get recent user data for context building."""
         # This would query the appropriate tables based on data_type
         # For now, return empty list - would be implemented based on actual models
         return []
     
-    def _get_previous_assessments(self, user_id: str) -> List[IBSAssessment]:
+    async def _get_previous_assessments(self, user_id: str) -> List[IBSAssessment]:
         """Get previous IBS assessments for the user."""
         # This would query stored assessments
         # For now, return empty list
         return []
     
-    def _get_user_preferences(self, user: User) -> Dict[str, Any]:
+    async def _get_user_preferences(self, user: User) -> Dict[str, Any]:
         """Get user preferences for personalization."""
         return {
             "dietary_restrictions": [],
             "preferred_communication_style": "detailed",
-            "focus_areas": ["diet", "symptoms"]
+            "notification_preferences": {}
         }

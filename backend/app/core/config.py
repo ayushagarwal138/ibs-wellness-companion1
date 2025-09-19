@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8001,http://127.0.0.1:8001"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1"
     
     @property
@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     
     # ChromaDB
     CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8000
+    CHROMA_PORT: int = 8001
     CHROMA_COLLECTION_NAME: str = "ibs_knowledge"
     
     # File Upload

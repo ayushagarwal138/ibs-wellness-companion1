@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useRouter } from 'next/navigation';
 import { 
   Brain, 
   Shield, 
@@ -68,25 +69,37 @@ export function ProfilePreview({
   predictions, 
   completionPercentage = 0 
 }: ProfilePreviewProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [profilePredictions, setProfilePredictions] = useState<ProfilePredictions | null>(predictions || null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (onboardingData && !predictions) {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && onboardingData && !predictions) {
       generatePredictions();
     }
-  }, [onboardingData, predictions]);
+  }, [onboardingData, predictions, isClient]);
 
   const generatePredictions = async () => {
-    if (!onboardingData) return;
+    if (!onboardingData || !isClient) return;
     
     setIsLoading(true);
     try {
-      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8001'}/api/v1/onboarding/predictions`, {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      if (!token) {
+        console.error('No access token found');
+        return;
+      }
+
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/onboarding/predictions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(onboardingData)
       });
@@ -390,11 +403,11 @@ export function ProfilePreview({
 
       {/* Action Buttons */}
       <div className="flex gap-3 pt-4">
-        <Button onClick={() => window.location.href = '/dashboard'} className="flex-1">
+        <Button onClick={() => router.push('/dashboard')} className="flex-1">
           <BarChart3 className="h-4 w-4 mr-2" />
           View Dashboard
         </Button>
-        <Button variant="outline" onClick={() => window.location.href = '/onboarding'} className="flex-1">
+        <Button variant="outline" onClick={() => router.push('/onboarding')} className="flex-1">
           <User className="h-4 w-4 mr-2" />
           Update Profile
         </Button>

@@ -43,7 +43,7 @@ async def create_chat_session(
         The created chat session
     """
     chat_service = ChatService(db)
-    return chat_service.create_session(current_user, session_data.title)
+    return await chat_service.create_session(current_user, session_data.title)
 
 
 @router.get("/sessions", response_model=ChatSessionList)
@@ -64,7 +64,7 @@ async def get_user_chat_sessions(
         List of user's chat sessions
     """
     chat_service = ChatService(db)
-    sessions = chat_service.get_user_sessions(current_user, limit)
+    sessions = await chat_service.get_user_sessions(current_user, limit)
     
     return ChatSessionList(
         sessions=sessions,
@@ -94,7 +94,7 @@ async def get_chat_session(
     chat_service = ChatService(db)
     
     # Verify session belongs to user
-    sessions = chat_service.get_user_sessions(current_user, 1000)  # Get all sessions
+    sessions = await chat_service.get_user_sessions(current_user, 1000)  # Get all sessions
     session = next((s for s in sessions if s.id == session_id), None)
     
     if not session:
@@ -131,7 +131,7 @@ async def send_message(
     effective_session_id = message_data.session_id or session_id
     
     try:
-        response = chat_service.send_message(
+        response = await chat_service.send_message(
             user=current_user,
             session_id=effective_session_id,
             message=message_data.message,
@@ -203,7 +203,7 @@ async def get_session_messages(
     chat_service = ChatService(db)
     
     try:
-        messages = chat_service.get_session_history(current_user, session_id, limit)
+        messages = await chat_service.get_session_history(current_user, session_id, limit)
         
         return ChatMessageList(
             messages=messages,
@@ -260,7 +260,7 @@ async def get_user_chat_stats(
     chat_service = ChatService(db)
     
     # Get user sessions to calculate stats
-    sessions = chat_service.get_user_sessions(current_user, 1000)
+    sessions = await chat_service.get_user_sessions(current_user, 1000)
     
     total_sessions = len(sessions)
     total_messages = 0

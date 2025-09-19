@@ -182,14 +182,14 @@ export default function SymptomLogForm({ onSuccess, onCancel }: SymptomLogFormPr
           <div className="space-y-3">
             <Label className="text-base font-medium">Bristol Stool Type (if applicable)</Label>
             <Select
-              value={formData.bristol_stool_type?.toString() || ''}
-              onValueChange={(value) => handleInputChange('bristol_stool_type', value ? parseInt(value) as BristolStoolType : undefined)}
+              value={formData.bristol_stool_type?.toString() || 'not_applicable'}
+              onValueChange={(value) => handleInputChange('bristol_stool_type', value === 'not_applicable' ? undefined : parseInt(value) as BristolStoolType)}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select stool type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Not applicable</SelectItem>
+                <SelectItem value="not_applicable">Not applicable</SelectItem>
                 <SelectItem value="1">Type 1 - Separate hard lumps</SelectItem>
                 <SelectItem value="2">Type 2 - Lumpy sausage</SelectItem>
                 <SelectItem value="3">Type 3 - Cracked sausage</SelectItem>
@@ -229,14 +229,14 @@ export default function SymptomLogForm({ onSuccess, onCancel }: SymptomLogFormPr
             <div className="space-y-2">
               <Label htmlFor="pain-type">Pain Type</Label>
               <Select
-                value={formData.pain_type || ''}
-                onValueChange={(value) => handleInputChange('pain_type', value)}
+                value={formData.pain_type || 'no_pain'}
+                onValueChange={(value) => handleInputChange('pain_type', value === 'no_pain' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select pain type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No pain</SelectItem>
+                  <SelectItem value="no_pain">No pain</SelectItem>
                   <SelectItem value="cramping">Cramping</SelectItem>
                   <SelectItem value="sharp">Sharp</SelectItem>
                   <SelectItem value="dull">Dull ache</SelectItem>

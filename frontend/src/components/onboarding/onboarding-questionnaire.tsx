@@ -165,7 +165,7 @@ export default function OnboardingQuestionnaire() {
     setIsLoading(true);
     try {
       // Call backend ML prediction endpoint
-      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8001'}/api/v1/onboarding/predictions`, {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/onboarding/predictions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,7 +216,7 @@ export default function OnboardingQuestionnaire() {
     setIsLoading(true);
     try {
       // Save onboarding data to backend
-      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8001'}/api/v1/users/onboarding`, {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/users/onboarding`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

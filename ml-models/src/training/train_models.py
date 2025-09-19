@@ -55,52 +55,64 @@ class ModelTrainer:
         
         self.training_results = {}
         
-    def train_all_models(self, use_synthetic_data: bool = True, 
+    def train_all_models(self, data: pd.DataFrame = None, use_synthetic_data: bool = False, 
                         db_connection=None, n_synthetic_users: int = 500) -> Dict[str, Any]:
         """
-        Train all ML models.
+        Train all IBS models with enhanced features including microbiome and psychological insights.
         
         Args:
-            use_synthetic_data: Whether to use synthetic data for training
-            db_connection: Database connection (if using real data)
+            data: Pre-prepared training data (if provided, use_synthetic_data is ignored)
+            use_synthetic_data: Whether to generate synthetic data
+            db_connection: Database connection for real data
             n_synthetic_users: Number of synthetic users to generate
             
         Returns:
-            Dictionary with training results for all models
+            Dictionary containing training results and model performance metrics
         """
-        logger.info("Starting comprehensive model training...")
+        logger.info("Starting comprehensive model training with enhanced features...")
         
-        # Step 1: Prepare data
-        if use_synthetic_data:
-            logger.info("Using synthetic data for training")
-            raw_data = self.data_preparator.create_synthetic_data(
-                n_users=n_synthetic_users, 
-                days_per_user=90
-            )
+        # Step 1: Prepare enhanced training data
+        logger.info("Preparing enhanced training data with microbiome and psychological features...")
+        if data is not None:
+            # Use provided data
+            training_data = data
+        elif use_synthetic_data:
+            training_data = self.data_preparator.create_synthetic_data(n_users=n_synthetic_users)
+            training_data = self.data_preparator.prepare_training_data(training_data)
         else:
+            # Load real data from database
             if db_connection is None:
-                raise ValueError("Database connection required for real data")
-            logger.info("Loading data from database")
-            raw_data = self.data_preparator.load_data_from_db(db_connection)
+                from training.database import get_database_connection
+                db = get_database_connection()
+                db_connection = db.get_connection()
             
-        # Prepare training data
-        training_data = self.data_preparator.prepare_training_data(raw_data)
+            raw_data = self.data_preparator.load_data_from_db(db_connection)
+            training_data = self.data_preparator.prepare_training_data(raw_data)
+            
+        # Validate data quality
+        quality_metrics = self.data_preparator.validate_data_quality(training_data)
+        logger.info(f"Data quality validation: {len(training_data)} records, "
+                   f"{len(training_data.columns)} features")
         
-        # Split data
-        train_data, val_data, test_data = self.data_preparator.split_data(training_data)
+        # Split data with stratification for better representation
+        train_data, val_data, test_data = self.data_preparator.split_data(
+            training_data, test_size=0.2, validation_size=0.1
+        )
         
-        # Step 2: Train individual models
-        logger.info("Training severity classifier...")
-        severity_results = self._train_severity_classifier(train_data, val_data, test_data)
+        logger.info(f"Data split - Train: {len(train_data)}, Val: {len(val_data)}, Test: {len(test_data)}")
         
-        logger.info("Training flare-up predictor...")
-        flareup_results = self._train_flareup_predictor(train_data, val_data, test_data)
+        # Step 2: Train models with enhanced features
+        logger.info("Training severity classifier with microbiome and psychological features...")
+        severity_results = self._train_severity_classifier_enhanced(train_data, val_data, test_data)
         
-        logger.info("Training recommendation engine...")
-        recommendation_results = self._train_recommendation_engine(train_data, val_data, test_data)
+        logger.info("Training flare-up predictor with temporal and composite features...")
+        flareup_results = self._train_flareup_predictor_enhanced(train_data, val_data, test_data)
         
-        # Step 3: Evaluate models
-        logger.info("Evaluating all models...")
+        logger.info("Training recommendation engine with personalized sensitivity profiles...")
+        recommendation_results = self._train_recommendation_engine_enhanced(train_data, val_data, test_data)
+        
+        # Step 3: Enhanced model evaluation
+        logger.info("Performing comprehensive model evaluation...")
         evaluation_results = self.evaluator.evaluate_all_models(
             {
                 'severity_classifier': self.severity_classifier,
@@ -110,94 +122,213 @@ class ModelTrainer:
             test_data
         )
         
-        # Step 4: Save models and results
+        # Step 4: Feature importance analysis
+        feature_importance = self._analyze_feature_importance(train_data)
+        
+        # Step 5: Save models and comprehensive results
         self._save_all_models()
         self._save_training_results({
             'severity_classifier': severity_results,
             'flareup_predictor': flareup_results,
             'recommendation_engine': recommendation_results,
             'evaluation': evaluation_results,
+            'feature_importance': feature_importance,
+            'data_quality': quality_metrics,
             'data_info': {
                 'n_samples': len(training_data),
                 'n_features': len(training_data.columns),
                 'train_size': len(train_data),
                 'val_size': len(val_data),
-                'test_size': len(test_data)
+                'test_size': len(test_data),
+                'enhanced_features': [
+                    'microbiome_diversity', 'beneficial_bacteria_pct', 'pathogenic_bacteria_pct',
+                    'anxiety_score', 'depression_score', 'psychological_distress',
+                    'dietary_sensitivity_score', 'microbiome_health_score'
+                ]
             }
         })
         
-        logger.info("Model training completed successfully!")
+        logger.info("Enhanced model training completed successfully!")
+        logger.info(f"Key improvements: Microbiome features, psychological profiling, "
+                   f"temporal patterns, and personalized sensitivity analysis")
+        
         return self.training_results
         
-    def _train_severity_classifier(self, train_data: pd.DataFrame, 
-                                 val_data: pd.DataFrame, 
-                                 test_data: pd.DataFrame) -> Dict[str, Any]:
-        """Train the IBS severity classifier."""
+    def _train_severity_classifier_enhanced(self, train_data: pd.DataFrame, 
+                                          val_data: pd.DataFrame, 
+                                          test_data: pd.DataFrame) -> Dict[str, Any]:
+        """Train the IBS severity classifier with enhanced microbiome and psychological features."""
         try:
+            # Enhanced training with new features
             results = self.severity_classifier.train(train_data)
             
-            # Validate on validation set
+            # Validate on validation set with enhanced metrics
             val_predictions = []
+            val_confidences = []
+            
             for _, row in val_data.iterrows():
                 pred = self.severity_classifier.predict_severity(row.to_dict())
                 val_predictions.append(pred)
+                val_confidences.append(pred.get('confidence', 0.5))
                 
+            # Calculate enhanced validation metrics
             results['validation_accuracy'] = sum(
                 1 for i, pred in enumerate(val_predictions) 
                 if abs(pred['severity_score'] - val_data.iloc[i]['severity_score']) < 1
             ) / len(val_predictions)
             
-            logger.info(f"Severity classifier training completed. Accuracy: {results.get('accuracy', 'N/A')}")
+            results['validation_confidence'] = np.mean(val_confidences)
+            
+            # Feature importance for microbiome and psychological features
+            if hasattr(self.severity_classifier, 'get_feature_importance'):
+                feature_importance = self.severity_classifier.get_feature_importance()
+                results['microbiome_feature_importance'] = {
+                    k: v for k, v in feature_importance.items() 
+                    if any(term in k.lower() for term in ['microbiome', 'bacteria', 'diversity'])
+                }
+                results['psychological_feature_importance'] = {
+                    k: v for k, v in feature_importance.items() 
+                    if any(term in k.lower() for term in ['anxiety', 'depression', 'stress', 'psychological'])
+                }
+            
+            logger.info(f"Enhanced severity classifier training completed. "
+                       f"Accuracy: {results.get('accuracy', 'N/A')}, "
+                       f"Validation Confidence: {results.get('validation_confidence', 'N/A'):.3f}")
             return results
             
         except Exception as e:
-            logger.error(f"Error training severity classifier: {e}")
+            logger.error(f"Error training enhanced severity classifier: {e}")
             return {'error': str(e)}
             
-    def _train_flareup_predictor(self, train_data: pd.DataFrame, 
-                               val_data: pd.DataFrame, 
-                               test_data: pd.DataFrame) -> Dict[str, Any]:
-        """Train the flare-up predictor."""
+    def _train_flareup_predictor_enhanced(self, train_data: pd.DataFrame, 
+                                        val_data: pd.DataFrame, 
+                                        test_data: pd.DataFrame) -> Dict[str, Any]:
+        """Train the flare-up predictor with enhanced temporal and composite features."""
         try:
+            # Enhanced training with temporal patterns and composite features
             results = self.flareup_predictor.train(train_data)
             
-            # Validate on validation set
+            # Validate on validation set with enhanced metrics
             val_predictions = []
+            val_risk_scores = []
+            
             for _, row in val_data.iterrows():
                 pred = self.flareup_predictor.predict_flareup_risk(row.to_dict())
                 val_predictions.append(pred)
+                val_risk_scores.append(pred.get('risk_score', 0.5))
                 
             results['validation_auc'] = self._calculate_validation_auc(val_predictions, val_data)
+            results['validation_risk_distribution'] = {
+                'mean': np.mean(val_risk_scores),
+                'std': np.std(val_risk_scores),
+                'high_risk_percentage': sum(1 for score in val_risk_scores if score > 0.7) / len(val_risk_scores)
+            }
             
-            logger.info(f"Flare-up predictor training completed. ROC-AUC: {results.get('roc_auc', 'N/A')}")
+            # Analyze temporal feature importance
+            if hasattr(self.flareup_predictor, 'get_feature_importance'):
+                feature_importance = self.flareup_predictor.get_feature_importance()
+                results['temporal_feature_importance'] = {
+                    k: v for k, v in feature_importance.items() 
+                    if any(term in k.lower() for term in ['rolling', 'lag', 'trend', 'temporal'])
+                }
+            
+            logger.info(f"Enhanced flare-up predictor training completed. "
+                       f"ROC-AUC: {results.get('roc_auc', 'N/A')}, "
+                       f"Validation AUC: {results.get('validation_auc', 'N/A'):.3f}")
             return results
             
         except Exception as e:
-            logger.error(f"Error training flare-up predictor: {e}")
+            logger.error(f"Error training enhanced flare-up predictor: {e}")
             return {'error': str(e)}
             
-    def _train_recommendation_engine(self, train_data: pd.DataFrame, 
-                                   val_data: pd.DataFrame, 
-                                   test_data: pd.DataFrame) -> Dict[str, Any]:
-        """Train the recommendation engine."""
+    def _train_recommendation_engine_enhanced(self, train_data: pd.DataFrame, 
+                                            val_data: pd.DataFrame, 
+                                            test_data: pd.DataFrame) -> Dict[str, Any]:
+        """Train the recommendation engine with personalized sensitivity profiles."""
         try:
+            # Enhanced training with personalized sensitivity analysis
             results = self.recommendation_engine.train(train_data)
             
-            # Validate on validation set
+            # Validate on validation set with personalized metrics
             val_recommendations = []
+            personalization_scores = []
+            
             for _, row in val_data.iterrows():
                 rec = self.recommendation_engine.generate_recommendations(row.to_dict())
                 val_recommendations.append(rec)
                 
+                # Calculate personalization score based on user-specific features
+                user_features = ['fodmap_sensitivity', 'gluten_sensitivity', 'lactose_sensitivity', 
+                               'microbiome_diversity', 'anxiety_score', 'depression_score']
+                personalization_score = sum(1 for feature in user_features if feature in rec.get('factors', []))
+                personalization_scores.append(personalization_score / len(user_features))
+                
             results['validation_recommendations'] = len(val_recommendations)
+            results['personalization_score'] = np.mean(personalization_scores)
             
-            logger.info(f"Recommendation engine training completed. R²: {results.get('diet_model_r2', 'N/A')}")
+            # Analyze recommendation diversity and coverage
+            all_recommendations = [rec.get('recommendations', []) for rec in val_recommendations]
+            unique_recommendations = set()
+            for rec_list in all_recommendations:
+                unique_recommendations.update(rec_list)
+                
+            results['recommendation_diversity'] = len(unique_recommendations)
+            results['average_recommendations_per_user'] = np.mean([len(rec) for rec in all_recommendations])
+            
+            logger.info(f"Enhanced recommendation engine training completed. "
+                       f"R²: {results.get('diet_model_r2', 'N/A')}, "
+                       f"Personalization Score: {results.get('personalization_score', 'N/A'):.3f}")
             return results
             
         except Exception as e:
-            logger.error(f"Error training recommendation engine: {e}")
+            logger.error(f"Error training enhanced recommendation engine: {e}")
             return {'error': str(e)}
             
+    def _analyze_feature_importance(self, train_data: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze feature importance across all models to understand key predictors."""
+        try:
+            feature_analysis = {
+                'microbiome_features': {},
+                'psychological_features': {},
+                'temporal_features': {},
+                'dietary_features': {},
+                'top_predictors': {}
+            }
+            
+            # Analyze features by category
+            microbiome_cols = [col for col in train_data.columns 
+                             if any(term in col.lower() for term in ['microbiome', 'bacteria', 'diversity'])]
+            psychological_cols = [col for col in train_data.columns 
+                                if any(term in col.lower() for term in ['anxiety', 'depression', 'stress', 'psychological'])]
+            temporal_cols = [col for col in train_data.columns 
+                           if any(term in col.lower() for term in ['rolling', 'lag', 'trend', 'temporal'])]
+            dietary_cols = [col for col in train_data.columns 
+                          if any(term in col.lower() for term in ['fodmap', 'gluten', 'lactose', 'dietary'])]
+            
+            # Calculate feature statistics
+            for category, cols in [
+                ('microbiome_features', microbiome_cols),
+                ('psychological_features', psychological_cols),
+                ('temporal_features', temporal_cols),
+                ('dietary_features', dietary_cols)
+            ]:
+                if cols:
+                    feature_analysis[category] = {
+                        'count': len(cols),
+                        'correlation_with_severity': train_data[cols + ['severity_score']].corr()['severity_score'].drop('severity_score').to_dict(),
+                        'variance': train_data[cols].var().to_dict()
+                    }
+            
+            logger.info(f"Feature importance analysis completed: "
+                       f"{len(microbiome_cols)} microbiome, {len(psychological_cols)} psychological, "
+                       f"{len(temporal_cols)} temporal, {len(dietary_cols)} dietary features")
+            
+            return feature_analysis
+            
+        except Exception as e:
+            logger.error(f"Error in feature importance analysis: {e}")
+            return {'error': str(e)}
+
     def _calculate_validation_auc(self, predictions: list, val_data: pd.DataFrame) -> float:
         """Calculate AUC for validation predictions."""
         try:

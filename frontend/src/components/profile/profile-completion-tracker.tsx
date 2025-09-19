@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 import { 
   CheckCircle, 
   Circle, 
@@ -47,6 +49,8 @@ export function ProfileCompletionTracker({
   onSectionComplete,
   className = ""
 }: ProfileCompletionTrackerProps) {
+  const { user, loading, checkOnboardingStatus } = useAuth();
+  const router = useRouter();
   const [profileSections, setProfileSections] = useState<ProfileSection[]>([
     {
       id: 'basic-info',
@@ -56,7 +60,7 @@ export function ProfileCompletionTracker({
       completed: false,
       required: true,
       estimatedTime: '2 min',
-      route: '/onboarding/basic',
+      route: '/profile/basic-info',
       weight: 15
     },
     {
@@ -67,7 +71,7 @@ export function ProfileCompletionTracker({
       completed: false,
       required: true,
       estimatedTime: '5 min',
-      route: '/onboarding/medical',
+      route: '/profile/medical-history',
       weight: 25
     },
     {
@@ -78,7 +82,7 @@ export function ProfileCompletionTracker({
       completed: false,
       required: true,
       estimatedTime: '4 min',
-      route: '/onboarding/diet',
+      route: '/profile/dietary-preferences',
       weight: 20
     },
     {
@@ -89,7 +93,7 @@ export function ProfileCompletionTracker({
       completed: false,
       required: true,
       estimatedTime: '3 min',
-      route: '/onboarding/lifestyle',
+      route: '/profile/lifestyle-factors',
       weight: 20
     },
     {
@@ -100,7 +104,7 @@ export function ProfileCompletionTracker({
       completed: false,
       required: false,
       estimatedTime: '2 min',
-      route: '/onboarding/goals',
+      route: '/profile/goals-preferences',
       weight: 10
     },
     {
@@ -118,6 +122,7 @@ export function ProfileCompletionTracker({
 
   const [completionPercentage, setCompletionPercentage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   useEffect(() => {
     loadProfileCompletion();
@@ -125,25 +130,22 @@ export function ProfileCompletionTracker({
 
   useEffect(() => {
     calculateCompletionPercentage();
-  }, [profileSections]);
+  }, [profileSections, onboardingCompleted]);
 
   const loadProfileCompletion = async () => {
-    if (!userId) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // In a real app, this would fetch from your API
-      const response = await fetch(`/api/v1/users/${userId}/profile-completion`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        updateSectionCompletion(data.completed_sections || []);
+      // Check if onboarding is completed using the auth context
+      const isCompleted = await checkOnboardingStatus();
+      setOnboardingCompleted(isCompleted);
+      
+      if (isCompleted) {
+        // If onboarding is completed, mark all required sections as completed
+        setProfileSections(prev => 
+          prev.map(section => ({
+            ...section,
+            completed: section.required ? true : section.completed
+          }))
+        );
       }
     } catch (error) {
       console.error('Failed to load profile completion:', error);
@@ -171,10 +173,8 @@ export function ProfileCompletionTracker({
   };
 
   const handleSectionClick = (section: ProfileSection) => {
-    if (section.completed) return;
-    
-    // Navigate to the section
-    window.location.href = section.route;
+    // Navigate to the section using Next.js router for proper client-side navigation
+    router.push(section.route);
     
     // Notify parent component
     if (onSectionComplete) {
@@ -183,11 +183,7 @@ export function ProfileCompletionTracker({
   };
 
   const getCompletionStatus = () => {
-    const requiredSections = profileSections.filter(s => s.required);
-    const completedRequired = requiredSections.filter(s => s.completed).length;
-    const totalRequired = requiredSections.length;
-    
-    if (completedRequired === totalRequired) {
+    if (onboardingCompleted) {
       return {
         status: 'complete',
         message: 'Profile Complete! You\'re ready to get personalized insights.',
@@ -195,7 +191,13 @@ export function ProfileCompletionTracker({
         bgColor: 'bg-green-50',
         borderColor: 'border-green-200'
       };
-    } else if (completedRequired > 0) {
+    }
+    
+    const requiredSections = profileSections.filter(s => s.required);
+    const completedRequired = requiredSections.filter(s => s.completed).length;
+    const totalRequired = requiredSections.length;
+    
+    if (completedRequired > 0) {
       return {
         status: 'in-progress',
         message: `${completedRequired}/${totalRequired} required sections completed`,
@@ -280,7 +282,7 @@ export function ProfileCompletionTracker({
         </div>
 
         {/* Next Action */}
-        {nextSection && (
+        {!onboardingCompleted && nextSection && (
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -364,7 +366,7 @@ export function ProfileCompletionTracker({
         </div>
 
         {/* Completion Benefits */}
-        {completionPercentage < 100 && (
+        {!onboardingCompleted && completionPercentage < 100 && (
           <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
             <h4 className="font-medium text-purple-900 mb-2 flex items-center gap-2">
               <Star className="h-4 w-4" />
@@ -393,7 +395,15 @@ export function ProfileCompletionTracker({
 
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
-          {nextSection ? (
+          {onboardingCompleted ? (
+            <Button 
+              onClick={() => router.push('/profile/settings')} 
+              className="flex-1"
+            >
+              Edit Profile
+              <Settings className="h-4 w-4 ml-2" />
+            </Button>
+          ) : nextSection ? (
             <Button 
               onClick={() => handleSectionClick(nextSection)} 
               className="flex-1"
@@ -403,19 +413,21 @@ export function ProfileCompletionTracker({
             </Button>
           ) : (
             <Button 
-              onClick={() => window.location.href = '/dashboard'} 
+              onClick={() => router.push('/dashboard')} 
               className="flex-1"
             >
               View Dashboard
               <TrendingUp className="h-4 w-4 ml-2" />
             </Button>
           )}
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.href = '/profile/settings'}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          {!onboardingCompleted && (
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/profile/settings')}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { apiService, SymptomStats as ApiSymptomStats } from '@/lib/api';
+import { apiService, type SymptomStats as ApiSymptomStats } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import {
   Chart as ChartJS,
@@ -30,26 +30,12 @@ ChartJS.register(
   ArcElement
 );
 
-interface SymptomStats {
-  total_logs: number;
-  average_severity: number;
-  most_common_symptoms: string[];
-  severity_distribution: { [key: string]: number };
-  bristol_distribution: { [key: string]: number };
-  pain_locations: { [key: string]: number };
-  weekly_trends: { [key: string]: number };
-}
-
 export default function SymptomStats() {
   const [stats, setStats] = useState<ApiSymptomStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30'); // days
 
-  useEffect(() => {
-    fetchStats();
-  }, [dateRange]);
-
-  const fetchStats = async () => {
+  const fetchStats = React.useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await apiService.getSymptomStats(parseInt(dateRange));
@@ -60,7 +46,11 @@ export default function SymptomStats() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateRange]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   if (isLoading) {
     return (
@@ -91,11 +81,11 @@ export default function SymptomStats() {
 
   // Severity Distribution Chart
   const severityChartData = {
-    labels: Object.keys(stats.severity_distribution),
+    labels: Object.keys(stats?.severity_distribution || {}),
     datasets: [
       {
         label: 'Number of Logs',
-        data: Object.values(stats.severity_distribution),
+        data: Object.values(stats?.severity_distribution || {}),
         backgroundColor: [
           'rgba(34, 197, 94, 0.8)',   // Green for mild
           'rgba(251, 191, 36, 0.8)',  // Yellow for moderate
@@ -111,46 +101,52 @@ export default function SymptomStats() {
     ],
   };
 
-  // Bristol Stool Distribution Chart
+  // Bristol Stool Chart Data
   const bristolChartData = {
-    labels: Object.keys(stats.bristol_distribution).map(key => `Type ${key}`),
+    labels: Object.keys(stats?.bristol_distribution || {}),
     datasets: [
       {
-        label: 'Frequency',
-        data: Object.values(stats.bristol_distribution),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 1,
+        label: 'Bristol Stool Scale Distribution',
+        data: Object.values(stats?.bristol_distribution || {}),
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB',
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40',
+          '#FF6384',
+        ],
       },
     ],
   };
 
-  // Pain Locations Chart
+  // Pain Location Chart Data
   const painLocationChartData = {
-    labels: Object.keys(stats.pain_locations),
+    labels: Object.keys(stats?.pain_locations || {}),
     datasets: [
       {
-        data: Object.values(stats.pain_locations),
+        label: 'Pain Location Distribution',
+        data: Object.values(stats?.pain_locations || {}),
         backgroundColor: [
-          'rgba(168, 85, 247, 0.8)',
-          'rgba(236, 72, 153, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(251, 191, 36, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(59, 130, 246, 0.8)',
+          '#FF6384',
+          '#36A2EB',
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40',
         ],
-        borderWidth: 1,
       },
     ],
   };
 
   // Weekly Trends Chart
   const weeklyTrendsData = {
-    labels: Object.keys(stats.weekly_trends),
+    labels: Object.keys(stats?.weekly_trends || {}),
     datasets: [
       {
         label: 'Symptom Logs',
-        data: Object.values(stats.weekly_trends),
+        data: Object.values(stats?.weekly_trends || {}),
         borderColor: 'rgba(59, 130, 246, 1)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         tension: 0.4,
@@ -216,7 +212,7 @@ export default function SymptomStats() {
             <CardTitle className="text-sm font-medium">Average Severity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.average_severity.toFixed(1)}/3</div>
+            <div className="text-2xl font-bold">{stats?.average_severity?.toFixed(1) || 'N/A'}/3</div>
             <p className="text-xs text-gray-500">severity rating</p>
           </CardContent>
         </Card>
@@ -227,11 +223,15 @@ export default function SymptomStats() {
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
-              {stats.most_common_symptoms.slice(0, 3).map((symptom, index) => (
-                <div key={index} className="text-sm">
-                  {index + 1}. {symptom}
-                </div>
-              ))}
+              {stats?.most_common_symptoms && stats.most_common_symptoms.length > 0 ? (
+                stats.most_common_symptoms.slice(0, 3).map((symptom, index) => (
+                  <div key={symptom} className="text-sm">
+                    {index + 1}. {symptom}
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-gray-500">No data available</div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -250,24 +250,28 @@ export default function SymptomStats() {
         </Card>
 
         {/* Bristol Stool Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bristol Stool Scale Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Bar data={bristolChartData} options={chartOptions} />
-          </CardContent>
-        </Card>
+        {stats?.bristol_distribution && Object.keys(stats.bristol_distribution).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Bristol Stool Scale Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Bar data={bristolChartData} options={chartOptions} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Pain Locations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pain Locations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Doughnut data={painLocationChartData} options={doughnutOptions} />
-          </CardContent>
-        </Card>
+        {stats?.pain_locations && Object.keys(stats.pain_locations).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pain Locations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Doughnut data={painLocationChartData} options={doughnutOptions} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Weekly Trends */}
         <Card>

@@ -127,8 +127,8 @@ export default function ChatInterface({ className }: ChatInterfaceProps) {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
-          content: currentMessage,
-          include_assessment: true,
+          message: currentMessage,
+          include_context: true,
         }),
       });
 
