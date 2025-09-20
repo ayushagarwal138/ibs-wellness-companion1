@@ -174,7 +174,7 @@ async def get_recommendations(
         user_data['diet'] = await _get_dietary_patterns(current_user.id, db)
         
         # Generate enhanced recommendations
-        recommendations = service.generate_enhanced_recommendations(current_user, user_data)
+        recommendations = await service.generate_enhanced_recommendations(current_user.id, user_data, db)
         
         # Store recommendations in database
         await _store_prediction(
@@ -274,7 +274,7 @@ async def get_realtime_predictions(
         prediction = service.predict_symptom_risk(user_data)
         
         # Generate immediate recommendations
-        recommendations = await service.generate_enhanced_recommendations(current_user, user_data)
+        recommendations = await service.generate_enhanced_recommendations(current_user.id, user_data, db)
         immediate_actions = recommendations.get('immediate_actions', [])
         
         return {
@@ -302,9 +302,9 @@ async def _prepare_user_data(
     """Prepare user data for ML predictions."""
     
     # Calculate user profile features
-    age = (datetime.utcnow().date() - user.date_of_birth).days // 365 if user.date_of_birth else 30
+    age = (datetime.utcnow() - datetime.combine(user.date_of_birth, datetime.min.time())).days // 365 if user.date_of_birth else 30
     bmi = user.weight_kg / ((user.height_cm / 100) ** 2) if user.height_cm and user.weight_kg else 25.0
-    years_since_diagnosis = (datetime.utcnow().date() - user.diagnosis_date).days // 365 if user.diagnosis_date else 1
+    years_since_diagnosis = (datetime.utcnow() - datetime.combine(user.diagnosis_date, datetime.min.time())).days // 365 if user.diagnosis_date else 1
     
     user_data = {
         'profile': {
@@ -326,17 +326,21 @@ async def _prepare_user_data(
         recent_symptom = result.scalar_one_or_none()
         
         if recent_symptom:
+            # Since SymptomLog doesn't have specific symptom attributes,
+            # we'll use the generic severity and create a default symptom profile
+            severity_score = recent_symptom.severity_score if hasattr(recent_symptom, 'severity_score') else _severity_to_numeric(recent_symptom.severity)
+            
             user_data['symptoms'] = {
-                'abdominal_pain': _severity_to_numeric(recent_symptom.abdominal_pain),
-                'bloating': _severity_to_numeric(recent_symptom.bloating),
-                'gas': _severity_to_numeric(recent_symptom.gas),
-                'diarrhea': _severity_to_numeric(recent_symptom.diarrhea),
-                'constipation': _severity_to_numeric(recent_symptom.constipation),
-                'urgency': _severity_to_numeric(recent_symptom.urgency),
-                'incomplete_evacuation': _severity_to_numeric(recent_symptom.incomplete_evacuation),
-                'nausea': _severity_to_numeric(recent_symptom.nausea),
-                'fatigue': _severity_to_numeric(recent_symptom.fatigue),
-                'mood_score': recent_symptom.mood_score or 5,
+                'abdominal_pain': severity_score,
+                'bloating': severity_score,
+                'gas': severity_score,
+                'diarrhea': severity_score,
+                'constipation': severity_score,
+                'urgency': severity_score,
+                'incomplete_evacuation': severity_score,
+                'nausea': severity_score,
+                'fatigue': severity_score,
+                'mood_score': recent_symptom.stress_level or 5,  # Use stress_level as mood proxy
                 'stress_level': recent_symptom.stress_level or 5,
                 'sleep_quality': recent_symptom.sleep_quality or 5
             }
@@ -368,13 +372,8 @@ async def _get_recent_symptom_trends(user_id: str, db: AsyncSession, days_back: 
     stress_levels = []
     
     for symptom in recent_symptoms:
-        # Calculate overall severity score
-        severity_score = (
-            _severity_to_numeric(symptom.abdominal_pain) +
-            _severity_to_numeric(symptom.bloating) +
-            _severity_to_numeric(symptom.diarrhea) +
-            _severity_to_numeric(symptom.constipation)
-        ) / 4
+        # Calculate overall severity score using the actual severity field
+        severity_score = symptom.severity_score if hasattr(symptom, 'severity_score') else _severity_to_numeric(symptom.severity)
         severity_scores.append(severity_score)
         
         if symptom.stress_level:

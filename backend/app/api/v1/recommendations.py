@@ -49,7 +49,7 @@ async def get_personalized_recommendations(
         user_data['diet'] = await _get_dietary_patterns(current_user.id, db)
         
         # Generate enhanced recommendations
-        recommendations = await service.generate_enhanced_recommendations(current_user, user_data)
+        recommendations = await service.generate_enhanced_recommendations(current_user.id, user_data, db)
         
         # Transform to match frontend expected format
         response = {
@@ -120,11 +120,11 @@ async def _prepare_user_data(user: User, db: AsyncSession) -> Dict[str, Any]:
     return {
         "user_id": user.id,
         "age": (datetime.utcnow() - user.date_of_birth).days // 365 if user.date_of_birth else 30,
-        "gender": user.gender.value if user.gender else "unknown",
-        "ibs_type": user.ibs_type.value if user.ibs_type else "unknown",
+        "gender": user.gender.value if user.gender and hasattr(user.gender, 'value') else "unknown",
+        "ibs_type": user.ibs_type.value if user.ibs_type and hasattr(user.ibs_type, 'value') else "unknown",
         "recent_symptoms": [
             {
-                "severity": symptom.severity.value,
+                "severity": symptom.severity.value if symptom.severity and hasattr(symptom.severity, 'value') else "mild",
                 "logged_at": symptom.logged_at.isoformat(),
                 "stress_level": symptom.stress_level or 5,
                 "sleep_quality": symptom.sleep_quality or 5
@@ -133,7 +133,7 @@ async def _prepare_user_data(user: User, db: AsyncSession) -> Dict[str, Any]:
         ],
         "recent_diet": [
             {
-                "meal_type": diet.meal_type.value,
+                "meal_type": diet.meal_type.value if diet.meal_type and hasattr(diet.meal_type, 'value') else "other",
                 "consumed_at": diet.consumed_at.isoformat(),
                 "portion_size": diet.portion_size_g or 100
             }

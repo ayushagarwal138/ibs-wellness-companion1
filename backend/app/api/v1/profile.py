@@ -20,12 +20,14 @@ async def get_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Get complete user profile information."""
+    """Get complete user profile."""
     return {
         "id": str(current_user.id),
         "email": current_user.email,
+        "username": current_user.username,
         "first_name": current_user.first_name,
         "last_name": current_user.last_name,
+        "full_name": current_user.full_name,
         "phone_number": current_user.phone_number,
         "date_of_birth": current_user.date_of_birth.isoformat() if current_user.date_of_birth else None,
         "gender": current_user.gender,
@@ -33,25 +35,25 @@ async def get_profile(
         "emergency_contact_name": current_user.emergency_contact_name,
         "emergency_contact_phone": current_user.emergency_contact_phone,
         "timezone": current_user.timezone,
+        "age": current_user.age,
+        "height_cm": current_user.height_cm,
+        "weight_kg": current_user.weight_kg,
+        "bmi": current_user.bmi,
         "medical_history": {
             "ibs_type": current_user.ibs_type,
             "diagnosis_date": current_user.diagnosis_date.isoformat() if current_user.diagnosis_date else None,
-            "current_medications": current_user.current_medications or [],
-            "allergies": current_user.allergies or [],
-            "medical_conditions": current_user.medical_conditions or []
+            "medical_notes": current_user.medical_notes
         },
-        "dietary_preferences": {
-            "dietary_restrictions": current_user.dietary_restrictions or [],
-            "food_allergies": current_user.food_allergies or [],
-            "preferred_cuisines": current_user.preferred_cuisines or [],
-            "meal_frequency": current_user.meal_frequency
+        "preferences": {
+            "notification_preferences": current_user.notification_preferences or {},
+            "privacy_settings": current_user.privacy_settings or {}
         },
-        "lifestyle_factors": {
-            "activity_level": current_user.activity_level,
-            "stress_level": current_user.stress_level,
-            "sleep_hours": current_user.sleep_hours,
-            "work_schedule": current_user.work_schedule
-        }
+        "role": current_user.role.value if current_user.role else None,
+        "is_active": current_user.is_active,
+        "is_verified": current_user.is_verified,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None,
+        "last_login_at": current_user.last_login_at.isoformat() if current_user.last_login_at else None
     }
 
 

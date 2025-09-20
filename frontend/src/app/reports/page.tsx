@@ -286,7 +286,7 @@ export default function ReportsPage() {
     // Adjust based on tracking consistency
     const trackingDays = calculateTrackingDays(userProfile?.created_at);
     const consistencyBonus = Math.min(trackingDays / 30 * 10, 15);
-    return Math.min(baseScore + consistencyBonus, 100);
+    return Math.round(Math.min(baseScore + consistencyBonus, 100));
   };
 
   const calculateGoalAchievement = (mlReport: any): number => {
@@ -307,20 +307,27 @@ export default function ReportsPage() {
       // Fetch real ML predictions and recommendations
       const mlReport = await mlService.generateReport(selectedTimeframe);
       
-      // Get user profile data for personalization
+      // Get user profile data for personalization (optional)
       let userProfile = null;
       try {
-        const response = await fetch('/api/v1/profile', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          const response = await fetch('http://localhost:8000/api/v1/profile', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (response.ok) {
+            userProfile = await response.json();
+          } else {
+            console.warn('Could not fetch user profile - using default data:', response.status);
           }
-        });
-        if (response.ok) {
-          userProfile = await response.json();
+        } else {
+          console.warn('No authentication token found - using default profile data');
         }
       } catch (error) {
-        console.warn('Could not fetch user profile:', error);
+        console.warn('Could not fetch user profile - using default data:', error);
       }
 
       // Generate personalized insights based on user data
