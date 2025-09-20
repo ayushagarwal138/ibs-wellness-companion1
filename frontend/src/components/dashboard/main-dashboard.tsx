@@ -179,7 +179,7 @@ export default function MainDashboard() {
                     </Link>
                   </Button>
                   <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2" asChild>
-                    <Link href="/dashboard/log-diet">
+                    <Link href="/diet-history">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"

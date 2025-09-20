@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ProfileDropdown } from '@/components/ui/profile-dropdown';
 import { NotificationIcon } from '@/components/ui/notification-icon';
 import { useNotificationState } from '@/hooks/useNotificationState';
-import { Heart, BarChart3, PlusCircle, Calendar, MessageCircle, User } from 'lucide-react';
+import { Heart, BarChart3, PlusCircle, Calendar, MessageCircle, User, FileText } from 'lucide-react';
 
 interface DashboardHeaderProps {
   title?: string;
@@ -49,10 +49,10 @@ export function DashboardHeader({
       active: pathname === '/dashboard/log-symptoms',
     },
     {
-      name: 'Log Diet',
-      href: '/dashboard/log-diet',
+      name: 'Diet History',
+      href: '/diet-history',
       icon: Calendar,
-      active: pathname === '/dashboard/log-diet',
+      active: pathname === '/diet-history',
     },
     {
       name: 'Chat Assistant',
@@ -65,6 +65,12 @@ export function DashboardHeader({
       href: '/dashboard/analytics',
       icon: BarChart3,
       active: pathname === '/dashboard/analytics',
+    },
+    {
+      name: 'Reports',
+      href: '/reports',
+      icon: FileText,
+      active: pathname === '/reports',
     },
   ];
 

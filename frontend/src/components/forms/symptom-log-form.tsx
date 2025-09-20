@@ -81,7 +81,25 @@ export default function SymptomLogForm({ onSuccess, onCancel }: SymptomLogFormPr
     setIsLoading(true);
 
     try {
-      await apiService.createSymptomLog(formData);
+      // Prepare data to match backend schema - convert symptoms array to potential_triggers string
+      const submitData = {
+        symptom_id: formData.symptom_id || 1,
+        severity: formData.severity,
+        bristol_stool_type: formData.bristol_stool_type,
+        bowel_movement_frequency: formData.bowel_movement_frequency,
+        pain_location: formData.pain_location || '',
+        pain_type: formData.pain_type || '',
+        stress_level: formData.stress_level,
+        sleep_quality: formData.sleep_quality,
+        exercise_minutes: formData.exercise_minutes,
+        potential_triggers: formData.symptoms.join(', '), // Convert symptoms array to string for triggers
+        notes: formData.notes || '',
+        logged_at: formData.logged_at || new Date().toISOString(),
+        // Add empty symptoms array to satisfy type requirements temporarily
+        symptoms: formData.symptoms,
+      };
+
+      await apiService.createSymptomLog(submitData);
       toast.success('Symptom log saved successfully!');
       
       // Reset form

@@ -57,7 +57,7 @@ export default function DashboardPage() {
                 <Calendar className="text-green-500" size={24} />
                 <div>
                   <h3 className="font-medium text-gray-900">Diet Tracker</h3>
-                  <p className="text-sm text-gray-500">Track your meals and reactions</p>
+                  <p className="text-sm text-gray-500">Log your meals and track dietary patterns</p>
                 </div>
               </div>
             </Link>
@@ -68,6 +68,16 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="font-medium text-gray-900">Analytics</h3>
                   <p className="text-sm text-gray-500">View trends and insights</p>
+                </div>
+              </div>
+            </Link>
+            
+            <Link href="/reports" className="bg-white p-6 rounded-lg border hover:shadow-md transition-shadow">
+              <div className="flex items-center space-x-3">
+                <TrendingUp className="text-blue-500" size={24} />
+                <div>
+                  <h3 className="font-medium text-gray-900">Health Reports</h3>
+                  <p className="text-sm text-gray-500">AI-powered insights and predictions</p>
                 </div>
               </div>
             </Link>

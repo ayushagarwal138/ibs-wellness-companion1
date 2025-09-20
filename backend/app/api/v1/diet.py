@@ -5,8 +5,8 @@ API endpoints for diet management and food reaction tracking.
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, desc, or_, select
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user
@@ -33,7 +33,7 @@ router = APIRouter()
 @router.post("/reactions", response_model=FoodReactionResponse)
 async def create_food_reaction(
     reaction_data: FoodReactionCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new food reaction entry."""
@@ -49,8 +49,8 @@ async def create_food_reaction(
     )
     
     db.add(food_reaction)
-    db.commit()
-    db.refresh(food_reaction)
+    await db.commit()
+    await db.refresh(food_reaction)
     
     return food_reaction
 
@@ -64,11 +64,11 @@ async def get_food_reactions(
     severity: Optional[ReactionSeverityEnum] = Query(None, description="Filter by severity"),
     start_date: Optional[datetime] = Query(None, description="Filter from date"),
     end_date: Optional[datetime] = Query(None, description="Filter to date"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get paginated list of food reactions for the current user."""
-    query = db.query(FoodReaction).filter(FoodReaction.user_id == current_user.id)
+    query = select(FoodReaction).filter(FoodReaction.user_id == current_user.id)
     
     # Apply filters
     if food_name:
@@ -84,11 +84,15 @@ async def get_food_reactions(
         query = query.filter(FoodReaction.consumed_at <= end_date)
     
     # Get total count
-    total = query.count()
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
     
     # Apply pagination
     offset = (page - 1) * size
-    items = query.order_by(desc(FoodReaction.consumed_at)).offset(offset).limit(size).all()
+    query = query.order_by(desc(FoodReaction.consumed_at)).offset(offset).limit(size)
+    result = await db.execute(query)
+    items = result.scalars().all()
     
     pages = (total + size - 1) // size
     
@@ -104,16 +108,18 @@ async def get_food_reactions(
 @router.get("/reactions/{reaction_id}", response_model=FoodReactionResponse)
 async def get_food_reaction(
     reaction_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get a specific food reaction by ID."""
-    food_reaction = db.query(FoodReaction).filter(
+    query = select(FoodReaction).filter(
         and_(
             FoodReaction.id == reaction_id,
             FoodReaction.user_id == current_user.id
         )
-    ).first()
+    )
+    result = await db.execute(query)
+    food_reaction = result.scalar_one_or_none()
     
     if not food_reaction:
         raise HTTPException(status_code=404, detail="Food reaction not found")
@@ -125,16 +131,18 @@ async def get_food_reaction(
 async def update_food_reaction(
     reaction_id: int,
     reaction_data: FoodReactionUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Update a food reaction entry."""
-    food_reaction = db.query(FoodReaction).filter(
+    query = select(FoodReaction).filter(
         and_(
             FoodReaction.id == reaction_id,
             FoodReaction.user_id == current_user.id
         )
-    ).first()
+    )
+    result = await db.execute(query)
+    food_reaction = result.scalar_one_or_none()
     
     if not food_reaction:
         raise HTTPException(status_code=404, detail="Food reaction not found")
@@ -146,8 +154,8 @@ async def update_food_reaction(
     
     food_reaction.updated_at = datetime.utcnow()
     
-    db.commit()
-    db.refresh(food_reaction)
+    await db.commit()
+    await db.refresh(food_reaction)
     
     return food_reaction
 
@@ -155,22 +163,24 @@ async def update_food_reaction(
 @router.delete("/reactions/{reaction_id}")
 async def delete_food_reaction(
     reaction_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Delete a food reaction entry."""
-    food_reaction = db.query(FoodReaction).filter(
+    query = select(FoodReaction).filter(
         and_(
             FoodReaction.id == reaction_id,
             FoodReaction.user_id == current_user.id
         )
-    ).first()
+    )
+    result = await db.execute(query)
+    food_reaction = result.scalar_one_or_none()
     
     if not food_reaction:
         raise HTTPException(status_code=404, detail="Food reaction not found")
     
-    db.delete(food_reaction)
-    db.commit()
+    await db.delete(food_reaction)
+    await db.commit()
     
     return {"message": "Food reaction deleted successfully"}
 
@@ -179,7 +189,7 @@ async def delete_food_reaction(
 @router.post("/logs", response_model=DietLogResponse)
 async def create_diet_log(
     diet_data: DietLogCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new diet log entry."""
@@ -202,8 +212,8 @@ async def create_diet_log(
     )
     
     db.add(diet_log)
-    db.commit()
-    db.refresh(diet_log)
+    await db.commit()
+    await db.refresh(diet_log)
     
     return diet_log
 
@@ -215,11 +225,12 @@ async def get_diet_logs(
     meal_type: Optional[MealTypeEnum] = Query(None, description="Filter by meal type"),
     start_date: Optional[datetime] = Query(None, description="Filter from date"),
     end_date: Optional[datetime] = Query(None, description="Filter to date"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get paginated list of diet logs for the current user."""
-    query = db.query(DietLog).filter(DietLog.user_id == current_user.id)
+    # Build the query using select
+    query = select(DietLog).filter(DietLog.user_id == current_user.id)
     
     # Apply filters
     if meal_type:
@@ -230,11 +241,24 @@ async def get_diet_logs(
         query = query.filter(DietLog.consumed_at <= end_date)
     
     # Get total count
-    total = query.count()
+    count_query = select(func.count()).select_from(DietLog).filter(DietLog.user_id == current_user.id)
+    if meal_type:
+        count_query = count_query.filter(DietLog.meal_type == meal_type)
+    if start_date:
+        count_query = count_query.filter(DietLog.consumed_at >= start_date)
+    if end_date:
+        count_query = count_query.filter(DietLog.consumed_at <= end_date)
     
-    # Apply pagination
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Apply pagination and ordering
     offset = (page - 1) * size
-    items = query.order_by(desc(DietLog.consumed_at)).offset(offset).limit(size).all()
+    query = query.order_by(desc(DietLog.consumed_at)).offset(offset).limit(size)
+    
+    # Execute the query
+    result = await db.execute(query)
+    items = result.scalars().all()
     
     pages = (total + size - 1) // size
     
@@ -250,7 +274,7 @@ async def get_diet_logs(
 @router.get("/logs/{log_id}", response_model=DietLogResponse)
 async def get_diet_log(
     log_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get a specific diet log by ID."""
@@ -271,7 +295,7 @@ async def get_diet_log(
 async def update_diet_log(
     log_id: int,
     diet_data: DietLogUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Update a diet log entry."""
@@ -301,7 +325,7 @@ async def update_diet_log(
 @router.delete("/logs/{log_id}")
 async def delete_diet_log(
     log_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Delete a diet log entry."""
@@ -325,7 +349,7 @@ async def delete_diet_log(
 @router.get("/stats/food", response_model=FoodStats)
 async def get_food_stats(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get food statistics for the current user."""
@@ -396,7 +420,7 @@ async def get_food_stats(
 @router.get("/stats/diet", response_model=DietStats)
 async def get_diet_stats(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get diet statistics for the current user."""
@@ -452,7 +476,7 @@ async def get_diet_stats(
 @router.get("/analysis/triggers", response_model=TriggerFoodAnalysis)
 async def get_trigger_food_analysis(
     days: int = Query(90, ge=30, le=365, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get trigger food analysis for the current user."""
@@ -530,7 +554,7 @@ async def get_trigger_food_analysis(
 @router.get("/analysis/nutritional", response_model=NutritionalAnalysis)
 async def get_nutritional_analysis(
     days: int = Query(30, ge=7, le=90, description="Number of days to analyze"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get nutritional analysis for the current user."""

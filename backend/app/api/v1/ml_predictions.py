@@ -19,7 +19,7 @@ from app.models.user import User
 from app.models.symptom import SymptomLog
 from app.models.diet import DietLog
 from app.models.medication import MedicationLog
-from app.services.ml_model_service import MLModelService
+from app.services.enhanced_recommendation_service import EnhancedRecommendationService
 from app.schemas.ml_predictions import (
     SeverityPredictionRequest,
     SeverityPredictionResponse,
@@ -34,15 +34,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ml", tags=["ML Predictions"])
 
-# Global ML service instance
-ml_service = MLModelService()
+# Global enhanced recommendation service instance - will be initialized on first use
+enhanced_recommendation_service = None
+
+
+def get_enhanced_recommendation_service(db: AsyncSession = Depends(get_db)) -> EnhancedRecommendationService:
+    """Get or create the enhanced recommendation service instance."""
+    global enhanced_recommendation_service
+    if enhanced_recommendation_service is None:
+        enhanced_recommendation_service = EnhancedRecommendationService(db)
+    return enhanced_recommendation_service
 
 
 @router.get("/models/info", response_model=ModelInfoResponse)
-async def get_model_info():
-    """Get information about loaded ML models."""
+async def get_model_info(
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
+):
+    """Get information about loaded enhanced ML models."""
     try:
-        info = ml_service.get_model_info()
+        info = service.get_model_info()
         return ModelInfoResponse(**info)
     except Exception as e:
         logger.error(f"Error getting model info: {e}")
@@ -53,11 +63,13 @@ async def get_model_info():
 
 
 @router.post("/models/reload")
-async def reload_models():
-    """Reload ML models from the latest checkpoint."""
+async def reload_models(
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
+):
+    """Reload enhanced ML models from the latest checkpoint."""
     try:
-        ml_service.reload_models()
-        return {"message": "Models reloaded successfully"}
+        service.reload_models()
+        return {"message": "Enhanced models reloaded successfully"}
     except Exception as e:
         logger.error(f"Error reloading models: {e}")
         raise HTTPException(
@@ -70,15 +82,16 @@ async def reload_models():
 async def predict_severity(
     request: SeverityPredictionRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
 ):
     """Predict IBS severity based on current symptoms and user data."""
     try:
         # Prepare user data for prediction
         user_data = await _prepare_user_data(current_user, db, request.symptoms)
         
-        # Make prediction
-        prediction = ml_service.predict_severity(user_data)
+        # Make prediction using enhanced service
+        prediction = service.predict_symptom_risk(user_data)
         
         # Store prediction in database for tracking
         await _store_prediction(
@@ -106,7 +119,8 @@ async def predict_severity(
 async def predict_flareup(
     request: FlareupPredictionRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
 ):
     """Predict flareup risk for the next N days."""
     try:
@@ -118,8 +132,8 @@ async def predict_flareup(
             current_user.id, db
         )
         
-        # Make prediction
-        prediction = ml_service.predict_flareup_risk(user_data, request.days_ahead)
+        # Make prediction using enhanced service
+        prediction = service.predict_symptom_risk(user_data)
         
         # Store prediction in database
         await _store_prediction(
@@ -148,7 +162,8 @@ async def predict_flareup(
 async def get_recommendations(
     request: RecommendationRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
 ):
     """Generate personalized diet and lifestyle recommendations."""
     try:
@@ -158,8 +173,8 @@ async def get_recommendations(
         # Add dietary patterns
         user_data['diet'] = await _get_dietary_patterns(current_user.id, db)
         
-        # Generate recommendations
-        recommendations = ml_service.generate_recommendations(user_data)
+        # Generate enhanced recommendations
+        recommendations = service.generate_enhanced_recommendations(current_user, user_data)
         
         # Store recommendations in database
         await _store_prediction(

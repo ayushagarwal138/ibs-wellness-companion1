@@ -21,15 +21,23 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.symptom import SymptomLog
 from app.models.diet import DietLog
-from app.services.ml_model_service import MLModelService
+from app.services.enhanced_recommendation_service import EnhancedRecommendationService
 from app.services.ml_integration_service import MLIntegrationService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ml/realtime", tags=["Real-time ML Predictions"])
 
-# Initialize ML services
-ml_service = MLModelService()
+# Initialize enhanced ML services - will be initialized on first use
+enhanced_recommendation_service = None
+
+
+def get_enhanced_recommendation_service(db: Session = Depends(get_db)) -> EnhancedRecommendationService:
+    """Get or create the enhanced recommendation service instance."""
+    global enhanced_recommendation_service
+    if enhanced_recommendation_service is None:
+        enhanced_recommendation_service = EnhancedRecommendationService(db)
+    return enhanced_recommendation_service
 
 
 class RealTimePredictionRequest(BaseModel):
@@ -60,7 +68,8 @@ class BatchPredictionRequest(BaseModel):
 async def stream_predictions(
     request: RealTimePredictionRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
 ):
     """Stream real-time predictions as they are computed."""
     
@@ -81,7 +90,7 @@ async def stream_predictions(
             )
             
             severity_start = datetime.utcnow()
-            severity_prediction = ml_service.predict_severity(user_data)
+            severity_prediction = service.predict_symptom_risk(user_data)
             severity_time = (datetime.utcnow() - severity_start).total_seconds() * 1000
             
             yield _format_stream_response(
@@ -397,19 +406,22 @@ async def _get_environmental_factors() -> Dict[str, Any]:
     }
 
 
-async def _async_severity_prediction(user_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Async wrapper for severity prediction."""
-    return ml_service.predict_severity(user_data)
+async def _async_severity_prediction(user_data: Dict[str, Any], service: EnhancedRecommendationService) -> Dict[str, Any]:
+    """Async wrapper for severity prediction using enhanced service."""
+    return service.predict_symptom_risk(user_data)
 
 
-async def _async_flareup_prediction(user_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Async wrapper for flareup prediction."""
-    return ml_service.predict_flareup_risk(user_data, 7)
+async def _async_flareup_prediction(user_data: Dict[str, Any], service: EnhancedRecommendationService) -> Dict[str, Any]:
+    """Async wrapper for flareup prediction using enhanced service."""
+    return service.predict_symptom_risk(user_data)
 
 
-async def _async_recommendations(user_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Async wrapper for recommendations."""
-    return ml_service.generate_recommendations(user_data)
+async def _async_recommendations(user_data: Dict[str, Any], service: EnhancedRecommendationService) -> Dict[str, Any]:
+    """Async wrapper for recommendations using enhanced service."""
+    # Need to create a mock user object for the enhanced service
+    from app.models.user import User
+    mock_user = User(id=user_data.get('user_id', ''))
+    return service.generate_enhanced_recommendations(mock_user, user_data)
 
 
 async def _generate_insights(

@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
-import { firebaseAuthService } from '@/lib/firebase-auth'
 import { analyticsService } from '@/lib/analytics'
 import { notificationService } from '@/lib/notifications'
 
@@ -57,7 +56,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
-  const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8001'
+  const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'
 
   // Ensure component is mounted before accessing localStorage
   useEffect(() => {
@@ -114,9 +113,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true)
-      
-      // First authenticate with Firebase
-      const firebaseUser = await firebaseAuthService.signIn(email, password)
       
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
@@ -184,9 +180,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const nameParts = fullName.trim().split(' ')
       const firstName = nameParts[0] || ''
       const lastName = nameParts.slice(1).join(' ') || ''
-      
-      // First register with Firebase
-      const firebaseUser = await firebaseAuthService.signUp(email, password)
       
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
@@ -260,9 +253,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           })
         }
       }
-      
-      // Sign out from Firebase
-      await firebaseAuthService.signOut()
       
     } catch (error) {
       console.error('Logout error:', error)

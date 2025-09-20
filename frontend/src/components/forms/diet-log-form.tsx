@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,7 +46,12 @@ const PREPARATION_METHODS = [
   'Raw', 'Steamed', 'Boiled', 'Grilled', 'Fried', 'Baked', 'Roasted', 'Sautéed'
 ];
 
-export default function DietLogForm() {
+interface DietLogFormProps {
+  onSuccess?: () => void;
+}
+
+export default function DietLogForm({ onSuccess }: DietLogFormProps) {
+  const router = useRouter();
   const [formData, setFormData] = useState<DietLogFormData>({
     meal_type: '',
     food_items: [],
@@ -154,6 +160,13 @@ export default function DietLogForm() {
         supplements_taken: []
       });
       setFoodItemInput('');
+      
+      // Call onSuccess callback if provided, otherwise show success message and reset form
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        toast.success('Meal logged successfully! You can log another meal or view your history.');
+      }
     } catch (error) {
       console.error('Error creating diet log:', error);
       toast.error('Failed to create diet log. Please try again.');

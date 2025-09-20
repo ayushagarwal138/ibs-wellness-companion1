@@ -20,7 +20,7 @@ from app.schemas.chat import (
     ChatbotResponse, ConversationContext, IBSAssessment, MessageType
 )
 from app.services.ibs_detection_service import IBSDetectionService
-from app.services.recommendation_service import RecommendationService
+from app.services.enhanced_recommendation_service import EnhancedRecommendationService
 from app.services.ml_integration_service import MLIntegrationService
 from app.services.nlp_service import NLPService, IntentType
 from app.services.conversation_memory import ConversationMemoryService
@@ -35,7 +35,7 @@ class ChatService:
         self.db = db
         self.logger = StructuredLogger("chat_service")
         self.ibs_detection = IBSDetectionService(db)
-        self.recommendation = RecommendationService(db)
+        self.recommendation_service = EnhancedRecommendationService(db)
         self.ml_integration = MLIntegrationService(db)
         self.nlp = NLPService()  # Initialize NLP service
         self.memory = ConversationMemoryService()
@@ -457,10 +457,10 @@ class ChatService:
                     factors_text = ", ".join(assessment.factors[:3])
                     response_parts.append(f"Key contributing factors include: {factors_text}. ")
                 
-                # Get recommendations
-                recommendations = self.recommendation_service.generate_recommendations(user, assessment)
+                # Get enhanced recommendations
+                recommendations = self.recommendation_service.generate_enhanced_recommendations(user, assessment)
                 if recommendations:
-                    response_parts.append("I have some personalized recommendations that might help. ")
+                    response_parts.append("I have some ML-enhanced personalized recommendations that might help. ")
                     
             except Exception as e:
                 response_parts.append("I'm having trouble accessing your recent data for assessment. Please make sure you've been logging your symptoms regularly. ")
@@ -563,45 +563,46 @@ class ChatService:
             # Get current assessment
             assessment = await self.ibs_detection.assess_ibs_severity(user)
             
-            # Enhance assessment with ML insights
-            enhanced_assessment = self.ml_integration.enhance_severity_assessment(assessment, user)
+            # Generate enhanced recommendations using the new ML-powered service
+            recommendations = self.recommendation_service.generate_enhanced_recommendations(
+                user, assessment, context.user_context if hasattr(context, 'user_context') else None
+            )
             
-            # Generate ML-enhanced recommendations
-            recommendations = self.ml_integration.generate_personalized_recommendations(user, enhanced_assessment)
+            # Get flare-up risk prediction from the enhanced service
+            user_features = self.recommendation_service._extract_user_features(user, assessment)
+            flareup_risk = self.recommendation_service.predict_symptom_risk(user_features)
             
-            # Get flare-up risk prediction
-            flareup_risk = self.ml_integration.predict_flareup_risk(user, days_ahead=7)
-            
-            response_parts.append(f"Based on your current IBS severity level ({enhanced_assessment.severity.value}), here are my top recommendations:")
+            response_parts.append(f"Based on your current IBS severity level ({assessment.severity.value}), here are my top ML-enhanced recommendations:")
             
             # Add flare-up risk information
-            if flareup_risk["risk_level"] != "low":
-                response_parts.append(f"⚠️ Flare-up risk in next 7 days: {flareup_risk['risk_level']} ({flareup_risk['risk_score']:.0%})")
-                if flareup_risk["factors"]:
-                    response_parts.append(f"Key risk factors: {', '.join(flareup_risk['factors'][:2])}")
+            if flareup_risk["risk_level"] != "Low":
+                response_parts.append(f"⚠️ Symptom risk prediction: {flareup_risk['risk_level']} ({flareup_risk['confidence']:.0%} confidence)")
+                if flareup_risk.get("key_factors"):
+                    response_parts.append(f"Key risk factors: {', '.join(flareup_risk['key_factors'][:2])}")
             
             # Summarize top recommendations
             for i, rec in enumerate(recommendations[:3], 1):
                 response_parts.append(f"{i}. {rec.title}: {rec.description}")
             
             if len(recommendations) > 3:
-                response_parts.append(f"I have {len(recommendations) - 3} additional recommendations available.")
+                response_parts.append(f"I have {len(recommendations) - 3} additional personalized recommendations available.")
                 
         except Exception as e:
+            self.logger.error(f"Error generating enhanced recommendations: {e}")
             response_parts.append("I need more data to provide personalized recommendations.")
             response_parts.append("Please make sure you're regularly logging your symptoms, food reactions, and medications.")
         
         return {
             "message": " ".join(response_parts),
-            "ibs_assessment": enhanced_assessment if 'enhanced_assessment' in locals() else assessment,
+            "ibs_assessment": assessment,
             "recommendations": recommendations if 'recommendations' in locals() else [],
             "flareup_prediction": flareup_risk if 'flareup_risk' in locals() else None,
-            "context_used": ["assessment", "recommendations", "ml_prediction"],
+            "context_used": ["assessment", "enhanced_recommendations", "ml_prediction"],
             "requires_followup": True,
             "followup_questions": [
-                "Would you like more details about any of these recommendations?",
+                "Would you like more details about any of these ML-enhanced recommendations?",
                 "Which area would you like to focus on first?",
-                "Do you have questions about implementing these suggestions?"
+                "Do you have questions about implementing these personalized suggestions?"
             ]
         }
     
