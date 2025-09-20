@@ -250,6 +250,73 @@ export default function DataVisualization() {
           </div>
         </div>
       </div>
+
+      {/* Indian Food Insights */}
+      <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-6">
+        <h4 className="font-medium text-orange-900 mb-4">Indian Food Analysis</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h5 className="text-sm font-medium text-orange-800 mb-3">IBS-Friendly Indian Dishes</h5>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-orange-700">Khichdi with Ghee</span>
+                <Badge variant="success" className="text-xs">Safe</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-orange-700">Moong Dal Soup</span>
+                <Badge variant="success" className="text-xs">Safe</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-orange-700">Curd Rice</span>
+                <Badge variant="warning" className="text-xs">Monitor</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-orange-700">Bottle Gourd Curry</span>
+                <Badge variant="success" className="text-xs">Safe</Badge>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h5 className="text-sm font-medium text-orange-800 mb-3">Spice Tolerance Analysis</h5>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Cumin (Jeera)</span>
+                  <span className="text-green-600">Well Tolerated</span>
+                </div>
+                <Progress value={85} className="h-2" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Turmeric (Haldi)</span>
+                  <span className="text-green-600">Beneficial</span>
+                </div>
+                <Progress value={92} className="h-2" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Red Chili</span>
+                  <span className="text-red-600">Trigger</span>
+                </div>
+                <Progress value={25} className="h-2" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Ginger (Adrak)</span>
+                  <span className="text-green-600">Helpful</span>
+                </div>
+                <Progress value={88} className="h-2" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 p-3 bg-orange-100 rounded-lg">
+          <p className="text-sm text-orange-800">
+            <strong>Insight:</strong> Your data shows better tolerance for traditional Indian spices like cumin and turmeric. 
+            Consider incorporating these into your meals while avoiding high-heat spices.
+          </p>
+        </div>
+      </div>
     </div>
   );
 
@@ -376,7 +443,7 @@ export default function DataVisualization() {
       {/* AI Recommendations */}
       <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6">
         <h4 className="font-medium text-purple-900 mb-4">AI-Powered Recommendations</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <h5 className="text-sm font-medium text-purple-800 mb-2">Immediate Actions</h5>
             <ul className="text-sm text-purple-700 space-y-1">
@@ -393,6 +460,15 @@ export default function DataVisualization() {
               <li>• Schedule stress management consultation</li>
               <li>• Increase fiber intake gradually</li>
               <li>• Consider FODMAP diet trial</li>
+            </ul>
+          </div>
+          <div>
+            <h5 className="text-sm font-medium text-purple-800 mb-2">Indian Cuisine Focus</h5>
+            <ul className="text-sm text-purple-700 space-y-1">
+              <li>• Try khichdi for easy digestion</li>
+              <li>• Use ginger in daily cooking</li>
+              <li>• Replace red chili with black pepper</li>
+              <li>• Include fennel seeds after meals</li>
             </ul>
           </div>
         </div>

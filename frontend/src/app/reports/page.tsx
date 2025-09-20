@@ -30,6 +30,10 @@ import {
 } from 'lucide-react';
 
 import { mlService } from '@/services/ml-service';
+import { downloadPDFReport } from '@/lib/pdf-generator';
+import { ShareReportModal } from '@/components/reports/share-report-modal';
+import { IndianDietRecommendations } from '@/components/reports/indian-diet-recommendations';
+import { LifestyleRecommendations } from '@/components/reports/lifestyle-recommendations';
 
 interface MLPrediction {
   risk_level: 'low' | 'medium' | 'moderate' | 'high';
@@ -195,6 +199,7 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'day' | 'week' | 'month'>('month');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Helper functions for personalization
   const calculateTrackingDays = (createdAt?: string): number => {
@@ -515,6 +520,37 @@ export default function ReportsPage() {
     // In production, fetch real ML predictions and report data
     fetchReportData();
   }, [selectedTimeframe]);
+
+  const handleExportPDF = () => {
+    // Transform the report data to match the PDF generator interface
+    const pdfReportData = {
+      user_summary: {
+        name: reportData.user_summary.name,
+        ibs_type: "Mixed IBS", // Default value
+        diagnosis_date: "2023-01-01", // Default value
+        last_updated: reportData.user_summary.last_updated,
+        overall_trend: reportData.user_summary.overall_trend
+      },
+      severity_assessment: {
+        current_score: reportData.severity_assessment.score,
+        trend: reportData.severity_assessment.trend,
+        risk_level: reportData.severity_assessment.current_level
+      },
+      ml_predictions: {
+        flareup_risk: reportData.ml_predictions.next_flare_probability,
+        severity_forecast: [reportData.ml_predictions.predicted_severity],
+        confidence_score: reportData.ml_predictions.confidence
+      },
+      progress_metrics: {
+        symptom_control: reportData.progress_metrics.symptom_control,
+        quality_of_life: reportData.progress_metrics.quality_of_life,
+        goal_achievement: reportData.progress_metrics.goal_achievement,
+        consistency_score: reportData.progress_metrics.consistency_score
+      }
+    };
+    
+    downloadPDFReport(pdfReportData);
+  };
 
   const getSuggestedSpecialists = (riskLevel: string, userProfile: any): string[] => {
     const specialists = [];
@@ -944,11 +980,15 @@ export default function ReportsPage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleExportPDF}
+                >
                   <Download className="h-4 w-4 mr-2" />
                   Export PDF
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => setIsShareModalOpen(true)}>
                   <Share2 className="h-4 w-4 mr-2" />
                   Share
                 </Button>
@@ -964,11 +1004,50 @@ export default function ReportsPage() {
           </div>
 
           {/* Report Content */}
-          {renderSeverityAssessment()}
-          {renderMLPredictions()}
-          {renderRecommendations()}
-          {renderProgressMetrics()}
-          {renderInsights()}
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="diet">Diet Recommendations</TabsTrigger>
+              <TabsTrigger value="lifestyle">Lifestyle Guide</TabsTrigger>
+              <TabsTrigger value="insights">Insights</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="space-y-6">
+              {renderSeverityAssessment()}
+              {renderMLPredictions()}
+              {renderRecommendations()}
+              {renderProgressMetrics()}
+            </TabsContent>
+            
+            <TabsContent value="diet" className="space-y-6">
+              <IndianDietRecommendations 
+                userProfile={{
+                  ibsType: reportData.severity_assessment.current_level === 'high' ? 'IBS-D' : 'IBS-M',
+                  severityLevel: reportData.severity_assessment.current_level,
+                  triggers: reportData.ml_predictions.key_factors,
+                  preferences: ['Low FODMAP', 'Anti-inflammatory']
+                }}
+              />
+            </TabsContent>
+            
+            <TabsContent value="lifestyle" className="space-y-6">
+              <LifestyleRecommendations 
+                userProfile={{
+                  ibsType: reportData.severity_assessment.current_level === 'high' ? 'IBS-D' : 'IBS-M',
+                  severityLevel: reportData.severity_assessment.current_level,
+                  stressLevel: 7,
+                  sleepQuality: 5,
+                  exerciseLevel: 'Low',
+                  currentSymptoms: ['Bloating', 'Abdominal pain', 'Irregular bowel movements'],
+                  triggers: reportData.ml_predictions.key_factors
+                }}
+              />
+            </TabsContent>
+            
+            <TabsContent value="insights" className="space-y-6">
+              {renderInsights()}
+            </TabsContent>
+          </Tabs>
           
           {/* Footer */}
           <div className="bg-white p-6 rounded-lg border">
@@ -983,6 +1062,13 @@ export default function ReportsPage() {
           </div>
         </main>
       </div>
+      
+      {/* Share Modal */}
+      <ShareReportModal 
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        reportData={reportData}
+      />
     </ProtectedRoute>
   );
 }

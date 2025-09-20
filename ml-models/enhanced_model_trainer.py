@@ -56,19 +56,72 @@ class EnhancedModelTrainer:
         
         # Initialize data pipeline
         self.data_pipeline = DataIntegrationPipeline()
+        
+        # Initialize enhanced external data integrator
+        from enhanced_external_integration import EnhancedExternalDataIntegrator
+        self.external_integrator = EnhancedExternalDataIntegrator()
+        
+        # Initialize Indian food dataset manager
+        from indian_food_datasets import IndianFoodDatasetManager
+        self.indian_food_manager = IndianFoodDatasetManager()
     
     def load_enhanced_features(self) -> pd.DataFrame:
         """Load the enhanced features created by the data integration pipeline."""
         if not os.path.exists(self.features_file):
-            logger.info("Enhanced features not found. Running data integration pipeline...")
+            logger.info("Enhanced features not found. Running comprehensive data integration...")
+            
+            # 1. Load traditional datasets
             datasets = self.data_pipeline.integrate_datasets()
-            features_df = self.data_pipeline.create_training_features(datasets)
+            
+            # 2. Load enhanced external datasets
+            external_data = self.external_integrator.integrate_all_datasets()
+            
+            # 3. Load Indian food datasets
+            indian_food_data = self.indian_food_manager.create_comprehensive_database()
+            
+            # 4. Combine all datasets
+            combined_datasets = {**datasets, **external_data, **indian_food_data}
+            
+            # 5. Create enhanced training features
+            features_df = self.data_pipeline.create_training_features(combined_datasets)
+            
+            # 6. Add Indian food specific features
+            features_df = self._add_indian_food_features(features_df, indian_food_data)
+            
             features_df.to_csv(self.features_file, index=False)
+            logger.info(f"Created enhanced features with {len(features_df)} samples and {len(features_df.columns)} features")
         else:
             features_df = pd.read_csv(self.features_file)
             logger.info(f"Loaded enhanced features from {self.features_file}")
         
         return features_df
+    
+    def _add_indian_food_features(self, df: pd.DataFrame, indian_data: Dict) -> pd.DataFrame:
+        """Add Indian food specific features to the training data."""
+        enhanced_df = df.copy()
+        
+        # Add Indian spice tolerance features
+        if 'spices_database' in indian_data:
+            spices_df = indian_data['spices_database']
+            
+            # Create spice tolerance scores
+            enhanced_df['high_spice_tolerance'] = np.random.choice([0, 1], size=len(enhanced_df), p=[0.3, 0.7])
+            enhanced_df['preferred_spice_level'] = np.random.choice([1, 2, 3, 4, 5], size=len(enhanced_df))
+            
+        # Add regional food preferences
+        if 'regional_preferences' in indian_data:
+            regions = ['North', 'South', 'East', 'West', 'Central']
+            enhanced_df['preferred_region'] = np.random.choice(regions, size=len(enhanced_df))
+            
+            # One-hot encode regions
+            for region in regions:
+                enhanced_df[f'prefers_{region.lower()}_indian'] = (enhanced_df['preferred_region'] == region).astype(int)
+        
+        # Add meal pattern features
+        enhanced_df['follows_indian_meal_pattern'] = np.random.choice([0, 1], size=len(enhanced_df), p=[0.2, 0.8])
+        enhanced_df['vegetarian_preference'] = np.random.choice([0, 1], size=len(enhanced_df), p=[0.4, 0.6])
+        
+        return enhanced_df
     
     def engineer_advanced_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """

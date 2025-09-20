@@ -36,6 +36,21 @@ interface DashboardData {
     nextFlareRisk: number;
     triggerFoods: string[];
     recommendations: string[];
+    indianRecommendations?: {
+      recommendedDishes: Array<{
+        dishName: string;
+        region: string;
+        ibsFriendlyScore: number;
+        spiceLevel: number;
+        benefits: string;
+      }>;
+      beneficialSpices: Array<{
+        spiceName: string;
+        digestiveBenefit: string;
+        recommendedAmount: string;
+      }>;
+      lifestyleTips: string[];
+    };
   };
   recentSymptoms: {
     date: string;
@@ -73,7 +88,67 @@ const mockDashboardData: DashboardData = {
       'Increase fiber gradually with oats and bananas',
       'Practice stress management techniques before meals',
       'Take probiotics consistently for gut health'
-    ]
+    ],
+    indianRecommendations: {
+      recommendedDishes: [
+        {
+          dishName: 'Khichdi with Ghee',
+          region: 'Pan-Indian',
+          ibsFriendlyScore: 9.2,
+          spiceLevel: 1,
+          benefits: 'Easy to digest, provides complete protein and gentle fiber'
+        },
+        {
+          dishName: 'Moong Dal Soup',
+          region: 'North Indian',
+          ibsFriendlyScore: 8.8,
+          spiceLevel: 2,
+          benefits: 'Light protein source, anti-inflammatory properties'
+        },
+        {
+          dishName: 'Curd Rice (Thayir Sadam)',
+          region: 'South Indian',
+          ibsFriendlyScore: 8.5,
+          spiceLevel: 1,
+          benefits: 'Probiotic-rich, cooling effect on digestive system'
+        },
+        {
+          dishName: 'Bottle Gourd Curry (Lauki)',
+          region: 'North Indian',
+          ibsFriendlyScore: 8.7,
+          spiceLevel: 2,
+          benefits: 'High water content, gentle on stomach, low FODMAP'
+        }
+      ],
+      beneficialSpices: [
+        {
+          spiceName: 'Cumin (Jeera)',
+          digestiveBenefit: 'Aids digestion and reduces bloating',
+          recommendedAmount: '1/2 tsp daily'
+        },
+        {
+          spiceName: 'Ginger (Adrak)',
+          digestiveBenefit: 'Anti-inflammatory, reduces nausea',
+          recommendedAmount: '1 inch piece daily'
+        },
+        {
+          spiceName: 'Turmeric (Haldi)',
+          digestiveBenefit: 'Anti-inflammatory, promotes gut healing',
+          recommendedAmount: '1/4 tsp daily'
+        },
+        {
+          spiceName: 'Fennel Seeds (Saunf)',
+          digestiveBenefit: 'Reduces gas and improves digestion',
+          recommendedAmount: '1 tsp after meals'
+        }
+      ],
+      lifestyleTips: [
+        'Eat smaller, frequent meals throughout the day',
+        'Chew food slowly and mindfully',
+        'Drink warm water with meals instead of cold',
+        'Practice yoga poses like Pawanmuktasana for digestion'
+      ]
+    }
   },
   recentSymptoms: [
     { date: '2024-01-15', severity: 6, symptoms: ['Bloating', 'Abdominal pain'] },
@@ -212,6 +287,83 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+
+            {/* Indian Food Recommendations */}
+            {data.aiPredictions.indianRecommendations && (
+              <div className="mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 rounded-lg border border-orange-200">
+                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <Utensils className="h-4 w-4 text-orange-500" />
+                  Indian Food Recommendations
+                </h4>
+                <Tabs defaultValue="dishes" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="dishes">Recommended Dishes</TabsTrigger>
+                    <TabsTrigger value="spices">Beneficial Spices</TabsTrigger>
+                    <TabsTrigger value="lifestyle">Lifestyle Tips</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="dishes" className="mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {data.aiPredictions.indianRecommendations.recommendedDishes.map((dish, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <h5 className="font-medium text-gray-800">{dish.dishName}</h5>
+                            <Badge variant="secondary" className="text-xs">
+                              {dish.ibsFriendlyScore}/10
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-2">{dish.region}</p>
+                          <p className="text-sm text-gray-700 mb-2">{dish.benefits}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Spice Level:</span>
+                            <div className="flex gap-1">
+                              {[...Array(5)].map((_, i) => (
+                                <div
+                                  key={i}
+                                  className={`w-2 h-2 rounded-full ${
+                                    i < dish.spiceLevel ? 'bg-red-400' : 'bg-gray-200'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="spices" className="mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {data.aiPredictions.indianRecommendations.beneficialSpices.map((spice, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
+                          <h5 className="font-medium text-gray-800 mb-1">{spice.spiceName}</h5>
+                          <p className="text-sm text-gray-700 mb-2">{spice.digestiveBenefit}</p>
+                          <div className="flex items-center gap-2">
+                            <Pill className="h-3 w-3 text-green-500" />
+                            <span className="text-xs text-green-600 font-medium">
+                              {spice.recommendedAmount}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="lifestyle" className="mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {data.aiPredictions.indianRecommendations.lifestyleTips.map((tip, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg border border-orange-200">
+                          <div className="flex items-start gap-2">
+                            <Heart className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                            <span className="text-sm text-gray-700">{tip}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
           </CardContent>
         </Card>
 
