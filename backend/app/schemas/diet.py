@@ -60,7 +60,7 @@ class FoodReactionList(BaseModel):
 class DietLogBase(BaseModel):
     """Base schema for diet logs."""
     meal_type: MealTypeEnum = Field(..., description="Type of meal")
-    food_items: List[str] = Field(..., description="List of food items consumed")
+    foods: List[str] = Field(..., description="List of food items consumed")
     portion_size: Optional[str] = Field(None, max_length=100, description="Portion size description")
     calories: Optional[int] = Field(None, ge=0, description="Estimated calories")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes")
@@ -77,7 +77,7 @@ class DietLogCreate(DietLogBase):
 class DietLogUpdate(BaseModel):
     """Schema for updating a diet log."""
     meal_type: Optional[str] = None
-    food_items: Optional[List[str]] = Field(None, min_items=1)
+    foods: Optional[List[str]] = Field(None, min_items=1)
     portion_size: Optional[str] = None
     calories: Optional[int] = Field(None, ge=0)
     notes: Optional[str] = None
@@ -105,15 +105,16 @@ class DietLogResponse(BaseModel):
     time_since_last_meal_hours: Optional[float] = None
     created_at: datetime
     updated_at: datetime
+    foods: List[str] = Field(default_factory=list, description="List of food names for frontend compatibility")
 
     class Config:
         from_attributes = True
-        
+    
     @validator('user_id', pre=True)
     def convert_uuid_to_string(cls, v):
         """Convert UUID to string for JSON serialization."""
-        if v is None:
-            return None
+        if hasattr(v, 'hex'):
+            return str(v)
         return str(v)
 
 

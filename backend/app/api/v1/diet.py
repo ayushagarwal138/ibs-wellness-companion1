@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, func, desc, or_, select
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, get_optional_current_user
 from app.models.user import User
 from app.models.diet import FoodReaction, DietLog, ReactionSeverityEnum, MealTypeEnum
+from app.models.food_item import FoodItem
 from app.schemas.diet import (
     FoodReactionCreate,
     FoodReactionUpdate,
@@ -193,17 +194,36 @@ async def create_diet_log(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new diet log entry."""
+    from app.models.diet import Food, FoodCategoryEnum, FODMAPLevelEnum
+    
+    if not diet_data.foods:
+        raise HTTPException(status_code=400, detail="At least one food item is required")
+    
     # For now, we'll use the first food item to find or create a food record
     # In a real implementation, you'd want to handle multiple foods differently
-    food_name = diet_data.food_items[0] if diet_data.food_items else "Unknown"
+    food_name = diet_data.foods[0]
     
-    # Try to find existing food or use food_id 1 (Apple) for testing
-    food_id = 1  # Using the Apple we just created
+    # Try to find existing food
+    result = await db.execute(
+        select(Food).where(Food.name.ilike(f"%{food_name}%"))
+    )
+    food = result.scalar_one_or_none()
+    
+    # If food doesn't exist, create it
+    if not food:
+        food = Food(
+            name=food_name,
+            category=FoodCategoryEnum.SNACKS,  # Default category
+            fodmap_level=FODMAPLevelEnum.UNKNOWN,
+            is_active=True
+        )
+        db.add(food)
+        await db.flush()  # Get the ID without committing
     
     consumed_time = diet_data.consumed_at or datetime.utcnow()
     diet_log = DietLog(
         user_id=current_user.id,
-        food_id=food_id,
+        food_id=food.id,
         meal_type=diet_data.meal_type,
         portion_size_g=100.0,  # Default portion size in grams
         portion_description=diet_data.portion_size,
@@ -229,8 +249,11 @@ async def get_diet_logs(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get paginated list of diet logs for the current user."""
-    # Build the query using select
-    query = select(DietLog).filter(DietLog.user_id == current_user.id)
+    # Build the query using select with join to get food information
+    from app.models.diet import Food
+    query = select(DietLog, Food.name.label('food_name')).join(
+        Food, DietLog.food_id == Food.id
+    ).filter(DietLog.user_id == current_user.id)
     
     # Apply filters
     if meal_type:
@@ -258,7 +281,34 @@ async def get_diet_logs(
     
     # Execute the query
     result = await db.execute(query)
-    items = result.scalars().all()
+    rows = result.all()
+    
+    # Transform the results to include food names
+    items = []
+    for diet_log, food_name in rows:
+        # Create a dict with all diet log attributes plus foods array
+        item_dict = {
+            'id': diet_log.id,
+            'user_id': str(diet_log.user_id),
+            'food_id': diet_log.food_id,
+            'meal_type': diet_log.meal_type,
+            'portion_size_g': diet_log.portion_size_g,
+            'portion_description': diet_log.portion_description,
+            'preparation_method': diet_log.preparation_method,
+            'cooking_time_minutes': diet_log.cooking_time_minutes,
+            'added_ingredients': diet_log.added_ingredients,
+            'eaten_at_home': diet_log.eaten_at_home,
+            'restaurant_name': diet_log.restaurant_name,
+            'meal_companions': diet_log.meal_companions,
+            'stress_level_before': diet_log.stress_level_before,
+            'notes': diet_log.notes,
+            'consumed_at': diet_log.consumed_at,
+            'time_since_last_meal_hours': diet_log.time_since_last_meal_hours,
+            'created_at': diet_log.created_at,
+            'updated_at': diet_log.updated_at,
+            'foods': [food_name] if food_name else []  # Add foods array for frontend compatibility
+        }
+        items.append(item_dict)
     
     pages = (total + size - 1) // size
     
@@ -606,3 +656,81 @@ async def get_nutritional_analysis(
         dietary_recommendations=dietary_recommendations,
         ibs_specific_insights=ibs_specific_insights
     )
+
+
+@router.get("/food-suggestions")
+async def get_food_suggestions(
+    query: str = Query("", description="Search query for food suggestions (empty for popular foods)"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of suggestions to return"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get food suggestions based on search query for autocomplete functionality."""
+    try:
+        if query.strip():
+            # Search in food_items table with query
+            food_query = select(FoodItem).filter(
+                FoodItem.name.ilike(f"%{query}%")
+            ).order_by(FoodItem.name).limit(limit)
+        else:
+            # Return popular/common foods when no query provided
+            food_query = select(FoodItem).order_by(FoodItem.name).limit(limit)
+        
+        result = await db.execute(food_query)
+        food_items = result.scalars().all()
+        
+        # Also get user's previously logged foods for personalized suggestions
+        user_foods = []
+        # Removed user-specific suggestions for now to avoid authentication issues
+        
+        # Combine suggestions
+        suggestions = []
+        
+        # Add database foods with additional info
+        for food_item in food_items:
+            suggestions.append({
+                "name": food_item.name,
+                "category": food_item.category,
+                "fodmap_level": food_item.fodmap_level,
+                "is_common_trigger": food_item.common_triggers,
+                "source": "database"
+            })
+        
+        # Add user's previous foods
+        for food in user_foods[:limit-len(suggestions)]:
+            if len(suggestions) < limit:
+                suggestions.append({
+                    "name": food,
+                    "category": "user_history",
+                    "fodmap_level": None,
+                    "is_common_trigger": None,
+                    "source": "user_history"
+                })
+        
+        # Add common foods if we don't have enough suggestions
+        common_foods = [
+            "Chicken breast", "Brown rice", "White rice", "Salmon", "Eggs",
+            "Spinach", "Carrots", "Bananas", "Oats", "Quinoa",
+            "Sweet potato", "Broccoli", "Bell pepper", "Cucumber", "Tomato"
+        ]
+        
+        for food in common_foods:
+            if len(suggestions) < limit and query.lower() in food.lower():
+                if not any(s["name"].lower() == food.lower() for s in suggestions):
+                    suggestions.append({
+                        "name": food,
+                        "category": "common",
+                        "fodmap_level": "low",
+                        "is_common_trigger": False,
+                        "source": "common"
+                    })
+        
+        return {
+            "suggestions": suggestions[:limit],
+            "total": len(suggestions[:limit])
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching food suggestions: {str(e)}"
+        )

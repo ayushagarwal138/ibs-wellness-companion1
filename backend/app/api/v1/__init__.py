@@ -14,6 +14,7 @@ from .users import router as users_router
 from .onboarding import router as onboarding_router
 from .profile import router as profile_router
 from .notifications import router as notifications_router
+from .recommendations import router as recommendations_router
 
 api_router = APIRouter()
 
@@ -28,5 +29,6 @@ api_router.include_router(chat_router, prefix="/chat", tags=["chat"])
 api_router.include_router(onboarding_router, prefix="/onboarding", tags=["onboarding"])
 api_router.include_router(profile_router, tags=["profile"])
 api_router.include_router(notifications_router, tags=["notifications"])
+api_router.include_router(recommendations_router, tags=["recommendations"])
 
 __all__ = ["api_router"]

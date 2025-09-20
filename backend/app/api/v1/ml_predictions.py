@@ -32,7 +32,7 @@ from app.schemas.ml_predictions import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ml", tags=["ML Predictions"])
+router = APIRouter(tags=["ML Predictions"])
 
 # Global enhanced recommendation service instance - will be initialized on first use
 enhanced_recommendation_service = None
@@ -198,6 +198,102 @@ async def get_recommendations(
         )
 
 
+@router.get("/predictions")
+async def get_predictions(
+    timeframe: str = "week",
+    include_recommendations: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
+):
+    """Get ML predictions for the user based on their data."""
+    try:
+        # Prepare user data for prediction
+        user_data = await _prepare_user_data(current_user, db)
+        
+        # Add recent symptom trends based on timeframe
+        if timeframe == "day":
+            days_back = 1
+        elif timeframe == "week":
+            days_back = 7
+        else:  # month
+            days_back = 30
+            
+        user_data['recent_symptoms'] = await _get_recent_symptom_trends(
+            current_user.id, db, days_back
+        )
+        
+        # Make predictions using enhanced service
+        severity_prediction = service.predict_symptom_risk(user_data)
+        
+        # Prepare response
+        response = {
+            "risk_level": severity_prediction.get('risk_level', 'medium'),
+            "confidence": severity_prediction.get('confidence', 0.75),
+            "next_flare_probability": severity_prediction.get('risk_score', 0.5),
+            "predicted_severity": severity_prediction.get('severity_score', 5),
+            "timeline": f"Next {timeframe}",
+            "key_factors": _extract_risk_factors(user_data, severity_prediction)
+        }
+        
+        # Add recommendations if requested
+        if include_recommendations:
+            recommendations = await service.generate_enhanced_recommendations(current_user, user_data, db)
+            response["recommendations"] = {
+                "immediate_actions": recommendations.get('immediate_actions', []),
+                "dietary_suggestions": recommendations.get('dietary_suggestions', []),
+                "lifestyle_changes": recommendations.get('lifestyle_changes', [])
+            }
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error getting predictions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error getting predictions"
+        )
+
+@router.get("/realtime-predictions")
+async def get_realtime_predictions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
+):
+    """Get real-time predictions based on current user state."""
+    try:
+        # Prepare user data for real-time prediction
+        user_data = await _prepare_user_data(current_user, db)
+        
+        # Get very recent data (last 24 hours)
+        user_data['recent_symptoms'] = await _get_recent_symptom_trends(
+            current_user.id, db, 1
+        )
+        
+        # Make real-time prediction
+        prediction = service.predict_symptom_risk(user_data)
+        
+        # Generate immediate recommendations
+        recommendations = await service.generate_enhanced_recommendations(current_user, user_data)
+        immediate_actions = recommendations.get('immediate_actions', [])
+        
+        return {
+            "current_risk": prediction.get('risk_score', 0.35) * 100,
+            "risk_factors": _extract_risk_factors(user_data, prediction)[:3],  # Top 3
+            "immediate_recommendations": [
+                action.get('action', '') for action in immediate_actions[:3]
+            ],
+            "confidence_score": prediction.get('confidence', 0.78) * 100
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting realtime predictions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error getting realtime predictions"
+        )
+
+
 async def _prepare_user_data(
     user: User, 
     db: AsyncSession, 
@@ -216,16 +312,18 @@ async def _prepare_user_data(
             'gender': user.gender,
             'bmi': bmi,
             'years_since_diagnosis': years_since_diagnosis,
-            'ibs_subtype': user.ibs_subtype
+            'ibs_type': user.ibs_type
         },
         'symptoms': symptoms or {}
     }
     
     # If no symptoms provided, get the most recent symptom log
     if not symptoms:
-        recent_symptom = db.query(SymptomLog).filter(
+        stmt = select(SymptomLog).where(
             SymptomLog.user_id == user.id
-        ).order_by(SymptomLog.logged_at.desc()).first()
+        ).order_by(SymptomLog.logged_at.desc()).limit(1)
+        result = await db.execute(stmt)
+        recent_symptom = result.scalar_one_or_none()
         
         if recent_symptom:
             user_data['symptoms'] = {
@@ -246,14 +344,14 @@ async def _prepare_user_data(
     return user_data
 
 
-async def _get_recent_symptom_trends(user_id: str, db: AsyncSession) -> Dict[str, Any]:
+async def _get_recent_symptom_trends(user_id: str, db: AsyncSession, days_back: int = 7) -> Dict[str, Any]:
     """Get recent symptom trends for the user."""
-    # Get symptoms from the last 7 days
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    # Get symptoms from the specified number of days back
+    days_ago = datetime.utcnow() - timedelta(days=days_back)
     result = await db.execute(
         select(SymptomLog).filter(
             SymptomLog.user_id == user_id,
-            SymptomLog.logged_at >= seven_days_ago
+            SymptomLog.logged_at >= days_ago
         )
     )
     recent_symptoms = result.scalars().all()

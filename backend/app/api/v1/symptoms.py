@@ -208,7 +208,28 @@ async def get_symptom_stats(
     # Average severity
     avg_severity = None
     if logs:
-        severities = [log.severity.value if hasattr(log.severity, 'value') else log.severity for log in logs]
+        # Convert severity enum values to numeric values for calculation
+        severity_mapping = {
+            'none': 0,
+            'mild': 1,
+            'moderate': 2,
+            'severe': 3,
+            'very_severe': 4
+        }
+        
+        severities = []
+        for log in logs:
+            if hasattr(log.severity, 'value'):
+                severity_val = log.severity.value
+            else:
+                severity_val = log.severity
+            
+            # Convert to numeric value
+            if isinstance(severity_val, str) and severity_val in severity_mapping:
+                severities.append(severity_mapping[severity_val])
+            elif isinstance(severity_val, int):
+                severities.append(severity_val)
+        
         avg_severity = sum(severities) / len(severities) if severities else None
     
     # Symptoms by type (simplified)

@@ -56,7 +56,7 @@ async def save_onboarding_data(
             profile_updates['weight_kg'] = float(onboarding_data['weight'])
             
         if 'ibsType' in onboarding_data:
-            profile_updates['ibs_subtype'] = onboarding_data['ibsType']
+            profile_updates['ibs_type'] = onboarding_data['ibsType']
             
         if 'diagnosisYear' in onboarding_data:
             profile_updates['diagnosis_date'] = datetime(int(onboarding_data['diagnosisYear']), 1, 1)

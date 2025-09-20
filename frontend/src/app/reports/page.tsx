@@ -193,72 +193,335 @@ const mockReportData: ReportData = {
 export default function ReportsPage() {
   const [reportData, setReportData] = useState<ReportData>(mockReportData);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'day' | 'week' | 'month'>('month');
+
+  // Helper functions for personalization
+  const calculateTrackingDays = (createdAt?: string): number => {
+    if (!createdAt) return 30;
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - created.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.min(diffDays, 365); // Cap at 1 year
+  };
+
+  const determineTrend = (predictions: any): 'improving' | 'stable' | 'worsening' => {
+    if (!predictions) return 'stable';
+    const riskLevel = predictions.risk_level;
+    const confidence = predictions.confidence || 0.5;
+    
+    if (riskLevel === 'low' && confidence > 0.7) return 'improving';
+    if (riskLevel === 'high' && confidence > 0.7) return 'worsening';
+    return 'stable';
+  };
+
+  const getPersonalizedSeverityDescription = (riskLevel: string, userProfile: any): string => {
+    const name = userProfile?.first_name || userProfile?.name || 'User';
+    
+    switch (riskLevel) {
+      case 'low':
+        return `Great news, ${name}! Your symptoms are well-controlled. Continue with your current management approach.`;
+      case 'medium':
+        return `${name}, your symptoms are at a moderate level. Consider implementing the recommended lifestyle changes.`;
+      case 'high':
+        return `${name}, your symptoms require attention. Please consider consulting with your healthcare provider.`;
+      default:
+        return `${name}, continue monitoring your symptoms and following your management plan.`;
+    }
+  };
+
+  const generatePersonalizedInsights = (mlReport: any, userProfile: any): Array<{
+    type: 'positive' | 'warning' | 'info';
+    title: string;
+    description: string;
+    action_required: boolean;
+  }> => {
+    const insights = [];
+    const name = userProfile?.first_name || userProfile?.name || 'User';
+    
+    // Generate insights based on predictions
+    if (mlReport.predictions?.risk_level === 'low') {
+      insights.push({
+        type: 'positive' as const,
+        title: `Excellent Progress, ${name}!`,
+        description: 'Your symptom management is working well. Keep up the great work!',
+        action_required: false
+      });
+    }
+    
+    if (mlReport.predictions?.next_flare_probability > 0.5) {
+      insights.push({
+        type: 'warning' as const,
+        title: 'Potential Flare Risk',
+        description: 'Our analysis suggests increased flare risk. Consider implementing preventive measures.',
+        action_required: true
+      });
+    }
+    
+    insights.push({
+      type: 'info' as const,
+      title: 'Tracking Consistency',
+      description: 'Regular symptom tracking helps improve prediction accuracy and personalized recommendations.',
+      action_required: false
+    });
+    
+    return insights;
+  };
+
+  // Metric calculation functions
+  const calculateSymptomControl = (mlReport: any): number => {
+    if (!mlReport.predictions) return 70;
+    const riskLevel = mlReport.predictions.risk_level;
+    switch (riskLevel) {
+      case 'low': return 85;
+      case 'medium': return 70;
+      case 'high': return 45;
+      default: return 70;
+    }
+  };
+
+  const calculateQualityOfLife = (mlReport: any, userProfile: any): number => {
+    const baseScore = calculateSymptomControl(mlReport);
+    // Adjust based on tracking consistency
+    const trackingDays = calculateTrackingDays(userProfile?.created_at);
+    const consistencyBonus = Math.min(trackingDays / 30 * 10, 15);
+    return Math.min(baseScore + consistencyBonus, 100);
+  };
+
+  const calculateGoalAchievement = (mlReport: any): number => {
+    if (!mlReport.predictions) return 75;
+    const confidence = mlReport.predictions.confidence || 0.5;
+    return Math.round(confidence * 100);
+  };
+
+  const calculateConsistencyScore = (mlReport: any, userProfile: any): number => {
+    const trackingDays = calculateTrackingDays(userProfile?.created_at);
+    return Math.min(Math.round((trackingDays / 30) * 100), 100);
+  };
+
+  const fetchReportData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch real ML predictions and recommendations
+      const mlReport = await mlService.generateReport(selectedTimeframe);
+      
+      // Get user profile data for personalization
+      let userProfile = null;
+      try {
+        const response = await fetch('/api/v1/profile', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (response.ok) {
+          userProfile = await response.json();
+        }
+      } catch (error) {
+        console.warn('Could not fetch user profile:', error);
+      }
+
+      // Generate personalized insights based on user data
+      const personalizedInsights = generatePersonalizedInsights(mlReport, userProfile);
+      
+      // Transform the API response to match our ReportData interface
+      const transformedData: ReportData = {
+        user_summary: {
+          name: userProfile?.first_name || userProfile?.name || "User",
+          tracking_days: calculateTrackingDays(userProfile?.created_at),
+          last_updated: new Date().toLocaleDateString(),
+          overall_trend: determineTrend(mlReport.predictions) as 'improving' | 'stable' | 'declining'
+        },
+        severity_assessment: {
+          current_level: mlReport.predictions?.risk_level || 'medium',
+          trend: determineTrend(mlReport.predictions),
+          score: mlReport.predictions?.predicted_severity || 5,
+          description: getPersonalizedSeverityDescription(mlReport.predictions?.risk_level || 'medium', userProfile)
+        },
+        ml_predictions: mlReport.predictions || {
+          risk_level: 'medium',
+          confidence: 0.75,
+          next_flare_probability: 0.3,
+          predicted_severity: 5,
+          timeline: 'Next week',
+          key_factors: ['Stress levels', 'Dietary patterns']
+        },
+        recommendations: {
+          immediate_actions: mlReport.predictions?.recommendations?.immediate_actions || [
+            {
+              action: 'Continue tracking symptoms daily',
+              priority: 'high' as const,
+              explanation: 'Consistent tracking helps identify patterns',
+              expected_benefit: 'Better symptom management'
+            }
+          ],
+          dietary_suggestions: mlReport.predictions?.recommendations?.dietary_suggestions || [
+            {
+              type: 'avoid' as const,
+              foods: ['High FODMAP foods'],
+              reason: 'May trigger symptoms',
+              timeline: '2-4 weeks'
+            }
+          ],
+          lifestyle_changes: mlReport.predictions?.recommendations?.lifestyle_changes || [
+            {
+              category: 'Stress Management',
+              suggestion: 'Practice daily meditation',
+              difficulty: 'easy' as const,
+              impact: 'Reduces stress-related symptoms'
+            }
+          ],
+          medical_advice: {
+            should_consult_doctor: false,
+            urgency: 'low' as const,
+            reasons: [],
+            suggested_specialists: []
+          }
+        },
+        insights: personalizedInsights,
+        progress_metrics: {
+          symptom_control: calculateSymptomControl(mlReport),
+          quality_of_life: calculateQualityOfLife(mlReport, userProfile),
+          goal_achievement: calculateGoalAchievement(mlReport),
+          consistency_score: calculateConsistencyScore(mlReport, userProfile)
+        }
+      };
+
+      setReportData(transformedData);
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+      setError('Failed to load report data. Please try again.');
+      
+      // Provide comprehensive fallback data
+      setReportData({
+        user_summary: {
+          name: "User",
+          tracking_days: 30,
+          last_updated: new Date().toLocaleDateString(),
+          overall_trend: "stable"
+        },
+        severity_assessment: {
+          current_level: "medium",
+          trend: "stable",
+          score: 5,
+          description: "Your symptoms appear to be at a moderate level. Continue monitoring and following your management plan."
+        },
+        ml_predictions: {
+          risk_level: 'medium',
+          confidence: 0.75,
+          next_flare_probability: 0.3,
+          predicted_severity: 5,
+          timeline: 'Next week',
+          key_factors: ['Stress levels', 'Dietary patterns', 'Sleep quality']
+        },
+        recommendations: {
+          immediate_actions: [
+            {
+              action: 'Continue tracking symptoms and food intake daily',
+              priority: 'high',
+              explanation: 'Consistent tracking is essential for identifying patterns',
+              expected_benefit: 'Better symptom management and more accurate predictions'
+            },
+            {
+              action: 'Practice stress reduction techniques',
+              priority: 'medium',
+              explanation: 'Stress is a common IBS trigger',
+              expected_benefit: 'Reduced symptom frequency and severity'
+            }
+          ],
+          dietary_suggestions: [
+            {
+              type: 'avoid',
+              foods: ['High FODMAP foods', 'Dairy products', 'Gluten'],
+              reason: 'Common IBS triggers that affect most patients',
+              timeline: '2-4 weeks trial elimination'
+            },
+            {
+              type: 'include',
+              foods: ['Probiotics', 'Soluble fiber', 'Peppermint tea'],
+              reason: 'May help improve digestive health',
+              timeline: 'Gradual introduction over 1-2 weeks'
+            }
+          ],
+          lifestyle_changes: [
+            {
+              category: 'Stress Management',
+              suggestion: 'Practice deep breathing exercises for 10 minutes daily',
+              difficulty: 'easy',
+              impact: 'Reduces stress-related IBS symptoms'
+            },
+            {
+              category: 'Exercise',
+              suggestion: 'Take a 20-30 minute walk after meals',
+              difficulty: 'easy',
+              impact: 'Improves digestion and reduces bloating'
+            },
+            {
+              category: 'Sleep',
+              suggestion: 'Maintain consistent sleep schedule (7-9 hours)',
+              difficulty: 'moderate',
+              impact: 'Better overall health and symptom management'
+            }
+          ],
+          medical_advice: {
+            should_consult_doctor: false,
+            urgency: 'low',
+            reasons: [],
+            suggested_specialists: []
+          }
+        },
+        insights: [
+          {
+            type: 'info',
+            title: 'Symptom Patterns',
+            description: 'Your symptom patterns suggest stress may be a significant trigger',
+            action_required: true
+          },
+          {
+            type: 'info',
+            title: 'Food Diary',
+            description: 'Consider keeping a detailed food diary to identify dietary triggers',
+            action_required: true
+          },
+          {
+            type: 'positive',
+            title: 'Meal Timing',
+            description: 'Regular meal timing appears to help with symptom management',
+            action_required: false
+          }
+        ],
+        progress_metrics: {
+          symptom_control: 65,
+          quality_of_life: 70,
+          goal_achievement: 75,
+          consistency_score: 80
+        }
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     // In production, fetch real ML predictions and report data
     fetchReportData();
   }, [selectedTimeframe]);
 
-  const fetchReportData = async () => {
-    setIsLoading(true);
-    try {
-      // Fetch real ML predictions and recommendations
-      const mlReport = await mlService.generateReport(selectedTimeframe);
-      
-      // Transform the API response to match our ReportData interface
-      const transformedData: ReportData = {
-        user_summary: {
-          name: "User",
-          tracking_days: 45,
-          last_updated: new Date().toLocaleDateString(),
-          overall_trend: 'improving'
-        },
-        severity_assessment: {
-          current_level: mlReport.predictions.risk_level,
-          trend: 'improving',
-          score: mlReport.predictions.predicted_severity,
-          description: getSeverityDescription(mlReport.predictions.risk_level)
-        },
-        ml_predictions: mlReport.predictions,
-        recommendations: {
-          immediate_actions: mlReport.predictions.recommendations?.immediate_actions || [],
-          dietary_suggestions: mlReport.predictions.recommendations?.dietary_suggestions || [],
-          lifestyle_changes: mlReport.predictions.recommendations?.lifestyle_changes || [],
-          medical_advice: {
-            should_consult_doctor: mlReport.predictions.risk_level === 'high',
-            urgency: mlReport.predictions.risk_level === 'high' ? 'high' : 'low',
-            reasons: mlReport.predictions.risk_level === 'high' 
-              ? ["High symptom severity detected", "Professional evaluation recommended"]
-              : ["Symptoms are well-managed", "Positive improvement trend"],
-            suggested_specialists: mlReport.predictions.risk_level === 'high' 
-              ? ["Gastroenterologist", "Registered Dietitian"] 
-              : []
-          }
-        },
-        insights: [
-          {
-            type: 'positive',
-            title: "AI Analysis Complete",
-            description: `Based on your data, we've identified ${mlReport.predictions.key_factors.length} key factors affecting your symptoms.`,
-            action_required: false
-          }
-        ],
-        progress_metrics: {
-          symptom_control: Math.round((10 - mlReport.predictions.predicted_severity) * 10),
-          quality_of_life: Math.round(mlReport.predictions.confidence * 0.9),
-          goal_achievement: 85,
-          consistency_score: 91
-        }
-      };
-      
-      setReportData(transformedData);
-    } catch (error) {
-      console.error('Error fetching report data:', error);
-      // Keep using mock data on error
-    } finally {
-      setIsLoading(false);
+  const getSuggestedSpecialists = (riskLevel: string, userProfile: any): string[] => {
+    const specialists = [];
+    
+    if (riskLevel === 'high' || riskLevel === 'moderate') {
+      specialists.push("Gastroenterologist");
+      specialists.push("Registered Dietitian");
     }
+    
+    if (riskLevel === 'high') {
+      specialists.push("Mental Health Counselor (for stress management)");
+    }
+
+    return specialists;
   };
 
   const getSeverityColor = (level: string) => {

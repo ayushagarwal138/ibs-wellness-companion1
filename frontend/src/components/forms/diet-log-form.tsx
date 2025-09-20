@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { apiService } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { MealType } from '@ibs-wellness/shared-types';
-import { Clock, Plus, X, Utensils, AlertTriangle } from 'lucide-react';
+import { Clock, Plus, X, Utensils, AlertTriangle, Search } from 'lucide-react';
 
 interface DietLogFormData {
-  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | '';
-  food_items: string[];
+  meal_type: MealType | '';
+  foods: string[];
   portion_size?: string;
   calories?: number;
   notes?: string;
@@ -29,6 +29,13 @@ interface DietLogFormData {
   eating_speed?: string;
   hydration_level?: number;
   supplements_taken?: string[];
+}
+
+interface FoodSuggestion {
+  name: string;
+  category: string;
+  fodmap_level: string;
+  is_common_trigger: boolean;
 }
 
 const FOOD_CATEGORIES = [
@@ -54,7 +61,7 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
   const router = useRouter();
   const [formData, setFormData] = useState<DietLogFormData>({
     meal_type: '',
-    food_items: [],
+    foods: [],
     portion_size: '',
     calories: undefined,
     notes: '',
@@ -63,13 +70,17 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
     mood_after: 5,
     food_categories: [],
     preparation_method: '',
-    eating_speed: '',
+    eating_speed: 'normal',
     hydration_level: 5,
     supplements_taken: []
   });
 
-  const [foodItemInput, setFoodItemInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [foodItemInput, setFoodItemInput] = useState('');
+  const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const handleInputChange = (field: keyof DietLogFormData, value: any) => {
     setFormData(prev => ({
@@ -78,20 +89,107 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
     }));
   };
 
-  const addFoodItem = () => {
-    if (foodItemInput.trim()) {
+  // Fetch food suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      // Always fetch suggestions, even for empty input to show popular foods
+      try {
+        console.log('Fetching food suggestions for:', foodItemInput.trim());
+        const response = await apiService.getFoodSuggestions(foodItemInput.trim());
+        console.log('Food suggestions response:', response);
+        setSuggestions(response.suggestions || []);
+        setShowSuggestions(true);
+        setSelectedSuggestionIndex(-1);
+      } catch (error: any) {
+        console.error('Error fetching food suggestions:', error);
+        console.error('Error details:', {
+          message: error?.message,
+          status: error?.response?.status,
+          data: error?.response?.data
+        });
+        setSuggestions([]);
+        setShowSuggestions(false);
+        
+        // Show user-friendly error message for authentication issues
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          console.warn('Authentication required for food suggestions');
+        }
+      }
+    };
+
+    // Reduce debounce time for faster response and fetch immediately for empty input
+    const timeoutId = setTimeout(fetchSuggestions, foodItemInput.trim() ? 150 : 0);
+    return () => clearTimeout(timeoutId);
+  }, [foodItemInput]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const addFoodItem = (foodName?: string) => {
+    const itemToAdd = foodName || foodItemInput.trim();
+    if (itemToAdd && !formData.foods.includes(itemToAdd)) {
       setFormData(prev => ({
         ...prev,
-        food_items: [...prev.food_items, foodItemInput.trim()]
+        foods: [...prev.foods, itemToAdd]
       }));
       setFoodItemInput('');
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: FoodSuggestion) => {
+    addFoodItem(suggestion.name);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addFoodItem();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+        } else {
+          addFoodItem();
+        }
+        break;
+      case 'Escape':
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
     }
   };
 
   const removeFoodItem = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      food_items: prev.food_items.filter((_, i) => i !== index)
+      foods: prev.foods.filter((_, i) => i !== index)
     }));
   };
 
@@ -120,33 +218,32 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
       toast.error('Please select a meal type');
       return;
     }
-
-    if (formData.food_items.length === 0) {
+    
+    if (formData.foods.length === 0) {
       toast.error('Please add at least one food item');
       return;
     }
 
     setIsLoading(true);
-
+    
     try {
       const submitData = {
-        meal_type: formData.meal_type as MealType,
-        foods: formData.food_items,
-        portion_size: formData.portion_size,
+        meal_type: formData.meal_type,
+        foods: formData.foods,
+        portion_size: formData.portion_size || undefined,
         calories: formData.calories || undefined,
-        notes: formData.notes,
-        consumed_at: formData.consumed_at ? new Date(formData.consumed_at).toISOString() : undefined,
-        mood_before: formData.mood_before,
-        mood_after: formData.mood_after,
+        notes: formData.notes || undefined,
+        consumed_at: formData.consumed_at ? new Date(formData.consumed_at).toISOString() : new Date().toISOString()
       };
 
       await apiService.createDietLog(submitData);
+      
       toast.success('Diet log created successfully!');
       
       // Reset form
       setFormData({
         meal_type: '',
-        food_items: [],
+        foods: [],
         portion_size: '',
         calories: undefined,
         notes: '',
@@ -155,21 +252,19 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
         mood_after: 5,
         food_categories: [],
         preparation_method: '',
-        eating_speed: '',
+        eating_speed: 'normal',
         hydration_level: 5,
         supplements_taken: []
       });
-      setFoodItemInput('');
       
-      // Call onSuccess callback if provided, otherwise show success message and reset form
       if (onSuccess) {
         onSuccess();
       } else {
-        toast.success('Meal logged successfully! You can log another meal or view your history.');
+        router.push('/dashboard');
       }
     } catch (error) {
-      console.error('Error creating diet log:', error);
       toast.error('Failed to create diet log. Please try again.');
+      console.error('Error creating diet log:', error);
     } finally {
       setIsLoading(false);
     }
@@ -177,85 +272,129 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Utensils className="h-6 w-6 text-green-600" />
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Utensils className="h-5 w-5" />
           Log Your Meal
         </CardTitle>
-        <p className="text-sm text-gray-600">Track your food intake to help identify triggers and patterns</p>
       </CardHeader>
-      <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Meal Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Meal Type */}
-            <div className="space-y-2">
-              <Label htmlFor="meal_type" className="text-sm font-medium">Meal Type *</Label>
-              <Select
-                value={formData.meal_type}
-                onValueChange={(value: string) => handleInputChange('meal_type', value as 'breakfast' | 'lunch' | 'dinner' | 'snack')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select meal type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="breakfast">🌅 Breakfast</SelectItem>
-                  <SelectItem value="lunch">☀️ Lunch</SelectItem>
-                  <SelectItem value="dinner">🌙 Dinner</SelectItem>
-                  <SelectItem value="snack">🍎 Snack</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Consumed At */}
-            <div className="space-y-2">
-              <Label htmlFor="consumed_at" className="text-sm font-medium flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                When did you eat this?
-              </Label>
-              <Input
-                id="consumed_at"
-                type="datetime-local"
-                value={formData.consumed_at}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('consumed_at', e.target.value)}
-                className="w-full"
-              />
-            </div>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Meal Type */}
+          <div className="space-y-2">
+            <Label htmlFor="meal_type">Meal Type *</Label>
+            <Select
+              value={formData.meal_type}
+              onValueChange={(value) => handleInputChange('meal_type', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select meal type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={MealType.BREAKFAST}>Breakfast</SelectItem>
+                <SelectItem value={MealType.LUNCH}>Lunch</SelectItem>
+                <SelectItem value={MealType.DINNER}>Dinner</SelectItem>
+                <SelectItem value={MealType.SNACK}>Snack</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Food Items */}
-          <div className="space-y-4">
-            <Label htmlFor="food_items" className="text-sm font-medium">Food Items *</Label>
-            <div className="flex gap-2">
-              <Input
-                id="food_items"
-                value={foodItemInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFoodItemInput(e.target.value)}
-                placeholder="Enter a food item (e.g., grilled chicken, brown rice)"
-                onKeyPress={(e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addFoodItem();
-                  }
-                }}
-                className="flex-1"
-              />
-              <Button type="button" onClick={addFoodItem} variant="outline" size="sm">
-                <Plus className="h-4 w-4" />
-              </Button>
+          {/* Consumed At */}
+          <div className="space-y-2">
+            <Label htmlFor="consumed_at" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              When did you eat this?
+            </Label>
+            <Input
+              id="consumed_at"
+              type="datetime-local"
+              value={formData.consumed_at}
+              onChange={(e) => handleInputChange('consumed_at', e.target.value)}
+              className="w-full"
+            />
+          </div>
+
+          {/* Food Items with Autocomplete */}
+          <div className="space-y-2">
+            <Label htmlFor="food_items">Food Items *</Label>
+            <div className="relative" ref={suggestionsRef}>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    id="food_items"
+                    type="text"
+                    placeholder="Start typing to search for foods or click to see popular foods..."
+                    value={foodItemInput}
+                    onChange={(e) => setFoodItemInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                      // Show suggestions when input is focused, even if empty
+                      if (suggestions.length > 0 || !foodItemInput.trim()) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    className="pr-10"
+                  />
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => addFoodItem()}
+                  disabled={!foodItemInput.trim()}
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className={`px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                        selectedSuggestionIndex === index ? 'bg-blue-50' : ''
+                      }`}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{suggestion.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            suggestion.category === 'database' ? 'bg-green-100 text-green-800' :
+                            suggestion.category === 'user_history' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {suggestion.category}
+                          </span>
+                          {suggestion.is_common_trigger && (
+                            <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded text-xs">
+                              <AlertTriangle className="h-3 w-3" />
+                              Trigger
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            {formData.food_items.length > 0 && (
-              <div className="flex flex-wrap gap-2 p-4 bg-gray-50 rounded-lg">
-                {formData.food_items.map((item, index) => (
+            
+            {/* Added Food Items */}
+            {formData.foods.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {formData.foods.map((item: string, index: number) => (
                   <div
                     key={index}
-                    className="bg-white border border-gray-200 px-3 py-2 rounded-full text-sm flex items-center gap-2 shadow-sm"
+                    className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
                   >
-                    {item}
+                    <span>{item}</span>
                     <button
                       type="button"
                       onClick={() => removeFoodItem(index)}
-                      className="text-red-500 hover:text-red-700 ml-1"
+                      className="ml-1 hover:bg-blue-200 rounded-full p-1"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -265,201 +404,49 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
             )}
           </div>
 
-          {/* Food Categories & Triggers */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              <Label className="text-sm font-medium">Potential Trigger Categories</Label>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {FOOD_CATEGORIES.map((category) => (
-                <div key={category} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={category}
-                    checked={formData.food_categories?.includes(category) || false}
-                    onCheckedChange={() => toggleFoodCategory(category)}
-                  />
-                  <Label htmlFor={category} className="text-xs cursor-pointer">
-                    {category}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Meal Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Portion Size */}
-            <div className="space-y-2">
-              <Label htmlFor="portion_size" className="text-sm font-medium">Portion Size</Label>
-              <Input
-                id="portion_size"
-                value={formData.portion_size}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('portion_size', e.target.value)}
-                placeholder="e.g., 1 cup, medium bowl"
-              />
-            </div>
-
-            {/* Preparation Method */}
-            <div className="space-y-2">
-              <Label htmlFor="preparation_method" className="text-sm font-medium">Preparation Method</Label>
-              <Select
-                value={formData.preparation_method}
-                onValueChange={(value: string) => handleInputChange('preparation_method', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="How was it prepared?" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PREPARATION_METHODS.map((method) => (
-                    <SelectItem key={method} value={method}>{method}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Eating Speed */}
-            <div className="space-y-2">
-              <Label htmlFor="eating_speed" className="text-sm font-medium">Eating Speed</Label>
-              <Select
-                value={formData.eating_speed}
-                onValueChange={(value: string) => handleInputChange('eating_speed', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="How fast did you eat?" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="very_slow">Very Slow</SelectItem>
-                  <SelectItem value="slow">Slow</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="fast">Fast</SelectItem>
-                  <SelectItem value="very_fast">Very Fast</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Portion Size */}
+          <div className="space-y-2">
+            <Label htmlFor="portion_size">Portion Size</Label>
+            <Input
+              id="portion_size"
+              type="text"
+              placeholder="e.g., 1 cup, 2 slices, medium bowl"
+              value={formData.portion_size}
+              onChange={(e) => handleInputChange('portion_size', e.target.value)}
+            />
           </div>
 
           {/* Calories */}
           <div className="space-y-2">
-            <Label htmlFor="calories" className="text-sm font-medium">Estimated Calories</Label>
+            <Label htmlFor="calories">Estimated Calories</Label>
             <Input
               id="calories"
               type="number"
-              min="0"
-              max="5000"
+              placeholder="Optional"
               value={formData.calories || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('calories', e.target.value ? parseInt(e.target.value) : undefined)}
-              placeholder="Enter estimated calories"
-              className="w-full md:w-48"
+              onChange={(e) => handleInputChange('calories', e.target.value ? parseInt(e.target.value) : undefined)}
             />
-          </div>
-
-          {/* Mood Tracking */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Mood Before */}
-            <div className="space-y-3">
-              <Label htmlFor="mood_before" className="text-sm font-medium">Mood Before Eating</Label>
-              <div className="px-3 py-4 bg-blue-50 rounded-lg">
-                <Slider
-                  value={[formData.mood_before || 5]}
-                  onValueChange={(value: number[]) => handleInputChange('mood_before', value[0])}
-                  max={10}
-                  min={1}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-2">
-                  <span>😞 Very Bad</span>
-                  <span>😐 Neutral</span>
-                  <span>😊 Excellent</span>
-                </div>
-                <div className="text-center mt-2 font-medium text-blue-700">
-                  Score: {formData.mood_before}/10
-                </div>
-              </div>
-            </div>
-
-            {/* Mood After */}
-            <div className="space-y-3">
-              <Label htmlFor="mood_after" className="text-sm font-medium">Mood After Eating</Label>
-              <div className="px-3 py-4 bg-green-50 rounded-lg">
-                <Slider
-                  value={[formData.mood_after || 5]}
-                  onValueChange={(value: number[]) => handleInputChange('mood_after', value[0])}
-                  max={10}
-                  min={1}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-2">
-                  <span>😞 Very Bad</span>
-                  <span>😐 Neutral</span>
-                  <span>😊 Excellent</span>
-                </div>
-                <div className="text-center mt-2 font-medium text-green-700">
-                  Score: {formData.mood_after}/10
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Hydration Level */}
-          <div className="space-y-3">
-            <Label htmlFor="hydration_level" className="text-sm font-medium">Hydration Level with Meal</Label>
-            <div className="px-3 py-4 bg-cyan-50 rounded-lg">
-              <Slider
-                value={[formData.hydration_level || 5]}
-                onValueChange={(value: number[]) => handleInputChange('hydration_level', value[0])}
-                max={10}
-                min={1}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-2">
-                <span>💧 Very Little</span>
-                <span>💧💧 Moderate</span>
-                <span>💧💧💧 Lots of Water</span>
-              </div>
-              <div className="text-center mt-2 font-medium text-cyan-700">
-                Level: {formData.hydration_level}/10
-              </div>
-            </div>
-          </div>
-
-          {/* Supplements */}
-          <div className="space-y-4">
-            <Label className="text-sm font-medium">Supplements Taken with Meal</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {COMMON_SUPPLEMENTS.map((supplement) => (
-                <div key={supplement} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={supplement}
-                    checked={formData.supplements_taken?.includes(supplement) || false}
-                    onCheckedChange={() => toggleSupplement(supplement)}
-                  />
-                  <Label htmlFor={supplement} className="text-xs cursor-pointer">
-                    {supplement}
-                  </Label>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes" className="text-sm font-medium">Additional Notes</Label>
+            <Label htmlFor="notes">Additional Notes</Label>
             <Textarea
               id="notes"
-              value={formData.notes || ''}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange('notes', e.target.value)}
-              placeholder="Any additional observations about this meal, how you felt, or other relevant details..."
-              rows={4}
-              className="resize-none"
+              placeholder="Any additional observations, context, or details about this meal..."
+              value={formData.notes}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              rows={3}
             />
           </div>
 
-          <Button type="submit" disabled={isLoading} className="w-full py-3 text-lg">
-            {isLoading ? 'Logging Meal...' : 'Log Meal'}
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? 'Saving...' : 'Save Diet Log'}
           </Button>
         </form>
       </CardContent>

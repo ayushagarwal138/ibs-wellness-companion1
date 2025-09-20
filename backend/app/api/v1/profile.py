@@ -15,6 +15,46 @@ from app.services.user_service import UserService
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 
+@router.get("")
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    """Get complete user profile information."""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "phone_number": current_user.phone_number,
+        "date_of_birth": current_user.date_of_birth.isoformat() if current_user.date_of_birth else None,
+        "gender": current_user.gender,
+        "avatar_url": current_user.avatar_url,
+        "emergency_contact_name": current_user.emergency_contact_name,
+        "emergency_contact_phone": current_user.emergency_contact_phone,
+        "timezone": current_user.timezone,
+        "medical_history": {
+            "ibs_type": current_user.ibs_type,
+            "diagnosis_date": current_user.diagnosis_date.isoformat() if current_user.diagnosis_date else None,
+            "current_medications": current_user.current_medications or [],
+            "allergies": current_user.allergies or [],
+            "medical_conditions": current_user.medical_conditions or []
+        },
+        "dietary_preferences": {
+            "dietary_restrictions": current_user.dietary_restrictions or [],
+            "food_allergies": current_user.food_allergies or [],
+            "preferred_cuisines": current_user.preferred_cuisines or [],
+            "meal_frequency": current_user.meal_frequency
+        },
+        "lifestyle_factors": {
+            "activity_level": current_user.activity_level,
+            "stress_level": current_user.stress_level,
+            "sleep_hours": current_user.sleep_hours,
+            "work_schedule": current_user.work_schedule
+        }
+    }
+
+
 @router.get("/basic-info")
 async def get_basic_info(
     current_user: User = Depends(get_current_user),
