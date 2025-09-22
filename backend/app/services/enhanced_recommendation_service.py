@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, desc, select
 
 # Add ML models path to system path
 ml_models_path = Path(__file__).parent.parent.parent.parent / "ml-models"
@@ -103,6 +104,40 @@ class EnhancedRecommendationService(RecommendationService):
             logger.error(f"Error loading enhanced ML models: {e}")
             # Fallback to base recommendation service if models fail to load
     
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get information about loaded enhanced ML models."""
+        current_time = datetime.now()
+        
+        # Create model status based on loaded models
+        models_loaded = {}
+        model_versions = {}
+        last_updated = {}
+        fallback_active = {}
+        
+        for model_name in ['severity_model', 'flareup_model', 'recommendation_model']:
+            # Check if we have the corresponding enhanced model
+            has_model = model_name.replace('_model', '') in self.ml_models or len(self.ml_models) > 0
+            models_loaded[model_name] = has_model
+            model_versions[model_name] = "enhanced_v1.0.0" if has_model else "fallback_v1.0.0"
+            last_updated[model_name] = current_time
+            fallback_active[model_name] = not has_model
+        
+        return {
+            'models_loaded': models_loaded,
+            'model_versions': model_versions,
+            'last_updated': last_updated,
+            'fallback_active': fallback_active
+        }
+    
+    def reload_models(self):
+        """Reload enhanced ML models from the latest checkpoint."""
+        self.ml_models.clear()
+        self.feature_names.clear()
+        self.scaler = None
+        self.feature_selector = None
+        self.load_ml_models()
+        logger.info("Enhanced models reloaded successfully")
+    
     def _load_enhanced_fodmap_data(self) -> Dict[str, Any]:
         """Load enhanced FODMAP data with external dataset insights."""
         return {
@@ -169,7 +204,7 @@ class EnhancedRecommendationService(RecommendationService):
         """
         if model_name not in self.ml_models:
             logger.warning(f"Model {model_name} not available, using fallback")
-            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 'Low'}
+            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 0.5}
         
         try:
             model = self.ml_models[model_name]
@@ -195,44 +230,52 @@ class EnhancedRecommendationService(RecommendationService):
             return {
                 'risk_probability': float(risk_probability),
                 'risk_level': risk_level,
-                'confidence': 'High' if len(self.ml_models) > 0 else 'Medium',
+                'confidence': 0.85 if len(self.ml_models) > 0 else 0.65,
                 'model_used': model_name
             }
             
         except Exception as e:
             logger.error(f"Error in ML prediction: {e}")
-            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 'Low'}
+            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 0.5}
     
     def _prepare_feature_vector(self, user_features: Dict[str, Any]) -> np.ndarray:
         """Prepare feature vector for ML model prediction."""
-        # Default feature values
+        # Default feature values - ensure exactly 15 features to match ML model
         default_features = {
+            'total_symptom_logs': 0,
+            'severe_symptoms': 0,
+            'moderate_symptoms': 0,
+            'avg_pain_level': 0,
+            'bowel_movement_logs': 0,
+            'food_reactions': 0,
+            'severe_food_reactions': 0,
+            'medication_logs': 0,
+            'age': 30,
+            'is_female': 0,
             'stress_level': 5,
             'sleep_score': 7,
             'fodmap_load_score': 5,
             'daily_fiber_estimate': 20,
-            'daily_calories_estimate': 2000,
-            'is_weekend': 0,
-            'wellness_composite': 5,
-            'flare_risk_score': 5,
-            'severity_trend_3day': 5,
-            'fiber_per_1000_cal': 10,
-            'high_stress_poor_sleep': 0,
-            'high_fodmap_day': 0,
-            'adequate_fiber': 1,
-            'severe_symptoms': 0
+            'wellness_composite': 5
         }
         
         # Update with provided features
         default_features.update(user_features)
         
-        # Create feature vector in the expected order
-        if self.feature_names:
-            feature_vector = np.array([default_features.get(name, 0) for name in self.feature_names])
-        else:
-            # Fallback to common features
-            common_features = ['stress_level', 'sleep_score', 'fodmap_load_score', 'daily_fiber_estimate']
-            feature_vector = np.array([default_features.get(name, 0) for name in common_features])
+        # Create feature vector with exactly 15 features in consistent order
+        feature_order = [
+            'total_symptom_logs', 'severe_symptoms', 'moderate_symptoms', 
+            'avg_pain_level', 'bowel_movement_logs', 'food_reactions',
+            'severe_food_reactions', 'medication_logs', 'age', 'is_female',
+            'stress_level', 'sleep_score', 'fodmap_load_score', 
+            'daily_fiber_estimate', 'wellness_composite'
+        ]
+        
+        feature_vector = np.array([default_features.get(name, 0) for name in feature_order])
+        
+        # Ensure exactly 15 features
+        if len(feature_vector) != 15:
+            feature_vector = np.pad(feature_vector, (0, max(0, 15 - len(feature_vector))))[:15]
         
         return feature_vector
     
@@ -240,7 +283,7 @@ class EnhancedRecommendationService(RecommendationService):
         self, 
         user_id: int, 
         ml_predictions: Dict[str, Any],
-        db: Session
+        db: AsyncSession
     ) -> Dict[str, Any]:
         """Generate enhanced recommendations combining ML predictions with external data"""
         try:
@@ -277,8 +320,11 @@ class EnhancedRecommendationService(RecommendationService):
             
             return {
                 'immediate_actions': immediate_actions,
-                'dietary_suggestions': enhanced_dietary,
-                'lifestyle_changes': enhanced_lifestyle,
+                'diet_recommendations': enhanced_dietary,
+                'lifestyle_recommendations': enhanced_lifestyle,
+                'diet_score': self._calculate_personalization_score(user_features),
+                'lifestyle_score': ml_predictions.get('confidence', 0),
+                'model_version': '1.0.0',
                 'ml_insights': ml_driven_recommendations,
                 'nutrition_optimization': nutrition_recommendations,
                 'personalization_score': self._calculate_personalization_score(user_features),
@@ -295,7 +341,7 @@ class EnhancedRecommendationService(RecommendationService):
         user_id: int, 
         ml_predictions: Dict[str, Any],
         user_features: Dict[str, Any],
-        db: Session
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """Generate personalized dietary recommendations based on user patterns"""
         recommendations = []
@@ -310,54 +356,48 @@ class EnhancedRecommendationService(RecommendationService):
         if risk_level == 'high':
             recommendations.extend([
                 {
-                    'type': 'eliminate',
-                    'foods': trigger_foods[:5] if trigger_foods else ['High FODMAP foods', 'Dairy products', 'Gluten-containing grains'],
-                    'reason': 'These foods have been identified as your primary triggers based on symptom correlation',
-                    'timeline': 'Eliminate immediately for 2-4 weeks',
-                    'priority': 'high'
+                    'category': 'eliminate',
+                    'recommendation': f"Eliminate {', '.join(trigger_foods[:5] if trigger_foods else ['High FODMAP foods', 'Dairy products', 'Gluten-containing grains'])}",
+                    'priority': 'high',
+                    'rationale': 'These foods have been identified as your primary triggers based on symptom correlation. Eliminating them immediately for 2-4 weeks can help reduce symptoms.'
                 },
                 {
-                    'type': 'include',
-                    'foods': ['Bone broth', 'Ginger tea', 'Peppermint tea', 'Rice', 'Bananas'],
-                    'reason': 'These foods are gentle on the digestive system and may help reduce inflammation',
-                    'timeline': 'Include daily during symptom flare-ups',
-                    'priority': 'high'
+                    'category': 'include',
+                    'recommendation': 'Include Bone broth, Ginger tea, Peppermint tea, Rice, Bananas',
+                    'priority': 'high',
+                    'rationale': 'These foods are gentle on the digestive system and may help reduce inflammation. Include daily during symptom flare-ups.'
                 }
             ])
         
         elif risk_level == 'moderate':
             recommendations.extend([
                 {
-                    'type': 'moderate',
-                    'foods': trigger_foods[:3] if trigger_foods else ['Caffeine', 'Spicy foods', 'High-fat foods'],
-                    'reason': 'Monitor these foods carefully as they may contribute to your symptoms',
-                    'timeline': 'Reduce portion sizes and frequency over 2-3 weeks',
-                    'priority': 'medium'
+                    'category': 'moderate',
+                    'recommendation': f"Monitor {', '.join(trigger_foods[:3] if trigger_foods else ['Caffeine', 'Spicy foods', 'High-fat foods'])} carefully",
+                    'priority': 'medium',
+                    'rationale': 'These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks.'
                 },
                 {
-                    'type': 'include',
-                    'foods': safe_foods[:5] if safe_foods else ['Oats', 'Lean proteins', 'Cooked vegetables', 'Herbal teas'],
-                    'reason': 'These foods have shown to be well-tolerated in your diet history',
-                    'timeline': 'Incorporate as staples in your meal planning',
-                    'priority': 'medium'
+                    'category': 'include',
+                    'recommendation': f"Incorporate {', '.join(safe_foods[:5] if safe_foods else ['Oats', 'Lean proteins', 'Cooked vegetables', 'Herbal teas'])} as staples",
+                    'priority': 'medium',
+                    'rationale': 'These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning.'
                 }
             ])
         
         else:  # low risk
             recommendations.extend([
                 {
-                    'type': 'maintain',
-                    'foods': safe_foods if safe_foods else ['Current well-tolerated foods'],
-                    'reason': 'Your current dietary approach is working well - maintain these patterns',
-                    'timeline': 'Continue current approach with gradual variety expansion',
-                    'priority': 'low'
+                    'category': 'maintain',
+                    'recommendation': f"Continue with {', '.join(safe_foods if safe_foods else ['current well-tolerated foods'])}",
+                    'priority': 'low',
+                    'rationale': 'Your current dietary approach is working well - maintain these patterns. Continue current approach with gradual variety expansion.'
                 },
                 {
-                    'type': 'explore',
-                    'foods': ['Probiotic foods', 'Prebiotic fibers', 'Anti-inflammatory spices'],
-                    'reason': 'Consider adding these foods to further optimize gut health',
-                    'timeline': 'Introduce one new food per week',
-                    'priority': 'low'
+                    'category': 'explore',
+                    'recommendation': 'Consider adding Probiotic foods, Prebiotic fibers, Anti-inflammatory spices',
+                    'priority': 'low',
+                    'rationale': 'Consider adding these foods to further optimize gut health. Introduce one new food per week.'
                 }
             ])
         
@@ -365,20 +405,18 @@ class EnhancedRecommendationService(RecommendationService):
         fodmap_load = user_features.get('fodmap_load', 0)
         if fodmap_load > 7:
             recommendations.append({
-                'type': 'eliminate',
-                'foods': ['High FODMAP foods (onions, garlic, wheat, beans)', 'Artificial sweeteners'],
-                'reason': f'Your FODMAP load is high ({fodmap_load}/10) - reducing these may significantly improve symptoms',
-                'timeline': 'Follow strict low-FODMAP diet for 4-6 weeks',
-                'priority': 'high'
+                'category': 'eliminate',
+                'recommendation': 'Eliminate High FODMAP foods (onions, garlic, wheat, beans) and Artificial sweeteners',
+                'priority': 'high',
+                'rationale': f'Your FODMAP load is high ({fodmap_load}/10) - reducing these may significantly improve symptoms. Follow strict low-FODMAP diet for 4-6 weeks.'
             })
         
         # Add hydration recommendations
         recommendations.append({
-            'type': 'hydration',
-            'foods': ['Warm water', 'Herbal teas', 'Electrolyte solutions'],
-            'reason': 'Proper hydration supports digestive health and can reduce constipation',
-            'timeline': 'Aim for 8-10 glasses daily, warm liquids preferred',
-            'priority': 'medium'
+            'category': 'hydration',
+            'recommendation': 'Increase intake of Warm water, Herbal teas, Electrolyte solutions',
+            'priority': 'medium',
+            'rationale': 'Proper hydration supports digestive health and can reduce constipation. Aim for 8-10 glasses daily, warm liquids preferred.'
         })
         
         return recommendations
@@ -388,7 +426,7 @@ class EnhancedRecommendationService(RecommendationService):
         user_id: int, 
         ml_predictions: Dict[str, Any],
         user_features: Dict[str, Any],
-        db: Session
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """Generate personalized lifestyle recommendations"""
         recommendations = []
@@ -402,19 +440,15 @@ class EnhancedRecommendationService(RecommendationService):
             recommendations.extend([
                 {
                     'category': 'Stress Management',
-                    'suggestion': 'Practice deep breathing exercises (4-7-8 technique) during symptom onset',
-                    'difficulty': 'easy',
-                    'impact': 'Can provide immediate relief and prevent symptom escalation',
-                    'frequency': '3-5 times daily, especially before meals',
-                    'priority': 'high'
+                    'recommendation': 'Practice deep breathing exercises (4-7-8 technique) during symptom onset',
+                    'priority': 'high',
+                    'rationale': 'Can provide immediate relief and prevent symptom escalation'
                 },
                 {
                     'category': 'Mindfulness',
-                    'suggestion': 'Use a meditation app for 10-15 minutes daily',
-                    'difficulty': 'easy',
-                    'impact': 'Reduces stress-related IBS symptoms by up to 40%',
-                    'frequency': 'Daily, preferably same time each day',
-                    'priority': 'high'
+                    'recommendation': 'Use a meditation app for 10-15 minutes daily',
+                    'priority': 'high',
+                    'rationale': 'Reduces stress-related IBS symptoms by up to 40%'
                 }
             ])
         
@@ -423,19 +457,15 @@ class EnhancedRecommendationService(RecommendationService):
             recommendations.extend([
                 {
                     'category': 'Sleep Hygiene',
-                    'suggestion': 'Avoid eating 3 hours before bedtime',
-                    'difficulty': 'moderate',
-                    'impact': 'Better sleep quality and reduced morning symptoms',
-                    'frequency': 'Every night',
-                    'priority': 'high'
+                    'recommendation': 'Avoid eating 3 hours before bedtime',
+                    'priority': 'high',
+                    'rationale': 'Better sleep quality and reduced morning symptoms'
                 },
                 {
                     'category': 'Sleep Environment',
-                    'suggestion': 'Keep bedroom cool (65-68°F) and use blackout curtains',
-                    'difficulty': 'easy',
-                    'impact': 'Improved sleep quality supports gut health recovery',
-                    'frequency': 'Nightly',
-                    'priority': 'medium'
+                    'recommendation': 'Keep bedroom cool (65-68°F) and use blackout curtains',
+                    'priority': 'medium',
+                    'rationale': 'Improved sleep quality supports gut health recovery'
                 }
             ])
         
@@ -444,39 +474,31 @@ class EnhancedRecommendationService(RecommendationService):
         if predicted_severity < 5:
             recommendations.append({
                 'category': 'Exercise',
-                'suggestion': 'Engage in moderate cardio (walking, swimming) for 30 minutes',
-                'difficulty': 'moderate',
-                'impact': 'Improves gut motility and reduces stress hormones',
-                'frequency': '4-5 times per week',
-                'priority': 'medium'
+                'recommendation': 'Engage in moderate cardio (walking, swimming) for 30 minutes',
+                'priority': 'medium',
+                'rationale': 'Improves gut motility and reduces stress hormones'
             })
         else:
             recommendations.append({
                 'category': 'Gentle Movement',
-                'suggestion': 'Try gentle yoga or stretching for 10-15 minutes after meals',
-                'difficulty': 'easy',
-                'impact': 'Promotes healthy digestion and reduces gas buildup',
-                'frequency': 'After each main meal',
-                'priority': 'high'
+                'recommendation': 'Try gentle yoga or stretching for 15-20 minutes',
+                'priority': 'medium',
+                'rationale': 'Gentle movement can help with digestion without overexertion'
             })
         
         # Meal timing recommendations
         recommendations.extend([
             {
                 'category': 'Meal Timing',
-                'suggestion': 'Eat smaller, more frequent meals (5-6 times daily)',
-                'difficulty': 'moderate',
-                'impact': 'Reduces digestive burden and prevents symptom spikes',
-                'frequency': 'Daily meal planning',
-                'priority': 'high'
+                'recommendation': 'Eat smaller, more frequent meals (5-6 times daily)',
+                'priority': 'high',
+                'rationale': 'Reduces digestive burden and prevents symptom spikes'
             },
             {
                 'category': 'Mindful Eating',
-                'suggestion': 'Chew each bite 20-30 times and eat without distractions',
-                'difficulty': 'moderate',
-                'impact': 'Improves digestion and reduces bloating by 25-30%',
-                'frequency': 'Every meal',
-                'priority': 'medium'
+                'recommendation': 'Chew food thoroughly and eat slowly',
+                'priority': 'medium',
+                'rationale': 'Improves digestion and reduces gas formation'
             }
         ])
         
@@ -484,11 +506,9 @@ class EnhancedRecommendationService(RecommendationService):
         if stress_level > 8:
             recommendations.append({
                 'category': 'Work-Life Balance',
-                'suggestion': 'Take 5-minute breaks every hour to practice breathing or stretching',
-                'difficulty': 'easy',
-                'impact': 'Prevents stress accumulation that can trigger symptoms',
-                'frequency': 'During work hours',
-                'priority': 'high'
+                'recommendation': 'Take 5-minute breaks every hour to practice breathing or stretching',
+                'priority': 'medium',
+                'rationale': 'Prevents stress accumulation that can trigger symptoms'
             })
         
         return recommendations
@@ -577,7 +597,7 @@ class EnhancedRecommendationService(RecommendationService):
         
         return actions
 
-    async def _identify_trigger_foods(self, user_id: int, db: Session) -> List[str]:
+    async def _identify_trigger_foods(self, user_id: int, db: AsyncSession) -> List[str]:
         """Identify foods that correlate with symptoms"""
         try:
             # This would typically query food logs and symptom data
@@ -592,7 +612,7 @@ class EnhancedRecommendationService(RecommendationService):
             logger.error(f"Error identifying trigger foods: {str(e)}")
             return ['High FODMAP foods', 'Dairy products', 'Gluten-containing grains']
 
-    async def _identify_safe_foods(self, user_id: int, db: Session) -> List[str]:
+    async def _identify_safe_foods(self, user_id: int, db: AsyncSession) -> List[str]:
         """Identify foods that are well-tolerated"""
         try:
             # This would typically query food logs for foods with low symptom correlation
@@ -662,87 +682,87 @@ class EnhancedRecommendationService(RecommendationService):
             'last_updated': datetime.utcnow().isoformat()
         }
 
-    def predict_symptom_risk(self, user_features: Dict[str, Any], model_name: str = 'logistic_regression') -> Dict[str, Any]:
-        """
-        Use ML models to predict IBS symptom risk and severity.
-        
-        Args:
-            user_features: Dictionary of user features
-            model_name: Name of the ML model to use
-            
-        Returns:
-            Dictionary with risk prediction and confidence
-        """
-        if model_name not in self.ml_models:
-            logger.warning(f"Model {model_name} not available, using fallback")
-            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 'Low'}
-        
+    async def _generate_ml_driven_recommendations(
+        self, 
+        ml_predictions: Dict[str, Any],
+        user_features: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate ML-driven recommendations based on predictions."""
         try:
-            model = self.ml_models[model_name]
+            recommendations = []
             
-            # Prepare feature vector
-            feature_vector = self._prepare_feature_vector(user_features)
+            # Risk-based recommendations
+            risk_level = ml_predictions.get('risk_level', 'medium')
+            if risk_level == 'high':
+                recommendations.extend([
+                    {
+                        'type': 'immediate_action',
+                        'title': 'High Risk Alert',
+                        'description': 'Consider consulting your healthcare provider',
+                        'priority': 'high'
+                    },
+                    {
+                        'type': 'dietary',
+                        'title': 'Strict FODMAP Elimination',
+                        'description': 'Follow a strict low-FODMAP diet for the next 2-3 days',
+                        'priority': 'high'
+                    }
+                ])
             
-            # Make prediction
-            if hasattr(model, 'predict_proba'):
-                probabilities = model.predict_proba(feature_vector.reshape(1, -1))[0]
-                risk_probability = probabilities[1] if len(probabilities) > 1 else probabilities[0]
-            else:
-                risk_probability = model.predict(feature_vector.reshape(1, -1))[0]
+            # Symptom-based recommendations
+            if user_features.get('severe_symptoms', 0) > 0:
+                recommendations.append({
+                    'type': 'symptom_management',
+                    'title': 'Symptom Relief Protocol',
+                    'description': 'Apply heat therapy and practice deep breathing exercises',
+                    'priority': 'medium'
+                })
             
-            # Determine risk level
-            if risk_probability > 0.7:
-                risk_level = 'High'
-            elif risk_probability > 0.4:
-                risk_level = 'Medium'
-            else:
-                risk_level = 'Low'
-            
-            return {
-                'risk_probability': float(risk_probability),
-                'risk_level': risk_level,
-                'confidence': 'High' if len(self.ml_models) > 0 else 'Medium',
-                'model_used': model_name
-            }
+            return recommendations
             
         except Exception as e:
-            logger.error(f"Error in ML prediction: {e}")
-            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 'Low'}
-    
-    def _prepare_feature_vector(self, user_features: Dict[str, Any]) -> np.ndarray:
-        """Prepare feature vector for ML model prediction."""
-        # Default feature values
-        default_features = {
-            'stress_level': 5,
-            'sleep_score': 7,
-            'fodmap_load_score': 5,
-            'daily_fiber_estimate': 20,
-            'daily_calories_estimate': 2000,
-            'is_weekend': 0,
-            'wellness_composite': 5,
-            'flare_risk_score': 5,
-            'severity_trend_3day': 5,
-            'fiber_per_1000_cal': 10,
-            'high_stress_poor_sleep': 0,
-            'high_fodmap_day': 0,
-            'adequate_fiber': 1,
-            'severe_symptoms': 0
-        }
-        
-        # Update with provided features
-        default_features.update(user_features)
-        
-        # Create feature vector in the expected order
-        if self.feature_names:
-            feature_vector = np.array([default_features.get(name, 0) for name in self.feature_names])
-        else:
-            # Fallback to common features
-            common_features = ['stress_level', 'sleep_score', 'fodmap_load_score', 'daily_fiber_estimate']
-            feature_vector = np.array([default_features.get(name, 0) for name in common_features])
-        
-        return feature_vector
-    
-    def generate_personalized_meal_plan(self, 
+            logger.error(f"Error generating ML-driven recommendations: {str(e)}")
+            return []
+
+    async def _get_nutrition_optimization_recommendations(
+        self, 
+        user_id: int, 
+        ml_predictions: Dict[str, Any], 
+        db: AsyncSession
+    ) -> List[Dict[str, Any]]:
+        """Get nutrition optimization recommendations."""
+        try:
+            recommendations = []
+            
+            # Basic nutrition recommendations
+            recommendations.extend([
+                {
+                    'type': 'nutrition',
+                    'title': 'Hydration Focus',
+                    'description': 'Maintain adequate hydration with 8-10 glasses of water daily',
+                    'priority': 'medium'
+                },
+                {
+                    'type': 'nutrition',
+                    'title': 'Fiber Balance',
+                    'description': 'Gradually increase soluble fiber intake with oats and bananas',
+                    'priority': 'medium'
+                },
+                {
+                    'type': 'nutrition',
+                    'title': 'Meal Timing',
+                    'description': 'Eat smaller, more frequent meals to reduce digestive stress',
+                    'priority': 'low'
+                }
+            ])
+            
+            return recommendations
+            
+        except Exception as e:
+            logger.error(f"Error getting nutrition recommendations: {str(e)}")
+            return []
+
+    async def generate_personalized_meal_plan(self, 
                                       user: User,
                                       risk_prediction: Dict[str, Any],
                                       dietary_restrictions: List[str] = None) -> Dict[str, Any]:
@@ -795,6 +815,70 @@ class EnhancedRecommendationService(RecommendationService):
         }
         
         return meal_plan
+
+
+    async def _extract_user_features(self, user_id: int, db: AsyncSession) -> Dict[str, Any]:
+        """Extract user features for ML model predictions."""
+        try:
+            # Get user data
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if not user:
+                return {}
+            
+            # Get recent symptom data (last 30 days)
+            from app.models.symptom import SymptomLog, SeverityEnum
+            from app.models.medication import MedicationLog
+            
+            symptom_result = await db.execute(
+                select(SymptomLog).where(
+                    SymptomLog.user_id == user.id,
+                    SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=30)
+                )
+            )
+            recent_symptoms = symptom_result.scalars().all()
+            
+            # Calculate features
+            features = {
+                'total_symptom_logs': len(recent_symptoms),
+                'severe_symptoms': len([s for s in recent_symptoms if s.severity == SeverityEnum.SEVERE]),
+                'moderate_symptoms': len([s for s in recent_symptoms if s.severity == SeverityEnum.MODERATE]),
+                'avg_pain_level': np.mean([s.pain_level for s in recent_symptoms if s.pain_level]) if recent_symptoms else 0,
+                'bowel_movement_logs': len([s for s in recent_symptoms if hasattr(s, 'bristol_stool_type')]),
+                'age': user.age if user.age else 30,
+                'is_female': 1 if user.gender and user.gender == 'FEMALE' else 0
+            }
+            
+            # Food reaction data
+            food_result = await db.execute(
+                select(FoodReaction).where(
+                    FoodReaction.user_id == user.id,
+                    FoodReaction.reaction_occurred_at >= datetime.utcnow() - timedelta(days=30)
+                )
+            )
+            food_reactions = food_result.scalars().all()
+            
+            features.update({
+                'food_reactions': len(food_reactions),
+                'severe_food_reactions': len([r for r in food_reactions if r.severity == ReactionSeverityEnum.SEVERE])
+            })
+            
+            # Medication adherence
+            med_result = await db.execute(
+                select(MedicationLog).where(
+                    MedicationLog.user_id == user.id,
+                    MedicationLog.taken_at >= datetime.utcnow() - timedelta(days=30)
+                )
+            )
+            medications = med_result.scalars().all()
+            
+            features['medication_logs'] = len(medications)
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Error extracting user features: {str(e)}")
+            return {}
 
 
 def create_enhanced_recommendation_service(db: Session) -> EnhancedRecommendationService:

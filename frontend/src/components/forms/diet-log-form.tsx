@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { apiService } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { MealType } from '@ibs-wellness/shared-types';
-import { Clock, Plus, X, Utensils, AlertTriangle, Search } from 'lucide-react';
+import { Clock, Plus, X, Utensils, AlertTriangle, Search, Calculator } from 'lucide-react';
 
 interface DietLogFormData {
   meal_type: MealType | '';
@@ -29,6 +29,14 @@ interface DietLogFormData {
   eating_speed?: string;
   hydration_level?: number;
   supplements_taken?: string[];
+  nutritional_info?: {
+    carbs: number;
+    protein: number;
+    fat: number;
+    fiber: number;
+    sugar: number;
+    sodium: number;
+  };
 }
 
 interface FoodSuggestion {
@@ -80,6 +88,7 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
   const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [isCalculatingNutrition, setIsCalculatingNutrition] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const handleInputChange = (field: keyof DietLogFormData, value: any) => {
@@ -144,6 +153,45 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
       setFoodItemInput('');
       setShowSuggestions(false);
       setSelectedSuggestionIndex(-1);
+      
+      // Auto-calculate nutrition when foods are added
+      calculateNutrition([...formData.foods, itemToAdd]);
+    }
+  };
+
+  const calculateNutrition = async (foods: string[]) => {
+    if (foods.length === 0) {
+      setFormData(prev => ({ ...prev, nutritional_info: undefined, calories: undefined }));
+      return;
+    }
+
+    setIsCalculatingNutrition(true);
+    try {
+      const response = await fetch('/api/v1/diet/nutrition/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(foods)
+      });
+
+      if (response.ok) {
+        const nutritionData = await response.json();
+        setFormData(prev => ({
+          ...prev,
+          calories: Math.round(nutritionData.nutrition.calories || 0),
+          nutritional_info: {
+            carbs: Math.round(nutritionData.nutrition.carbs_g || 0),
+            protein: Math.round(nutritionData.nutrition.protein_g || 0),
+            fat: Math.round(nutritionData.nutrition.fat_g || 0),
+            fiber: Math.round(nutritionData.nutrition.fiber_g || 0),
+            sugar: Math.round(nutritionData.nutrition.sugar_g || 0),
+            sodium: Math.round(nutritionData.nutrition.sodium_mg || 0)
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Error calculating nutrition:', error);
+    } finally {
+      setIsCalculatingNutrition(false);
     }
   };
 
@@ -187,10 +235,14 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
   };
 
   const removeFoodItem = (index: number) => {
+    const newFoods = formData.foods.filter((_, i) => i !== index);
     setFormData(prev => ({
       ...prev,
-      foods: prev.foods.filter((_, i) => i !== index)
+      foods: newFoods
     }));
+    
+    // Recalculate nutrition when foods are removed
+    calculateNutrition(newFoods);
   };
 
   const toggleFoodCategory = (category: string) => {
@@ -412,20 +464,97 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
               type="text"
               placeholder="e.g., 1 cup, 2 slices, medium bowl"
               value={formData.portion_size}
-              onChange={(e) => handleInputChange('portion_size', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('portion_size', e.target.value);
+                // Recalculate nutrition when portion size changes
+                if (formData.foods.length > 0) {
+                  setTimeout(() => calculateNutrition(formData.foods), 500);
+                }
+              }}
             />
           </div>
 
-          {/* Calories */}
+          {/* Nutritional Information Display */}
+          {(formData.nutritional_info || formData.calories || isCalculatingNutrition) && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Nutritional Information
+                {isCalculatingNutrition && (
+                  <span className="text-sm text-gray-500">(Calculating...)</span>
+                )}
+              </Label>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {isCalculatingNutrition ? '...' : (formData.calories || 0)}
+                  </div>
+                  <div className="text-sm text-gray-600">Calories</div>
+                </div>
+                
+                {formData.nutritional_info && (
+                  <>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {isCalculatingNutrition ? '...' : formData.nutritional_info.carbs}g
+                      </div>
+                      <div className="text-sm text-gray-600">Carbs</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">
+                        {isCalculatingNutrition ? '...' : formData.nutritional_info.protein}g
+                      </div>
+                      <div className="text-sm text-gray-600">Protein</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {isCalculatingNutrition ? '...' : formData.nutritional_info.fat}g
+                      </div>
+                      <div className="text-sm text-gray-600">Fat</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {isCalculatingNutrition ? '...' : formData.nutritional_info.fiber}g
+                      </div>
+                      <div className="text-sm text-gray-600">Fiber</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-pink-600">
+                        {isCalculatingNutrition ? '...' : formData.nutritional_info.sugar}g
+                      </div>
+                      <div className="text-sm text-gray-600">Sugar</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {isCalculatingNutrition ? '...' : formData.nutritional_info.sodium}mg
+                      </div>
+                      <div className="text-sm text-gray-600">Sodium</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Calories (Manual Override) */}
           <div className="space-y-2">
-            <Label htmlFor="calories">Estimated Calories</Label>
+            <Label htmlFor="calories">Manual Calorie Override</Label>
             <Input
               id="calories"
               type="number"
-              placeholder="Optional"
+              placeholder="Leave empty to use calculated value"
               value={formData.calories || ''}
               onChange={(e) => handleInputChange('calories', e.target.value ? parseInt(e.target.value) : undefined)}
             />
+            <p className="text-sm text-gray-500">
+              Only fill this if you want to override the automatically calculated calories
+            </p>
           </div>
 
           {/* Notes */}

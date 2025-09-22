@@ -336,6 +336,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error('Cannot update profile on server side')
       }
 
+      // Convert frontend data to backend enum format
+      const convertedData = { ...data }
+      
+      // Convert gender to uppercase enum
+      if (convertedData.gender) {
+        const genderMap: { [key: string]: string } = {
+          'male': 'MALE',
+          'female': 'FEMALE',
+          'other': 'OTHER',
+          'prefer_not_to_say': 'PREFER_NOT_TO_SAY'
+        }
+        convertedData.gender = genderMap[convertedData.gender.toLowerCase()] || convertedData.gender
+      }
+      
+      // Convert IBS type to uppercase enum with underscores
+      if (convertedData.ibs_type) {
+        const ibsTypeMap: { [key: string]: string | null } = {
+          'ibs-d': 'IBS_D',
+          'ibs-c': 'IBS_C', 
+          'ibs-m': 'IBS_M',
+          'ibs-u': 'IBS_U',
+          'not_diagnosed': null // Handle not diagnosed case
+        }
+        const mappedType = ibsTypeMap[convertedData.ibs_type.toLowerCase()]
+        if (mappedType === null) {
+          delete convertedData.ibs_type // Remove field if not diagnosed
+        } else {
+          convertedData.ibs_type = mappedType || convertedData.ibs_type
+        }
+      }
+
       const token = localStorage.getItem('access_token')
       const response = await fetch(`${API_BASE_URL}/api/v1/users/profile`, {
         method: 'PATCH',
@@ -343,7 +374,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(convertedData),
       })
 
       if (!response.ok) {
@@ -352,8 +383,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const updatedUser = await response.json()
-      setUser(updatedUser)
+      
+      // Update user state with the response from server
+      setUser(prevUser => ({
+        ...prevUser,
+        ...updatedUser
+      }))
+      
       toast.success('Profile updated successfully!')
+      
+      return updatedUser
     } catch (error: any) {
       toast.error(error.message || 'Profile update failed')
       throw error

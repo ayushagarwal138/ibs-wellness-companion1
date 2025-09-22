@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { OAuthButtons } from "./oauth-buttons"
 import Link from "next/link"
+import { toast } from "react-hot-toast"
 
 export function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -32,13 +33,33 @@ export function RegisterForm() {
     if (!formData.email || !formData.password || !formData.fullName) return
 
     if (formData.password !== formData.confirmPassword) {
-      // This would be handled by toast in a real app
-      alert("Passwords don't match")
+      toast.error("Passwords don't match")
       return
     }
 
-    if (formData.password.length < 6) {
-      alert("Password must be at least 6 characters long")
+    if (formData.password.length < 8) {
+      toast.error("Password must be at least 8 characters long")
+      return
+    }
+
+    // Check password strength requirements
+    if (!/[A-Z]/.test(formData.password)) {
+      toast.error("Password must contain at least one uppercase letter")
+      return
+    }
+
+    if (!/[a-z]/.test(formData.password)) {
+      toast.error("Password must contain at least one lowercase letter")
+      return
+    }
+
+    if (!/\d/.test(formData.password)) {
+      toast.error("Password must contain at least one digit")
+      return
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      toast.error("Password must contain at least one special character")
       return
     }
 
@@ -102,12 +123,12 @@ export function RegisterForm() {
               id="password"
               name="password"
               type="password"
-              placeholder="Create a password (min. 6 characters)"
+              placeholder="Create a password (min. 8 chars, 1 upper, 1 lower, 1 digit, 1 special)"
               value={formData.password}
               onChange={handleChange}
               required
               disabled={isLoading}
-              minLength={6}
+              minLength={8}
             />
           </div>
 

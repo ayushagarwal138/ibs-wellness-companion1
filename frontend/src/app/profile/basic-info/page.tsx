@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { User, Save, ArrowLeft } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+import { useUserSync } from '@/hooks/useUserSync';
+import { toast } from 'react-hot-toast';
+import { SyncStatusIndicator } from '@/components/ui/sync-status-indicator';
 
 interface BasicInfoData {
   firstName: string;
@@ -24,15 +28,13 @@ interface BasicInfoData {
   weight_kg?: number;
   emergencyContact: string;
   emergencyPhone: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
 }
 
 export default function BasicInfoPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { data: session } = useSession();
+  const { syncProfile, syncStatus } = useUserSync();
   const [formData, setFormData] = useState<BasicInfoData>({
     firstName: '',
     lastName: '',
@@ -43,18 +45,16 @@ export default function BasicInfoPage() {
     height_cm: undefined,
     weight_kg: undefined,
     emergencyContact: '',
-    emergencyPhone: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: ''
+    emergencyPhone: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     if (user) {
-      loadBasicInfoFromUser();
+      // First try to load from backend API, fallback to user context
+      loadBasicInfo();
     }
   }, [user]);
 
@@ -70,26 +70,57 @@ export default function BasicInfoPage() {
         height_cm: user.height_cm || undefined,
         weight_kg: user.weight_kg || undefined,
         emergencyContact: '',
-        emergencyPhone: '',
-        address: '',
-        city: '',
-        state: '',
-        zipCode: ''
+        emergencyPhone: ''
       });
     }
   };
 
   const loadBasicInfo = async () => {
-    setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/basic-info');
+      setIsLoading(true);
+      
+      // Get token from localStorage for custom auth
+      const token = localStorage.getItem('access_token');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Try to load from backend API first
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/basic-info`, {
+        credentials: 'include',
+        headers,
+      });
+      
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        // Transform backend data to form format
+        setFormData({
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          email: data.email || '',
+          phone: data.phone_number || '',
+          dateOfBirth: data.date_of_birth || '',
+          gender: data.gender || '',
+          height_cm: data.height_cm || undefined,
+          weight_kg: data.weight_kg || undefined,
+          emergencyContact: data.emergency_contact_name || '',
+          emergencyPhone: data.emergency_contact_phone || ''
+        });
+        setHasUnsavedChanges(false);
+      } else {
+        // Fallback to user context data if API fails
+        loadBasicInfoFromUser();
       }
     } catch (error) {
-      console.error('Failed to load basic info:', error);
+      console.error('Failed to load basic info from API, falling back to user context:', error);
+      // Fallback to user context data
+      loadBasicInfoFromUser();
     } finally {
       setIsLoading(false);
     }
@@ -100,6 +131,7 @@ export default function BasicInfoPage() {
       ...prev,
       [field]: value
     }));
+    setHasUnsavedChanges(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,24 +139,80 @@ export default function BasicInfoPage() {
     setIsSaving(true);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/basic-info', {
+      // Get token from localStorage for custom auth
+      const token = localStorage.getItem('access_token');
+      
+      console.log('Authentication token:', token ? 'Present' : 'Missing');
+      console.log('User context:', user ? 'Present' : 'Missing');
+      
+      if (!token) {
+        console.error('No authentication token found');
+        toast.error('Please log in again to save changes.');
+        return;
+      }
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+
+      // Convert form data to backend format
+      const profileData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone_number: formData.phone,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        height_cm: formData.height_cm,
+        weight_kg: formData.weight_kg,
+        emergency_contact_name: formData.emergencyContact,
+        emergency_contact_phone: formData.emergencyPhone,
+      };
+
+      console.log('Sending profile data:', profileData);
+      console.log('Request headers:', headers);
+
+      // Call the backend profile endpoint directly
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/basic-info`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        headers,
+        body: JSON.stringify(profileData),
+        credentials: 'include'
       });
 
-      if (response.ok) {
-        // Show success message or redirect
-        router.push('/profile');
-      } else {
-        throw new Error('Failed to save basic info');
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        
+        if (response.status === 401) {
+          toast.error('Authentication failed. Please log in again.');
+          // Optionally redirect to login
+          // router.push('/auth/login');
+        } else {
+          throw new Error(errorData.detail || errorData.message || 'Failed to update profile');
+        }
+        return;
       }
+
+      const result = await response.json();
+      console.log('Success response:', result);
+      
+      setHasUnsavedChanges(false);
+      toast.success('Profile updated successfully!');
+      
     } catch (error) {
       console.error('Failed to save basic info:', error);
-      // TODO: Show error message to user
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        toast.error('Network error. Please check your connection and try again.');
+        alert('CORS or network error detected. Check browser console for details.');
+      } else {
+        toast.error(`Failed to save changes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -158,25 +246,32 @@ export default function BasicInfoPage() {
         <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.back()}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-full">
-                  <User className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Basic Information</h1>
-                  <p className="text-gray-600">Personal details, age, and contact information</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.back()}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-full">
+                    <User className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Basic Information</h1>
+                    <p className="text-gray-600">Personal details, age, and contact information</p>
+                  </div>
                 </div>
               </div>
+              
+              {/* Sync Status Indicator */}
+              <SyncStatusIndicator 
+                status={syncStatus}
+              />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -317,49 +412,6 @@ export default function BasicInfoPage() {
                 </CardContent>
               </Card>
 
-              {/* Address Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Address Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="address">Street Address</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) => handleInputChange('city', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">State/Province</Label>
-                      <Input
-                        id="state"
-                        value={formData.state}
-                        onChange={(e) => handleInputChange('state', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="zipCode">ZIP/Postal Code</Label>
-                      <Input
-                        id="zipCode"
-                        value={formData.zipCode}
-                        onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
               {/* Action Buttons */}
               <div className="flex justify-end gap-4">
                 <Button
@@ -371,13 +423,13 @@ export default function BasicInfoPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || syncStatus.syncing}
                   className="flex items-center gap-2"
                 >
-                  {isSaving ? (
+                  {(isSaving || syncStatus.syncing) ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Saving...
+                      {syncStatus.syncing ? 'Syncing...' : 'Saving...'}
                     </>
                   ) : (
                     <>

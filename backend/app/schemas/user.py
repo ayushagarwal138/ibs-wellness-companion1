@@ -25,11 +25,12 @@ class UserUpdate(BaseModel):
     """User update schema."""
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    email: Optional[EmailStr] = None
     phone_number: Optional[str] = Field(None, max_length=20)
     date_of_birth: Optional[date] = None
     gender: Optional[GenderEnum] = None
-    height_cm: Optional[float] = Field(None, gt=0, le=300)
-    weight_kg: Optional[float] = Field(None, gt=0, le=1000)
+    height_cm: Optional[float] = Field(None, ge=50, le=300)  # Changed from gt=0 to ge=50
+    weight_kg: Optional[float] = Field(None, ge=20, le=500)  # Changed from gt=0 and le=1000 to ge=20, le=500
     ibs_type: Optional[IBSTypeEnum] = None
     diagnosis_date: Optional[date] = None
     emergency_contact_name: Optional[str] = Field(None, max_length=100)
@@ -48,6 +49,15 @@ class UserUpdate(BaseModel):
             import re
             if not re.match(r'^\+?[\d\s\-\(\)]+$', v):
                 raise ValueError('Invalid phone number format')
+        return v
+    
+    @validator('date_of_birth')
+    def validate_date_of_birth(cls, v):
+        """Validate date of birth is not in the future."""
+        if v is not None:
+            from datetime import date
+            if v > date.today():
+                raise ValueError('Date of birth cannot be in the future')
         return v
 
 

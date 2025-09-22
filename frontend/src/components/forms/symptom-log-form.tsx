@@ -109,7 +109,8 @@ export default function SymptomLogForm({ onSuccess, onCancel }: SymptomLogFormPr
       };
 
       // Cast to any to bypass type checking since backend schema differs from frontend types
-      await apiService.createSymptomLog(submitData as any);
+      const result = await apiService.createSymptomLog(submitData as any);
+      console.log('Symptom log save result:', result);
       toast.success('Symptom log saved successfully!');
       
       // Reset form
@@ -132,7 +133,15 @@ export default function SymptomLogForm({ onSuccess, onCancel }: SymptomLogFormPr
       onSuccess?.();
     } catch (error) {
       console.error('Error creating symptom log:', error);
-      toast.error('Failed to save symptom log. Please try again.');
+      
+      // Try to get more detailed error information
+      let errorMessage = 'Failed to save symptom log. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = `Failed to save symptom log: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
+      alert(`Error saving symptom log: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }

@@ -12,8 +12,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 # Import our models and settings
 from app.core.config import settings
-from app.models.user import User  # Import specific models to avoid async issues
 from app.core.database import Base  # Import the actual Base from database
+
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models import (
+    user, symptom, diet, medication, food_item, chat, financial,
+    analytics, notifications, goals, appointments
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -23,7 +23,10 @@ import {
   AlertCircle,
   Calendar,
   FileText,
-  Settings
+  Settings,
+  Sparkles,
+  Award,
+  Zap
 } from 'lucide-react';
 
 interface ProfileSection {
@@ -35,7 +38,7 @@ interface ProfileSection {
   required: boolean;
   estimatedTime: string;
   route: string;
-  weight: number; // For calculating completion percentage
+  weight: number;
 }
 
 interface ProfileCompletionTrackerProps {
@@ -134,12 +137,10 @@ export function ProfileCompletionTracker({
 
   const loadProfileCompletion = async () => {
     try {
-      // Check if onboarding is completed using the auth context
       const isCompleted = await checkOnboardingStatus();
       setOnboardingCompleted(isCompleted);
       
       if (isCompleted) {
-        // If onboarding is completed, mark all required sections as completed
         setProfileSections(prev => 
           prev.map(section => ({
             ...section,
@@ -154,15 +155,6 @@ export function ProfileCompletionTracker({
     }
   };
 
-  const updateSectionCompletion = (completedSections: string[]) => {
-    setProfileSections(prev => 
-      prev.map(section => ({
-        ...section,
-        completed: completedSections.includes(section.id)
-      }))
-    );
-  };
-
   const calculateCompletionPercentage = () => {
     const totalWeight = profileSections.reduce((sum, section) => sum + section.weight, 0);
     const completedWeight = profileSections
@@ -173,10 +165,8 @@ export function ProfileCompletionTracker({
   };
 
   const handleSectionClick = (section: ProfileSection) => {
-    // Navigate to the section using Next.js router for proper client-side navigation
     router.push(section.route);
     
-    // Notify parent component
     if (onSectionComplete) {
       onSectionComplete(section.id);
     }
@@ -219,12 +209,6 @@ export function ProfileCompletionTracker({
   const completionStatus = getCompletionStatus();
   const nextSection = profileSections.find(s => !s.completed);
   const completedCount = profileSections.filter(s => s.completed).length;
-  const totalEstimatedTime = profileSections
-    .filter(s => !s.completed)
-    .reduce((total, section) => {
-      const time = parseInt(section.estimatedTime);
-      return total + time;
-    }, 0);
 
   if (isLoading) {
     return (
@@ -245,191 +229,142 @@ export function ProfileCompletionTracker({
   }
 
   return (
-    <Card className={`${className} ${completionStatus.borderColor} border-l-4`}>
-      <CardHeader className={completionStatus.bgColor}>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className={`h-6 w-6 ${completionStatus.color}`} />
-            Profile Completion
-          </div>
-          <Badge variant="outline" className={completionStatus.color}>
-            {completionPercentage}%
-          </Badge>
-        </CardTitle>
-        <div className="space-y-3">
-          <Progress value={completionPercentage} className="h-3" />
-          <p className={`text-sm ${completionStatus.color}`}>
-            {completionStatus.message}
-          </p>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">{completedCount}</div>
-            <div className="text-xs text-gray-600">Completed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">{profileSections.length - completedCount}</div>
-            <div className="text-xs text-gray-600">Remaining</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">{totalEstimatedTime}</div>
-            <div className="text-xs text-gray-600">Min left</div>
-          </div>
-        </div>
-
-        {/* Next Action */}
-        {!onboardingCompleted && nextSection && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-full">
-                  {nextSection.icon}
-                </div>
-                <div>
-                  <h4 className="font-medium text-blue-900">Next: {nextSection.title}</h4>
-                  <p className="text-sm text-blue-700">{nextSection.estimatedTime} remaining</p>
-                </div>
+    <div className="space-y-4">
+      <Card className={`relative overflow-hidden transition-all duration-300 hover:shadow-lg ${completionStatus.borderColor} border-l-4`}>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/30 pointer-events-none" />
+        
+        <CardHeader className={`relative ${completionStatus.bgColor} border-b border-gray-100 pb-3`}>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${completionStatus.color === 'text-green-600' ? 'bg-green-100' : completionStatus.color === 'text-blue-600' ? 'bg-blue-100' : 'bg-orange-100'}`}>
+                <Shield className={`h-5 w-5 ${completionStatus.color}`} />
               </div>
-              <Button 
-                size="sm" 
-                onClick={() => handleSectionClick(nextSection)}
-                className="bg-blue-600 hover:bg-blue-700"
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Profile Completion</h3>
+                <p className="text-base text-gray-600 font-normal">Build your personalized health journey</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <Badge 
+                variant="outline" 
+                className={`${completionStatus.color} text-base font-bold px-2 py-1 border-2`}
               >
-                Continue
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
+                {completionPercentage}%
+              </Badge>
+            </div>
+          </CardTitle>
+          
+          <div className="space-y-2 mt-3">
+            <div className="relative">
+              <Progress 
+                value={completionPercentage} 
+                className="h-3 bg-gray-200 rounded-full overflow-hidden"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 rounded-full opacity-20 animate-pulse" />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <p className="text-base font-medium ${completionStatus.color} break-words">
+                {completionStatus.message}
+              </p>
+              {completionPercentage === 100 && (
+                <div className="flex items-center gap-1 text-green-600">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-sm font-medium">Complete!</span>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </CardHeader>
 
-        {/* Section List */}
-        <div className="space-y-2">
-          <h4 className="font-medium text-gray-900 mb-3">Profile Sections</h4>
-          {profileSections.map((section) => (
-            <div
-              key={section.id}
-              className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
-                section.completed
-                  ? 'bg-green-50 border-green-200 hover:bg-green-100'
-                  : 'bg-white border-gray-200 hover:bg-gray-50'
-              }`}
-              onClick={() => handleSectionClick(section)}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full ${
-                  section.completed 
-                    ? 'bg-green-100 text-green-600' 
-                    : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {section.completed ? (
-                    <CheckCircle className="h-4 w-4" />
-                  ) : (
-                    section.icon
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h5 className={`font-medium ${
-                      section.completed ? 'text-green-900' : 'text-gray-900'
+        <CardContent className="relative space-y-3 p-3">
+            <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-2 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 min-w-0">
+              <div className="text-2xl font-bold text-blue-700 mb-1">{completedCount}</div>
+              <div className="text-sm font-medium text-blue-600 uppercase tracking-wide break-words">Completed</div>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 min-w-0">
+              <div className="text-2xl font-bold text-orange-700 mb-1">{profileSections.length - completedCount}</div>
+              <div className="text-sm font-medium text-orange-600 uppercase tracking-wide break-words">Remaining</div>
+            </div>
+            <div className="text-center p-2 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 min-w-0">
+              <div className="text-2xl font-bold text-purple-700 mb-1">5</div>
+              <div className="text-sm font-medium text-purple-600 uppercase tracking-wide break-words">Min Left</div>
+            </div>
+          </div>
+
+            <div className="space-y-2">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-bold text-gray-900 text-base">Profile Sections</h4>
+              <Badge variant="outline" className="text-sm">
+                {completedCount}/{profileSections.length} Complete
+              </Badge>
+            </div>
+            
+            <div className="space-y-1">
+              {profileSections.map((section, index) => (
+                <div
+                  key={section.id}
+                  className={`group relative flex items-center justify-between p-2 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                    section.completed
+                      ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                      : 'bg-white border-gray-200 hover:border-blue-300'
+                  }`}
+                  onClick={() => handleSectionClick(section)}
+                >
+                  <div className="absolute -left-1 -top-1 w-4 h-4 bg-gray-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {index + 1}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 flex-1">
+                    <div className={`p-1 rounded-xl transition-all duration-200 ${
+                      section.completed 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-600'
                     }`}>
-                      {section.title}
-                    </h5>
-                    {section.required && (
-                      <Badge variant="outline" className="text-xs">
-                        Required
-                      </Badge>
+                      {section.completed ? (
+                        <CheckCircle className="h-3 w-3" />
+                      ) : (
+                        section.icon
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 mb-0">
+                        <h5 className={`font-bold text-sm truncate ${
+                          section.completed ? 'text-green-900' : 'text-gray-900'
+                        }`}>
+                          {section.title}
+                        </h5>
+                        {section.required && (
+                          <Badge variant="outline" className="text-sm bg-red-50 text-red-600 border-red-200 px-1 py-0 flex-shrink-0">
+                            Required
+                          </Badge>
+                        )}
+                      </div>
+                      <p className={`text-sm break-words ${
+                        section.completed ? 'text-green-700' : 'text-gray-600'
+                      }`}>
+                        {section.description}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    {section.completed ? (
+                      <div className="p-1 bg-green-100 rounded-full">
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                      </div>
+                    ) : (
+                      <Circle className="h-3 w-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
                     )}
                   </div>
-                  <p className={`text-sm ${
-                    section.completed ? 'text-green-700' : 'text-gray-600'
-                  }`}>
-                    {section.description}
-                  </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!section.completed && (
-                  <span className="text-xs text-gray-500">{section.estimatedTime}</span>
-                )}
-                {section.completed ? (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                ) : (
-                  <Circle className="h-5 w-5 text-gray-400" />
-                )}
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-
-        {/* Completion Benefits */}
-        {!onboardingCompleted && completionPercentage < 100 && (
-          <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-            <h4 className="font-medium text-purple-900 mb-2 flex items-center gap-2">
-              <Star className="h-4 w-4" />
-              Unlock with Complete Profile
-            </h4>
-            <ul className="space-y-1 text-sm text-purple-700">
-              <li className="flex items-center gap-2">
-                <TrendingUp className="h-3 w-3" />
-                AI-powered personalized insights
-              </li>
-              <li className="flex items-center gap-2">
-                <Target className="h-3 w-3" />
-                Custom dietary recommendations
-              </li>
-              <li className="flex items-center gap-2">
-                <AlertCircle className="h-3 w-3" />
-                Symptom pattern analysis
-              </li>
-              <li className="flex items-center gap-2">
-                <FileText className="h-3 w-3" />
-                Detailed health reports
-              </li>
-            </ul>
           </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          {onboardingCompleted ? (
-            <Button 
-              onClick={() => router.push('/profile/settings')} 
-              className="flex-1"
-            >
-              Edit Profile
-              <Settings className="h-4 w-4 ml-2" />
-            </Button>
-          ) : nextSection ? (
-            <Button 
-              onClick={() => handleSectionClick(nextSection)} 
-              className="flex-1"
-            >
-              Continue Setup
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          ) : (
-            <Button 
-              onClick={() => router.push('/dashboard')} 
-              className="flex-1"
-            >
-              View Dashboard
-              <TrendingUp className="h-4 w-4 ml-2" />
-            </Button>
-          )}
-          {!onboardingCompleted && (
-            <Button 
-              variant="outline" 
-              onClick={() => router.push('/profile/settings')}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

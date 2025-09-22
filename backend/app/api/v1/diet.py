@@ -27,6 +27,7 @@ from app.schemas.diet import (
     NutritionalAnalysis,
     TriggerFoodAnalysis
 )
+from app.services.nutrition_calculator import NutritionCalculator
 
 router = APIRouter()
 
@@ -199,43 +200,51 @@ async def create_diet_log(
     if not diet_data.foods:
         raise HTTPException(status_code=400, detail="At least one food item is required")
     
-    # For now, we'll use the first food item to find or create a food record
-    # In a real implementation, you'd want to handle multiple foods differently
-    food_name = diet_data.foods[0]
-    
-    # Try to find existing food
-    result = await db.execute(
-        select(Food).where(Food.name.ilike(f"%{food_name}%"))
-    )
-    food = result.scalar_one_or_none()
-    
-    # If food doesn't exist, create it
-    if not food:
-        food = Food(
-            name=food_name,
-            category=FoodCategoryEnum.SNACKS,  # Default category
-            fodmap_level=FODMAPLevelEnum.UNKNOWN,
-            is_active=True
-        )
-        db.add(food)
-        await db.flush()  # Get the ID without committing
-    
     consumed_time = diet_data.consumed_at or datetime.utcnow()
-    diet_log = DietLog(
-        user_id=current_user.id,
-        food_id=food.id,
-        meal_type=diet_data.meal_type,
-        portion_size_g=100.0,  # Default portion size in grams
-        portion_description=diet_data.portion_size,
-        notes=diet_data.notes,
-        consumed_at=consumed_time
-    )
+    created_logs = []
     
-    db.add(diet_log)
+    # Process each food item separately
+    for food_name in diet_data.foods:
+        # Try to find existing food
+        result = await db.execute(
+            select(Food).where(Food.name.ilike(f"%{food_name}%"))
+        )
+        food = result.scalar_one_or_none()
+        
+        # If food doesn't exist, create it
+        if not food:
+            food = Food(
+                name=food_name,
+                category=FoodCategoryEnum.SNACKS,  # Default category
+                fodmap_level=FODMAPLevelEnum.UNKNOWN,
+                is_active=True
+            )
+            db.add(food)
+            await db.flush()  # Get the ID without committing
+        
+        # Create diet log entry for this food
+        diet_log = DietLog(
+            user_id=current_user.id,
+            food_id=food.id,
+            meal_type=diet_data.meal_type,
+            portion_size_g=100.0,  # Default portion size in grams
+            portion_description=diet_data.portion_size,
+            notes=diet_data.notes,
+            consumed_at=consumed_time
+        )
+        
+        db.add(diet_log)
+        created_logs.append(diet_log)
+    
     await db.commit()
-    await db.refresh(diet_log)
     
-    return diet_log
+    # Refresh all created logs
+    for log in created_logs:
+        await db.refresh(log)
+    
+    # Return the first log for backward compatibility
+    # In the future, we might want to return all logs or a summary
+    return created_logs[0] if created_logs else None
 
 
 @router.get("/logs", response_model=DietLogList)
@@ -263,29 +272,47 @@ async def get_diet_logs(
     if end_date:
         query = query.filter(DietLog.consumed_at <= end_date)
     
-    # Get total count
-    count_query = select(func.count()).select_from(DietLog).filter(DietLog.user_id == current_user.id)
-    if meal_type:
-        count_query = count_query.filter(DietLog.meal_type == meal_type)
-    if start_date:
-        count_query = count_query.filter(DietLog.consumed_at >= start_date)
-    if end_date:
-        count_query = count_query.filter(DietLog.consumed_at <= end_date)
+    # Order by consumed_at to group meals properly
+    query = query.order_by(desc(DietLog.consumed_at))
     
-    total_result = await db.execute(count_query)
-    total = total_result.scalar()
-    
-    # Apply pagination and ordering
-    offset = (page - 1) * size
-    query = query.order_by(desc(DietLog.consumed_at)).offset(offset).limit(size)
-    
-    # Execute the query
+    # Execute the query to get all matching logs
     result = await db.execute(query)
     rows = result.all()
     
+    # Group logs by meal (same consumed_at, meal_type, and user)
+    meal_groups = {}
+    for diet_log, food_name in rows:
+        # Create a key for grouping meals (within 5 minutes of each other)
+        meal_key = (
+            diet_log.meal_type,
+            diet_log.consumed_at.replace(second=0, microsecond=0),  # Group by minute
+            diet_log.portion_description or "",
+            diet_log.notes or ""
+        )
+        
+        if meal_key not in meal_groups:
+            meal_groups[meal_key] = {
+                'diet_log': diet_log,
+                'foods': []
+            }
+        
+        meal_groups[meal_key]['foods'].append(food_name)
+    
+    # Convert grouped meals to list and sort by consumed_at
+    grouped_meals = list(meal_groups.values())
+    grouped_meals.sort(key=lambda x: x['diet_log'].consumed_at, reverse=True)
+    
+    # Apply pagination to grouped meals
+    total = len(grouped_meals)
+    offset = (page - 1) * size
+    paginated_meals = grouped_meals[offset:offset + size]
+    
     # Transform the results to include food names
     items = []
-    for diet_log, food_name in rows:
+    for meal_group in paginated_meals:
+        diet_log = meal_group['diet_log']
+        foods = meal_group['foods']
+        
         # Create a dict with all diet log attributes plus foods array
         item_dict = {
             'id': diet_log.id,
@@ -306,7 +333,7 @@ async def get_diet_logs(
             'time_since_last_meal_hours': diet_log.time_since_last_meal_hours,
             'created_at': diet_log.created_at,
             'updated_at': diet_log.updated_at,
-            'foods': [food_name] if food_name else []  # Add foods array for frontend compatibility
+            'foods': foods  # Include all foods from this meal
         }
         items.append(item_dict)
     
@@ -393,6 +420,91 @@ async def delete_diet_log(
     db.commit()
     
     return {"message": "Diet log deleted successfully"}
+
+
+# Enhanced nutritional analysis endpoints
+@router.get("/nutrition/daily/{date}")
+async def get_daily_nutrition_summary(
+    date: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get comprehensive daily nutrition summary."""
+    try:
+        target_date = datetime.fromisoformat(date.replace('Z', '+00:00'))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    calculator = NutritionCalculator(db)
+    summary = await calculator.calculate_daily_nutrition_summary(str(current_user.id), target_date)
+    
+    return summary.to_dict()
+
+
+@router.get("/nutrition/trends")
+async def get_nutrition_trends(
+    days: int = Query(30, ge=7, le=90, description="Number of days to analyze"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get nutrition trends over a specified period."""
+    calculator = NutritionCalculator(db)
+    trends = await calculator.get_nutrition_trends(str(current_user.id), days)
+    
+    return trends
+
+
+@router.post("/nutrition/calculate")
+async def calculate_meal_nutrition(
+    food_items: List[str],
+    portion_size: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Calculate nutrition for a specific meal combination."""
+    if not food_items:
+        raise HTTPException(status_code=400, detail="At least one food item is required")
+    
+    calculator = NutritionCalculator(db)
+    nutrition = await calculator.calculate_meal_nutrition(food_items, portion_size)
+    macros = calculator.calculate_macronutrient_breakdown(nutrition)
+    
+    return {
+        "nutrition": nutrition.to_dict(),
+        "macronutrient_breakdown": macros.to_dict(),
+        "food_items": food_items,
+        "portion_size": portion_size
+    }
+
+
+@router.get("/nutrition/food/{food_name}")
+async def get_food_nutrition_data(
+    food_name: str,
+    portion_size: Optional[str] = Query("100g", description="Portion size (e.g., '1 cup', '150g')"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get detailed nutritional information for a specific food item."""
+    calculator = NutritionCalculator(db)
+    
+    # Get base nutrition per 100g
+    base_nutrition = await calculator.get_food_nutrition_per_100g(food_name)
+    if not base_nutrition:
+        raise HTTPException(status_code=404, detail=f"Food item '{food_name}' not found")
+    
+    # Calculate for specified portion
+    portion_grams = calculator.parse_portion_size(portion_size)
+    portion_nutrition = calculator.calculate_nutrition_for_portion(base_nutrition, portion_grams)
+    macros = calculator.calculate_macronutrient_breakdown(portion_nutrition)
+    
+    return {
+        "food_name": food_name,
+        "portion_size": portion_size,
+        "portion_grams": portion_grams,
+        "nutrition_per_100g": base_nutrition.to_dict(),
+        "nutrition_for_portion": portion_nutrition.to_dict(),
+        "macronutrient_breakdown": macros.to_dict()
+    }
 
 
 # Analytics endpoints

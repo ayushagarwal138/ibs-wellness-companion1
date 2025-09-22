@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { User, Calendar, Activity, Heart, AlertCircle, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import { useUserSync } from '@/hooks/useUserSync';
+import { toast } from 'react-hot-toast';
+import { SyncStatusIndicator } from '../ui/sync-status-indicator';
 
 interface UserProfileData {
   // Basic Information
@@ -105,12 +108,15 @@ const treatmentOptions = [
 ];
 
 export default function UserProfileSetup() {
+  const { syncProfile, syncStatus } = useUserSync();
   const [currentStep, setCurrentStep] = useState(0);
   const [profileData, setProfileData] = useState<UserProfileData>(initialProfileData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const updateProfileData = (updates: Partial<UserProfileData>) => {
     setProfileData(prev => ({ ...prev, ...updates }));
+    setHasUnsavedChanges(true);
   };
 
   const toggleArrayItem = (array: string[], item: string) => {
@@ -134,17 +140,40 @@ export default function UserProfileSetup() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Here you would submit the profile data to your API
-      console.log('Submitting profile data:', profileData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Handle success (redirect, show success message, etc.)
-      alert('Profile setup completed successfully!');
+      // Transform profile data to match API format
+      const transformedData = {
+        first_name: '', // Would need to be collected in basic info
+        last_name: '',  // Would need to be collected in basic info
+        email: '',      // Would need to be collected in basic info
+        height_cm: profileData.height,
+        weight_kg: profileData.weight,
+        gender: profileData.gender,
+        ibs_type: profileData.ibsType,
+        diagnosis_date: `${profileData.diagnosisYear}-01-01`,
+        // Additional profile data would be stored in separate endpoints
+      };
+
+      // Use sync profile for real-time updates
+      const result = await syncProfile(transformedData, {
+        optimistic: true,
+        triggerML: true,
+        showToast: false // We'll handle toasts manually
+      });
+
+      if (result.success) {
+        toast.success('Profile setup completed successfully!');
+        setHasUnsavedChanges(false);
+        
+        // Handle ML predictions if available
+        if (result.ml_predictions) {
+          toast.success('AI insights: Profile analysis complete with personalized recommendations');
+        }
+      } else {
+        throw new Error(result.error || 'Failed to save profile');
+      }
     } catch (error) {
       console.error('Error submitting profile:', error);
-      alert('Error submitting profile. Please try again.');
+      toast.error('Error submitting profile. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -563,12 +592,19 @@ export default function UserProfileSetup() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Complete Your IBS Profile
-        </h1>
-        <p className="text-gray-600">
-          Help us personalize your experience by sharing information about your IBS journey.
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Complete Your IBS Profile
+            </h1>
+            <p className="text-gray-600">
+              Help us personalize your experience by sharing information about your IBS journey.
+            </p>
+          </div>
+          <div>
+            <SyncStatusIndicator status={syncStatus} />
+          </div>
+        </div>
       </div>
 
       {/* Progress Steps */}
@@ -638,15 +674,15 @@ export default function UserProfileSetup() {
         {currentStep === steps.length - 1 ? (
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || syncStatus.syncing}
             className={`flex items-center px-6 py-2 rounded-md ${
-              isSubmitting
+              isSubmitting || syncStatus.syncing
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-green-500 hover:bg-green-600'
             } text-white`}
           >
-            {isSubmitting ? 'Submitting...' : 'Complete Setup'}
-            {!isSubmitting && <CheckCircle size={16} className="ml-2" />}
+            {syncStatus.syncing ? 'Syncing...' : isSubmitting ? 'Submitting...' : 'Complete Setup'}
+            {!isSubmitting && !syncStatus.syncing && <CheckCircle size={16} className="ml-2" />}
           </button>
         ) : (
           <button

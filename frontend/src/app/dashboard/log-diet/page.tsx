@@ -215,18 +215,57 @@ export default function LogDietPage() {
                         <div key={log.id} className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <h3 className="font-medium text-gray-900">{log.foods?.join(', ')}</h3>
+                              {/* Meal Type and Time */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center space-x-2">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                    {log.meal_type || 'Meal'}
+                                  </span>
+                                  <span className="text-sm text-gray-600">{formatDate(log.created_at)}</span>
+                                </div>
                                 {log.calories && (
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     {log.calories} cal
                                   </span>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-600 mb-2">{formatDate(log.created_at)}</p>
-                              {log.notes && (
-                                <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">{log.notes}</p>
-                              )}
+                              
+                              {/* Food Items with Visual Separation */}
+                              <div className="mb-3">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Food Items:</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {log.foods && log.foods.length > 0 ? (
+                                    log.foods.map((food, index) => (
+                                      <div
+                                        key={index}
+                                        className="inline-flex items-center px-3 py-1.5 bg-orange-50 text-orange-800 rounded-full text-sm font-medium border border-orange-200"
+                                      >
+                                        <span className="mr-1">🍽️</span>
+                                        {food}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-gray-500 italic">No food items recorded</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Additional Details */}
+                              <div className="space-y-2">
+                                {log.portion_size && (
+                                  <div className="flex items-center text-sm text-gray-600">
+                                    <span className="font-medium mr-2">Portion:</span>
+                                    <span>{log.portion_size}</span>
+                                  </div>
+                                )}
+                                
+                                {log.notes && (
+                                  <div>
+                                    <span className="text-sm font-medium text-gray-700">Notes:</span>
+                                    <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded mt-1">{log.notes}</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <button
                               onClick={() => deleteDietLog(log.id)}

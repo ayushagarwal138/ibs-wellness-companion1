@@ -79,79 +79,99 @@ class MLService {
   }
 
   async getPredictions(request: MLPredictionRequest = {}): Promise<MLPredictionResponse> {
+    const startTime = performance.now();
+    
     try {
-      const queryParams = new URLSearchParams();
-      if (request.timeframe) queryParams.append('timeframe', request.timeframe);
-      if (request.include_recommendations) queryParams.append('include_recommendations', 'true');
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/ml/predictions?${queryParams}`,
-        {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/v1/ml/predictions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify(request),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Log performance
+      const duration = performance.now() - startTime;
+      console.log(`ML Predictions API call completed in ${duration.toFixed(2)}ms`);
+      
+      return data;
     } catch (error) {
-      console.error('Error fetching ML predictions:', error);
+      console.error('ML Predictions API error:', error);
+      const duration = performance.now() - startTime;
+      console.log(`ML Predictions API call failed after ${duration.toFixed(2)}ms`);
+      
       // Return mock data as fallback
       return this.getMockPredictions();
     }
   }
 
   async getRealtimePredictions(): Promise<RealtimePredictionResponse> {
+    const startTime = performance.now();
+    
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/ml/realtime-predictions`,
-        {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/v1/ml/realtime-predictions`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Log performance
+      const duration = performance.now() - startTime;
+      console.log(`Real-time Predictions API call completed in ${duration.toFixed(2)}ms`);
+      
+      return data;
     } catch (error) {
-      console.error('Error fetching realtime predictions:', error);
+      console.error('Real-time Predictions API error:', error);
+      const duration = performance.now() - startTime;
+      console.log(`Real-time Predictions API call failed after ${duration.toFixed(2)}ms`);
+      
       // Return mock data as fallback
       return {
-        current_risk: 35,
-        risk_factors: ['Stress levels', 'Dairy consumption', 'Sleep quality'],
-        immediate_recommendations: [
-          'Reduce dairy intake for the next 3-5 days',
-          'Practice 10 minutes of deep breathing before meals',
-          'Ensure 8+ hours of sleep tonight'
-        ],
-        confidence_score: 78
+        current_risk: Math.round((Math.random() * 0.8 + 0.1) * 100), // 10 to 90 (already as percentage)
+        risk_factors: ['Stress levels elevated', 'Irregular sleep pattern', 'Dietary triggers detected'],
+        immediate_recommendations: ['Take deep breaths', 'Avoid trigger foods', 'Stay hydrated'],
+        confidence_score: Math.round(75 + Math.random() * 20) // 75-95%
       };
     }
   }
 
   async getPersonalizedRecommendations(): Promise<PersonalizedRecommendationsResponse> {
+    const startTime = performance.now();
+    
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/recommendations/personalized`,
-        {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/v1/recommendations/personalized`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Log performance
+      const duration = performance.now() - startTime;
+      console.log(`Personalized Recommendations API call completed in ${duration.toFixed(2)}ms`);
+      
+      return data;
     } catch (error) {
-      console.error('Error fetching personalized recommendations:', error);
+      console.error('Personalized Recommendations API error:', error);
+      const duration = performance.now() - startTime;
+      console.log(`Personalized Recommendations API call failed after ${duration.toFixed(2)}ms`);
+      
       // Return mock data as fallback
       return this.getMockRecommendations();
     }

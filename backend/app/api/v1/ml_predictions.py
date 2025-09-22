@@ -38,16 +38,28 @@ router = APIRouter(tags=["ML Predictions"])
 enhanced_recommendation_service = None
 
 
-def get_enhanced_recommendation_service(db: AsyncSession = Depends(get_db)) -> EnhancedRecommendationService:
+async def get_enhanced_recommendation_service(db: AsyncSession = Depends(get_db)) -> EnhancedRecommendationService:
     """Get or create the enhanced recommendation service instance."""
     global enhanced_recommendation_service
     if enhanced_recommendation_service is None:
-        enhanced_recommendation_service = EnhancedRecommendationService(db)
+        # Create a synchronous session for the service that expects Session
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from app.core.config import settings
+        
+        # Create a synchronous engine and session
+        sync_database_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+        sync_engine = create_engine(sync_database_url)
+        sync_session_factory = sessionmaker(bind=sync_engine)
+        sync_session = sync_session_factory()
+        
+        enhanced_recommendation_service = EnhancedRecommendationService(sync_session)
     return enhanced_recommendation_service
 
 
 @router.get("/models/info", response_model=ModelInfoResponse)
 async def get_model_info(
+    current_user: User = Depends(get_current_user),
     service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
 ):
     """Get information about loaded enhanced ML models."""
@@ -64,6 +76,7 @@ async def get_model_info(
 
 @router.post("/models/reload")
 async def reload_models(
+    current_user: User = Depends(get_current_user),
     service: EnhancedRecommendationService = Depends(get_enhanced_recommendation_service)
 ):
     """Reload enhanced ML models from the latest checkpoint."""
@@ -90,8 +103,24 @@ async def predict_severity(
         # Prepare user data for prediction
         user_data = await _prepare_user_data(current_user, db, request.symptoms)
         
-        # Make prediction using enhanced service
-        prediction = service.predict_symptom_risk(user_data)
+        # Check if ML models are available
+        model_info = service.get_model_info()
+        
+        if not any(model_info['models_loaded'].values()):
+            # No models loaded, use fallback prediction
+            symptoms = user_data.get('symptoms', {})
+            avg_severity = sum(symptoms.get(k, 0) for k in ['abdominal_pain', 'bloating', 'gas', 'diarrhea', 'constipation', 'urgency']) / 6
+            severity_level = "High" if avg_severity > 2.5 else "Medium" if avg_severity > 1.5 else "Low"
+            
+            prediction = {
+                'severity_score': round(avg_severity, 2),
+                'severity_level': severity_level,
+                'confidence': 0.6,
+                'model_version': 'fallback_rule_based'
+            }
+        else:
+            # Make prediction using enhanced service
+            prediction = service.predict_symptom_risk(user_data)
         
         # Store prediction in database for tracking
         await _store_prediction(
@@ -99,10 +128,10 @@ async def predict_severity(
         )
         
         return SeverityPredictionResponse(
-            severity_score=prediction['severity_score'],
-            severity_level=prediction['severity_level'],
-            confidence=prediction['confidence'],
-            model_version=prediction['model_version'],
+            severity_score=prediction.get('severity_score', prediction.get('risk_probability', 0.5)),
+            severity_level=prediction.get('severity_level', prediction.get('risk_level', 'Medium')),
+            confidence=prediction.get('confidence', 0.6),
+            model_version=prediction.get('model_version', 'fallback_rule_based'),
             predicted_at=datetime.utcnow(),
             factors=_extract_severity_factors(user_data, prediction)
         )
@@ -132,8 +161,37 @@ async def predict_flareup(
             current_user.id, db
         )
         
-        # Make prediction using enhanced service
-        prediction = service.predict_symptom_risk(user_data)
+        # Check if models are loaded, use fallback if not
+        if not service.ml_models:
+            # Fallback prediction based on recent symptom trends
+            symptoms = user_data.get('symptoms', {})
+            recent_symptoms = user_data.get('recent_symptoms', {})
+            
+            # Calculate risk based on symptom severity and trends
+            avg_severity = sum([
+                symptoms.get('abdominal_pain', 0),
+                symptoms.get('bloating', 0),
+                symptoms.get('diarrhea', 0),
+                symptoms.get('constipation', 0),
+                symptoms.get('urgency', 0)
+            ]) / 5.0
+            
+            # Adjust for stress and sleep
+            stress_factor = symptoms.get('stress_level', 5) / 10.0
+            sleep_factor = (10 - symptoms.get('sleep_quality', 5)) / 10.0
+            
+            risk_score = min(1.0, (avg_severity / 10.0 + stress_factor * 0.3 + sleep_factor * 0.2))
+            
+            prediction = {
+                'risk_score': risk_score,
+                'risk_level': 'High' if risk_score > 0.7 else 'Medium' if risk_score > 0.4 else 'Low',
+                'days_ahead': request.days_ahead or 7,
+                'confidence': 0.6,
+                'model_version': 'fallback_rule_based'
+            }
+        else:
+            # Make prediction using enhanced service
+            prediction = service.predict_symptom_risk(user_data)
         
         # Store prediction in database
         await _store_prediction(
@@ -141,11 +199,11 @@ async def predict_flareup(
         )
         
         return FlareupPredictionResponse(
-            risk_score=prediction['risk_score'],
-            risk_level=prediction['risk_level'],
-            days_ahead=prediction['days_ahead'],
-            confidence=prediction['confidence'],
-            model_version=prediction['model_version'],
+            risk_score=prediction.get('risk_score', prediction.get('risk_probability', 0.5)),
+            risk_level=prediction.get('risk_level', 'Medium'),
+            days_ahead=prediction.get('days_ahead', request.days_ahead or 7),
+            confidence=prediction.get('confidence', 0.6),
+            model_version=prediction.get('model_version', 'fallback_rule_based'),
             predicted_at=datetime.utcnow(),
             risk_factors=_extract_risk_factors(user_data, prediction)
         )
@@ -278,12 +336,12 @@ async def get_realtime_predictions(
         immediate_actions = recommendations.get('immediate_actions', [])
         
         return {
-            "current_risk": prediction.get('risk_score', 0.35) * 100,
+            "current_risk": prediction.get('risk_probability', 0.35) * 100,
             "risk_factors": _extract_risk_factors(user_data, prediction)[:3],  # Top 3
             "immediate_recommendations": [
                 action.get('action', '') for action in immediate_actions[:3]
             ],
-            "confidence_score": prediction.get('confidence', 0.78) * 100
+            "confidence_score": prediction.get('confidence', 0.78) if isinstance(prediction.get('confidence'), (int, float)) else 0.78
         }
         
     except Exception as e:

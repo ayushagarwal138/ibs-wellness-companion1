@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,13 +126,13 @@ export default function DietaryPreferencesPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [newFavoriteFood, setNewFavoriteFood] = useState('');
   const [newDislikedFood, setNewDislikedFood] = useState('');
 
   useEffect(() => {
     if (user) {
-      loadDietaryPreferencesFromUser();
-    } else {
+      // First try to load from backend API, fallback to user context
       loadDietaryPreferences();
     }
   }, [user]);
@@ -161,16 +162,57 @@ export default function DietaryPreferencesPage() {
   };
 
   const loadDietaryPreferences = async () => {
-    setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/dietary-preferences');
+      setIsLoading(true);
+      
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Try to load from backend API first
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/dietary-preferences`, {
+        headers,
+        credentials: 'include',
+      });
+
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        // Transform backend data to form format
+        setFormData({
+          dietaryRestrictions: data.dietary_restrictions || [],
+          foodAllergies: data.food_allergies || [],
+          preferredDiets: data.special_diets || [],
+          mealsPerDay: data.meal_frequency || 3,
+          waterIntake: data.water_intake_goal || 8,
+          alcoholConsumption: '',
+          caffeineIntake: '',
+          cookingFrequency: '',
+          eatingOutFrequency: '',
+          favoritefoods: data.safe_foods || [],
+          dislikedFoods: data.trigger_foods || [],
+          supplementsUsed: [],
+          mealTiming: '',
+          snackingHabits: '',
+          foodBudget: '',
+          specialNotes: ''
+        });
+        setHasUnsavedChanges(false);
+      } else {
+        // Fallback to user context data if API fails
+        loadDietaryPreferencesFromUser();
       }
     } catch (error) {
-      console.error('Failed to load dietary preferences:', error);
+      console.error('Failed to load dietary preferences from API, falling back to user context:', error);
+      // Fallback to user context data
+      loadDietaryPreferencesFromUser();
     } finally {
       setIsLoading(false);
     }
@@ -210,27 +252,41 @@ export default function DietaryPreferencesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
+    setIsLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/dietary-preferences', {
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/dietary-preferences`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
+        credentials: 'include', // Send both session cookies and Bearer token
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        router.push('/profile');
+        const result = await response.json();
+        console.log('Dietary preferences saved successfully:', result);
+        alert('Dietary preferences saved successfully!');
       } else {
-        throw new Error('Failed to save dietary preferences');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save dietary preferences');
       }
     } catch (error) {
       console.error('Failed to save dietary preferences:', error);
+      alert(`Failed to save dietary preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 

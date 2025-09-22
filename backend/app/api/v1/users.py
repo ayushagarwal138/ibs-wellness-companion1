@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, Optional
 import json
+import logging
 from datetime import datetime
 
 from app.core.database import get_db
@@ -15,6 +16,7 @@ from app.schemas.user import UserUpdate, UserResponse
 from app.services.user_service import UserService
 from app.services.ml_integration_service import MLIntegrationService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -47,7 +49,16 @@ async def save_onboarding_data(
             profile_updates['date_of_birth'] = datetime(birth_year, 1, 1)
             
         if 'gender' in onboarding_data:
-            profile_updates['gender'] = onboarding_data['gender']
+            # Map frontend gender values to backend enum values
+            gender_mapping = {
+                'male': 'MALE',
+                'female': 'FEMALE', 
+                'other': 'OTHER',
+                'prefer_not_to_say': 'PREFER_NOT_TO_SAY'
+            }
+            frontend_gender = onboarding_data['gender'].lower()
+            if frontend_gender in gender_mapping:
+                profile_updates['gender'] = gender_mapping[frontend_gender]
             
         if 'height' in onboarding_data:
             profile_updates['height_cm'] = int(onboarding_data['height'])
@@ -56,7 +67,19 @@ async def save_onboarding_data(
             profile_updates['weight_kg'] = float(onboarding_data['weight'])
             
         if 'ibsType' in onboarding_data:
-            profile_updates['ibs_type'] = onboarding_data['ibsType']
+            # Map frontend IBS type values to backend enum values
+            ibs_type_mapping = {
+                'ibs-d': 'IBS_D',
+                'ibs-c': 'IBS_C',
+                'ibs-m': 'IBS_M', 
+                'ibs-u': 'IBS_U',
+                'not_diagnosed': None  # Don't set if not diagnosed
+            }
+            frontend_ibs_type = onboarding_data['ibsType'].lower()
+            if frontend_ibs_type in ibs_type_mapping:
+                mapped_value = ibs_type_mapping[frontend_ibs_type]
+                if mapped_value is not None:  # Only set if not None
+                    profile_updates['ibs_type'] = mapped_value
             
         if 'diagnosisYear' in onboarding_data:
             profile_updates['diagnosis_date'] = datetime(int(onboarding_data['diagnosisYear']), 1, 1)
@@ -191,59 +214,54 @@ async def get_user_profile(
         )
 
 
-@router.patch("/profile")
+@router.patch("/profile", response_model=UserResponse)
 async def update_user_profile(
-    profile_data: UserUpdate,
+    profile_update: UserUpdate,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Update user profile information.
-    
-    Args:
-        profile_data: Updated profile data
-        current_user: The current authenticated user
-        db: Database session
-        
-    Returns:
-        Updated user profile
-    """
+    """Update user profile with comprehensive data."""
     try:
-        user_service = UserService()
-        updated_user = await user_service.update_user(
+        # Update user profile
+        updated_user = await UserService.update_user(
             db=db,
             user_id=current_user.id,
-            user_update=profile_data
+            user_update=profile_update
         )
         
         if not updated_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to update user profile"
-            )
+            raise HTTPException(status_code=404, detail="User not found")
         
-        return UserResponse(
-            id=str(updated_user.id),
-            email=updated_user.email,
-            first_name=updated_user.first_name,
-            last_name=updated_user.last_name,
-            is_active=updated_user.is_active,
-            is_verified=updated_user.is_verified,
-            created_at=updated_user.created_at,
-            last_login=updated_user.last_login_at,
-            phone_number=getattr(updated_user, 'phone_number', None),
-            date_of_birth=updated_user.date_of_birth,
-            gender=getattr(updated_user, 'gender', None),
-            height_cm=updated_user.height_cm,
-            weight_kg=updated_user.weight_kg,
-            ibs_type=getattr(updated_user, 'ibs_type', None),
-            diagnosis_date=updated_user.diagnosis_date
-        )
+        # Convert UUID to string for response
+        user_dict = {
+            "id": str(updated_user.id),
+            "email": updated_user.email,
+            "first_name": updated_user.first_name,
+            "last_name": updated_user.last_name,
+            "is_active": updated_user.is_active,
+            "is_verified": updated_user.is_verified,
+            "created_at": updated_user.created_at,
+            "last_login": updated_user.last_login_at,  # Use last_login_at from model
+            "phone_number": updated_user.phone_number,
+            "date_of_birth": updated_user.date_of_birth,
+            "gender": updated_user.gender,
+            "height_cm": updated_user.height_cm,
+            "weight_kg": updated_user.weight_kg,
+            "ibs_type": updated_user.ibs_type,
+            "diagnosis_date": updated_user.diagnosis_date
+        }
         
+        return UserResponse(**user_dict)
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        logger.error(f"Error updating profile: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update user profile: {str(e)}"
+            status_code=500,
+            detail=f"Failed to update profile: {str(e)}"
         )
 
 

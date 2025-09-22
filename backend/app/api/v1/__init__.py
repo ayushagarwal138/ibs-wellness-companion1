@@ -15,12 +15,19 @@ from .onboarding import router as onboarding_router
 from .profile import router as profile_router
 from .notifications import router as notifications_router
 from .recommendations import router as recommendations_router
+from .optimization import router as optimization_router
+from .endpoints.user_sync import router as user_sync_router
+from .financial import router as financial_router
+from .analytics import router as analytics_router
+from .goals import router as goals_router
+from .appointments import router as appointments_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth_router, prefix="/auth", tags=["authentication"])
 api_router.include_router(oauth_router, prefix="/auth", tags=["oauth"])
 api_router.include_router(users_router, prefix="/users", tags=["users"])
+api_router.include_router(user_sync_router, prefix="/sync", tags=["user-sync"])
 api_router.include_router(symptoms_router, prefix="/symptoms", tags=["symptoms"])
 api_router.include_router(medications_router, prefix="/medications", tags=["medications"])
 api_router.include_router(diet_router, prefix="/diet", tags=["diet"])
@@ -30,5 +37,10 @@ api_router.include_router(onboarding_router, prefix="/onboarding", tags=["onboar
 api_router.include_router(profile_router, tags=["profile"])
 api_router.include_router(notifications_router, tags=["notifications"])
 api_router.include_router(recommendations_router, tags=["recommendations"])
+api_router.include_router(optimization_router, prefix="/optimization", tags=["optimization"])
+api_router.include_router(financial_router, prefix="/financial", tags=["financial"])
+api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(goals_router, prefix="/goals", tags=["goals"])
+api_router.include_router(appointments_router, prefix="/appointments", tags=["appointments"])
 
 __all__ = ["api_router"]

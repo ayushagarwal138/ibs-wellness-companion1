@@ -25,7 +25,7 @@ API_BASE = f"{BASE_URL}/api/v1"
 # Sample test data
 SAMPLE_USER_CREDENTIALS = {
     "email": "john.doe@example.com",
-    "password": "securepassword123"
+    "password": "SecurePassword123!"
 }
 
 SAMPLE_SYMPTOMS = {

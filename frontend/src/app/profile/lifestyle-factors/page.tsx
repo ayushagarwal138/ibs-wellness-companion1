@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -187,8 +188,7 @@ export default function LifestyleFactorsPage() {
 
   useEffect(() => {
     if (user) {
-      loadLifestyleFactorsFromUser();
-    } else {
+      // Try to load data from backend API first, fallback to user context
       loadLifestyleFactors();
     }
   }, [user]);
@@ -229,14 +229,64 @@ export default function LifestyleFactorsPage() {
   const loadLifestyleFactors = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/lifestyle-factors');
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL']}/api/v1/profile/lifestyle-factors`, {
+        headers,
+        credentials: 'include', // Send both session cookies and Bearer token
+      });
+
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        // Transform backend data to frontend format
+        setFormData({
+          exerciseFrequency: data.exercise_frequency || '',
+          exerciseTypes: data.exercise_types || [],
+          exerciseDuration: data.exercise_duration || 30,
+          exerciseIntensity: data.exercise_intensity || '',
+          sleepHours: data.sleep_hours || 8,
+          sleepQuality: data.sleep_quality || '',
+          bedtime: data.bedtime || '',
+          wakeupTime: data.wakeup_time || '',
+          stressLevel: data.stress_level || 5,
+          stressManagement: data.stress_management || [],
+          workSchedule: data.work_schedule || '',
+          workStressLevel: data.work_stress_level || 5,
+          smokingStatus: data.smoking_status || '',
+          smokingFrequency: data.smoking_frequency || '',
+          socialSupport: data.social_support || '',
+          hobbies: data.hobbies || [],
+          screenTime: data.screen_time || 4,
+          outdoorTime: data.outdoor_time || 1,
+          travelFrequency: data.travel_frequency || '',
+          livingEnvironment: data.living_environment || '',
+          petOwnership: data.pet_ownership || '',
+          relaxationActivities: data.relaxation_activities || [],
+          mentalHealthSupport: data.mental_health_support || '',
+          specialNotes: data.special_notes || ''
+        });
+      } else {
+        // Fallback to user context data if API fails
+        if (user) {
+          loadLifestyleFactorsFromUser();
+        }
       }
     } catch (error) {
-      console.error('Failed to load lifestyle factors:', error);
+      console.error('Failed to load lifestyle factors from API:', error);
+      // Fallback to user context data if API fails
+      if (user) {
+        loadLifestyleFactorsFromUser();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -276,27 +326,41 @@ export default function LifestyleFactorsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
+    setIsLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/lifestyle-factors', {
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/lifestyle-factors`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
+        credentials: 'include', // Send both session cookies and Bearer token
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        router.push('/profile');
+        const result = await response.json();
+        console.log('Lifestyle factors saved successfully:', result);
+        alert('Lifestyle factors saved successfully!');
       } else {
-        throw new Error('Failed to save lifestyle factors');
+        const errorData = await response.json();
+        throw new Error(`Failed to save lifestyle factors: ${errorData.detail || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Failed to save lifestyle factors:', error);
+      alert(`Error saving lifestyle factors: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 

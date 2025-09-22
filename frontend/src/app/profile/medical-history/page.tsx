@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,14 +88,14 @@ export default function MedicalHistoryPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [newMedication, setNewMedication] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newCondition, setNewCondition] = useState('');
 
   useEffect(() => {
     if (user) {
-      loadMedicalHistoryFromUser();
-    } else {
+      // First try to load from backend API, fallback to user context
       loadMedicalHistory();
     }
   }, [user]);
@@ -121,16 +122,53 @@ export default function MedicalHistoryPage() {
   };
 
   const loadMedicalHistory = async () => {
-    setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/medical-history');
+      setIsLoading(true);
+      
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Try to load from backend API first
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/medical-history`, {
+        headers,
+        credentials: 'include',
+      });
+      
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        // Transform backend data to form format
+        setFormData({
+          diagnosisYear: data.diagnosis_date ? new Date(data.diagnosis_date).getFullYear() : new Date().getFullYear(),
+          ibsType: data.ibs_type || '',
+          severityLevel: '',
+          knownTriggers: [],
+          commonSymptoms: [],
+          symptomPatterns: [],
+          medications: [],
+          allergies: [],
+          otherConditions: [],
+          familyHistory: '',
+          previousTreatments: [],
+          doctorNotes: data.medical_notes || ''
+        });
+        setHasUnsavedChanges(false);
+      } else {
+        // Fallback to user context data if API fails
+        loadMedicalHistoryFromUser();
       }
     } catch (error) {
-      console.error('Failed to load medical history:', error);
+      console.error('Failed to load medical history from API, falling back to user context:', error);
+      // Fallback to user context data
+      loadMedicalHistoryFromUser();
     } finally {
       setIsLoading(false);
     }
@@ -173,22 +211,46 @@ export default function MedicalHistoryPage() {
     setIsSaving(true);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/medical-history', {
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+         headers['Authorization'] = `Bearer ${token}`;
+       }
+      
+      // Convert form data to backend format - only send fields that exist in the User model
+      const profileData = {
+        diagnosis_date: `${formData.diagnosisYear}-01-01`,
+        ibs_type: formData.ibsType,
+        medical_notes: formData.doctorNotes,
+        // Note: Other fields like triggers, symptoms, etc. are not stored in the User model
+        // They would need separate tables or JSONB fields to be implemented
+      };
+      
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/medical-history`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        headers,
+        credentials: 'include', // Send both session cookies and Bearer token
+        body: JSON.stringify(profileData),
       });
-
+      
       if (response.ok) {
-        router.push('/profile');
+        const result = await response.json();
+        console.log('Medical history saved successfully:', result);
+        // Don't redirect, just show success message
+        alert('Medical history saved successfully!');
       } else {
-        throw new Error('Failed to save medical history');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save medical history');
       }
     } catch (error) {
       console.error('Failed to save medical history:', error);
+      alert(`Failed to save medical history: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }

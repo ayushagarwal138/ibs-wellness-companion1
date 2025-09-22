@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Debug Test</title>
+</head>
+<body>
+    <h1>CORS Debug Test</h1>
+    <button onclick="testLogin()">Test Login Request</button>
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                console.log('Making request to backend...');
+                
+                const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'frontend-test@example.com',
+                        password: 'FrontendTest123!'
+                    }),
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Success:', data);
+                resultDiv.innerHTML = `
+                    <h3>Success!</h3>
+                    <p>Status: ${response.status}</p>
+                    <p>Access Token: ${data.access_token ? 'Received' : 'Missing'}</p>
+                    <p>User: ${data.user?.email || 'Unknown'}</p>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <h3>Error!</h3>
+                    <p style="color: red;">${error.message}</p>
+                    <p>Check browser console for more details.</p>
+                `;
+            }
+        }
+
+        // Test if backend is reachable
+        async function testBackendHealth() {
+            try {
+                const response = await fetch('http://localhost:8000/health', {
+                    method: 'GET',
+                });
+                console.log('Backend health check:', response.status);
+            } catch (error) {
+                console.error('Backend health check failed:', error);
+            }
+        }
+
+        // Run health check on page load
+        testBackendHealth();
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +13,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-
-
 import { Target, Save, ArrowLeft, Plus, X, Bell, Calendar, TrendingUp } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
@@ -190,13 +189,13 @@ export default function GoalsPreferencesPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [newShortTermGoal, setNewShortTermGoal] = useState('');
   const [newLongTermGoal, setNewLongTermGoal] = useState('');
 
   useEffect(() => {
     if (user) {
-      loadGoalsPreferencesFromUser();
-    } else {
+      // Try to load data from backend API first, fallback to user context
       loadGoalsPreferences();
     }
   }, [user]);
@@ -246,14 +245,79 @@ export default function GoalsPreferencesPage() {
   const loadGoalsPreferences = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/goals-preferences');
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL']}/api/v1/profile/goals-preferences`, {
+        headers,
+        credentials: 'include', // Send both session cookies and Bearer token
+      });
+      
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        // Transform backend data to frontend format
+        setFormData({
+          healthGoals: data.health_goals || [],
+          symptomManagementGoals: data.symptom_management_goals || [],
+          lifestyleGoals: data.lifestyle_goals || [],
+          shortTermGoals: data.short_term_goals || [],
+          longTermGoals: data.long_term_goals || [],
+          motivationLevel: data.motivation_level || 7,
+          preferredTrackingMethods: data.preferred_tracking_methods || [],
+          reminderPreferences: {
+            medicationReminders: data.reminder_preferences?.medication_reminders ?? true,
+            mealLogging: data.reminder_preferences?.meal_logging ?? true,
+            symptomTracking: data.reminder_preferences?.symptom_tracking ?? true,
+            exerciseReminders: data.reminder_preferences?.exercise_reminders ?? false,
+            waterIntakeReminders: data.reminder_preferences?.water_intake_reminders ?? false,
+            sleepReminders: data.reminder_preferences?.sleep_reminders ?? false,
+          },
+          notificationSettings: {
+            pushNotifications: data.notification_preferences?.push_notifications ?? true,
+            emailNotifications: data.notification_preferences?.email_notifications ?? false,
+            smsNotifications: data.notification_preferences?.sms_notifications ?? false,
+            weeklyReports: data.notification_preferences?.weekly_reports ?? true,
+            monthlyReports: data.notification_preferences?.monthly_reports ?? true,
+          },
+          dataPrivacyPreferences: {
+            shareAnonymousData: data.privacy_settings?.data_sharing_consent ?? false,
+            allowResearchParticipation: data.privacy_settings?.research_participation ?? false,
+            dataRetentionPeriod: data.privacy_settings?.data_retention_period || '2years',
+          },
+          appPreferences: {
+            theme: data.app_preferences?.theme || 'auto',
+            language: data.app_preferences?.language || 'en',
+            measurementUnits: data.app_preferences?.measurement_units || 'metric',
+            defaultDashboardView: data.app_preferences?.default_dashboard_view || 'overview',
+          },
+          supportPreferences: data.support_preferences || [],
+          prioritySymptoms: data.priority_symptoms || [],
+          successMetrics: data.success_metrics || [],
+          challengeAreas: data.challenge_areas || [],
+          specialNotes: data.special_notes || ''
+        });
+        setHasUnsavedChanges(false);
+      } else {
+        // Fallback to user context data if API fails
+        if (user) {
+          loadGoalsPreferencesFromUser();
+        }
       }
     } catch (error) {
-      console.error('Failed to load goals and preferences:', error);
+      console.error('Failed to load goals and preferences from API:', error);
+      // Fallback to user context data if API fails
+      if (user) {
+        loadGoalsPreferencesFromUser();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -303,27 +367,41 @@ export default function GoalsPreferencesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
+    setIsLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/profile/goals-preferences', {
+      // Get token from localStorage if available
+      const token = localStorage.getItem('access_token');
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'}/api/v1/profile/goals-preferences`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
+        credentials: 'include', // Send both session cookies and Bearer token
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        router.push('/profile');
+        const result = await response.json();
+        console.log('Goals and preferences saved successfully:', result);
+        alert('Goals and preferences saved successfully!');
       } else {
-        throw new Error('Failed to save goals and preferences');
+        const errorData = await response.json();
+        throw new Error(`Failed to save goals and preferences: ${errorData.detail || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Failed to save goals and preferences:', error);
+      alert(`Error saving goals and preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 

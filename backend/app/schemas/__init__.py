@@ -7,6 +7,9 @@ from .user import *
 from .symptom import *
 from .medication import *
 from .diet import *
+from .analytics import *
+from .goal import *
+from .appointment import *
 
 __all__ = [
     # Auth schemas
@@ -61,4 +64,32 @@ __all__ = [
     "DietStats",
     "NutritionalAnalysis",
     "TriggerFoodAnalysis",
+    
+    # Analytics schemas
+    "UserAnalyticsResponse",
+    "SystemMetricsResponse",
+    "AchievementResponse",
+    "AchievementListResponse",
+    
+    # Goal schemas
+    "GoalBase",
+    "GoalCreate",
+    "GoalUpdate",
+    "GoalResponse",
+    "GoalListResponse",
+    "GoalProgressCreate",
+    "GoalProgressResponse",
+    "GoalSummaryResponse",
+    
+    # Appointment schemas
+    "AppointmentBase",
+    "AppointmentCreate",
+    "AppointmentUpdate",
+    "AppointmentResponse",
+    "AppointmentListResponse",
+    "AppointmentSummaryResponse",
+    "AppointmentReminderResponse",
+    "AppointmentResultCreate",
+    "AppointmentResultResponse",
+    "AppointmentStatsResponse",
 ]
