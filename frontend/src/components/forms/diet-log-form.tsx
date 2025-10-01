@@ -167,9 +167,19 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
 
     setIsCalculatingNutrition(true);
     try {
+      // Get the access token for authentication
+      const token = localStorage.getItem('access_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/v1/diet/nutrition/calculate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(foods)
       });
 

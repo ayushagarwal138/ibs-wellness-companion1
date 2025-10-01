@@ -47,7 +47,7 @@ async def create_food_reaction(
         onset_time_minutes=reaction_data.onset_time_minutes,
         duration_minutes=reaction_data.duration_minutes,
         notes=reaction_data.notes,
-        consumed_at=reaction_data.consumed_at or datetime.utcnow()
+        reaction_occurred_at=reaction_data.consumed_at or datetime.utcnow()
     )
     
     db.add(food_reaction)
@@ -81,9 +81,9 @@ async def get_food_reactions(
     if severity:
         query = query.filter(FoodReaction.severity == severity)
     if start_date:
-        query = query.filter(FoodReaction.consumed_at >= start_date)
+        query = query.filter(FoodReaction.reaction_occurred_at >= start_date)
     if end_date:
-        query = query.filter(FoodReaction.consumed_at <= end_date)
+        query = query.filter(FoodReaction.reaction_occurred_at <= end_date)
     
     # Get total count
     count_query = select(func.count()).select_from(query.subquery())
@@ -92,7 +92,7 @@ async def get_food_reactions(
     
     # Apply pagination
     offset = (page - 1) * size
-    query = query.order_by(desc(FoodReaction.consumed_at)).offset(offset).limit(size)
+    query = query.order_by(desc(FoodReaction.reaction_occurred_at)).offset(offset).limit(size)
     result = await db.execute(query)
     items = result.scalars().all()
     
@@ -205,11 +205,25 @@ async def create_diet_log(
     
     # Process each food item separately
     for food_name in diet_data.foods:
-        # Try to find existing food
+        # Try to find existing food with exact match first (case-sensitive)
         result = await db.execute(
-            select(Food).where(Food.name.ilike(f"%{food_name}%"))
+            select(Food).where(Food.name == food_name)
         )
         food = result.scalar_one_or_none()
+        
+        # If no exact match, try case-insensitive exact match with limit to handle duplicates
+        if not food:
+            result = await db.execute(
+                select(Food).where(func.lower(Food.name) == func.lower(food_name)).limit(1)
+            )
+            food = result.scalar_one_or_none()
+        
+        # If still no match, try partial match but limit to one result
+        if not food:
+            result = await db.execute(
+                select(Food).where(Food.name.ilike(f"%{food_name}%")).limit(1)
+            )
+            food = result.scalar_one_or_none()
         
         # If food doesn't exist, create it
         if not food:
@@ -521,7 +535,7 @@ async def get_food_stats(
     reactions_query = db.query(FoodReaction).filter(
         and_(
             FoodReaction.user_id == current_user.id,
-            FoodReaction.consumed_at >= start_date
+            FoodReaction.reaction_occurred_at >= start_date
         )
     )
     
@@ -648,7 +662,7 @@ async def get_trigger_food_analysis(
     reactions = db.query(FoodReaction).filter(
         and_(
             FoodReaction.user_id == current_user.id,
-            FoodReaction.consumed_at >= start_date
+            FoodReaction.reaction_occurred_at >= start_date
         )
     ).all()
     

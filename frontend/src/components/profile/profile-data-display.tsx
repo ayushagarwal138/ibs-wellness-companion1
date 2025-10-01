@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRouter } from 'next/navigation';
 // import { useAuth } from '@/hooks/useAuth';
+import { apiService } from '@/lib/api';
+import { SymptomLog } from '@ibs-wellness/shared-types';
 import { 
   User, 
   Heart, 
@@ -44,13 +46,35 @@ interface ProfileDataDisplayProps {
   className?: string;
 }
 
+// Extended interface for API response that includes symptom_name
+interface SymptomLogResponse {
+  id: number;
+  symptom_id: number;
+  symptom_name: string;
+  severity: string;
+  logged_at: string;
+  duration_minutes?: number;
+  notes?: string;
+  bristol_stool_type?: string;
+  bowel_movement_frequency?: number;
+  pain_location?: string;
+  pain_type?: string;
+  stress_level?: number;
+  sleep_quality?: number;
+  exercise_minutes?: number;
+  potential_triggers?: string;
+  created_at: string;
+}
+
 interface ProfileData {
   basicInfo?: any;
   medicalHistory?: any;
   dietaryPreferences?: any;
   lifestyleFactors?: any;
   goalsPreferences?: any;
-  initialSymptomLog?: any;
+  initialSymptomLog?: {
+    data?: SymptomLogResponse[];
+  } | null;
 }
 
 export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) {
@@ -77,7 +101,7 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
       const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
       
       // Load data from all profile sections
-      const [basicInfo, medicalHistory, dietaryPreferences, lifestyleFactors, goalsPreferences] = await Promise.allSettled([
+      const [basicInfo, medicalHistory, dietaryPreferences, lifestyleFactors, goalsPreferences, initialSymptomLog] = await Promise.allSettled([
         fetch(`${apiUrl}/api/v1/profile/basic-info`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }).then(res => res.ok ? res.json() : null),
@@ -96,7 +120,9 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
         
         fetch(`${apiUrl}/api/v1/profile/goals-preferences`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        }).then(res => res.ok ? res.json() : null)
+        }).then(res => res.ok ? res.json() : null),
+        
+        apiService.getInitialSymptomLogs().then(data => data ? { data } : null)
       ]);
 
       setProfileData({
@@ -105,7 +131,7 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
         dietaryPreferences: dietaryPreferences.status === 'fulfilled' ? dietaryPreferences.value : null,
         lifestyleFactors: lifestyleFactors.status === 'fulfilled' ? lifestyleFactors.value : null,
         goalsPreferences: goalsPreferences.status === 'fulfilled' ? goalsPreferences.value : null,
-        initialSymptomLog: null // Will be implemented later
+        initialSymptomLog: initialSymptomLog.status === 'fulfilled' ? initialSymptomLog.value : null
       });
     } catch (error) {
       console.error('Failed to load profile data:', error);
@@ -948,36 +974,41 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
   };
 
   const renderInitialSymptomLog = () => {
-    // Mock recent symptom data for display
-    const recentSymptoms = [
-      {
-        id: 1,
-        date: '2024-01-15',
-        severity: 'Moderate',
-        symptoms: ['Abdominal pain', 'Bloating', 'Gas'],
-        stressLevel: 6,
-        sleepQuality: 4,
-        notes: 'Symptoms appeared after lunch, possibly related to dairy intake'
-      },
-      {
-        id: 2,
-        date: '2024-01-12',
-        severity: 'Mild',
-        symptoms: ['Cramping', 'Urgency'],
-        stressLevel: 4,
-        sleepQuality: 7,
-        notes: 'Better day overall, good sleep helped'
-      },
-      {
-        id: 3,
-        date: '2024-01-10',
-        severity: 'Severe',
-        symptoms: ['Abdominal pain', 'Diarrhea', 'Nausea', 'Fatigue'],
-        stressLevel: 8,
-        sleepQuality: 3,
-        notes: 'High stress day at work, symptoms flared up significantly'
-      }
-    ];
+    const data: SymptomLogResponse[] = profileData.initialSymptomLog?.data || [];
+    
+    // If no data is available, show a message
+    if (!data || data.length === 0) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Recent Symptom Logs</h3>
+              <p className="text-sm text-gray-600">No symptom logs found</p>
+            </div>
+            <Button 
+              onClick={() => router.push('/dashboard/log-symptoms')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Log New Symptoms
+            </Button>
+          </div>
+          
+          <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+            <h4 className="text-lg font-medium text-gray-700 mb-2">No symptom logs yet</h4>
+            <p className="text-sm text-gray-600 mb-4">Start tracking your symptoms to see patterns and insights</p>
+            <Button 
+              onClick={() => router.push('/dashboard/log-symptoms')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Log Your First Symptoms
+            </Button>
+          </div>
+        </div>
+      );
+    }
 
     const getSeverityColor = (severity: string) => {
       switch (severity.toLowerCase()) {
@@ -1005,18 +1036,18 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
         </div>
 
         <div className="space-y-4">
-          {recentSymptoms.map((log) => (
+          {data.map((log) => (
             <div key={log.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center space-x-3">
                   <Calendar className="h-4 w-4 text-gray-400" />
                   <span className="text-sm font-medium text-gray-900">
-                    {new Date(log.date).toLocaleDateString('en-US', { 
+                    {log.logged_at ? new Date(log.logged_at).toLocaleDateString('en-US', { 
                       weekday: 'short', 
                       year: 'numeric', 
                       month: 'short', 
                       day: 'numeric' 
-                    })}
+                    }) : 'Date not available'}
                   </span>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(log.severity)}`}>
@@ -1026,47 +1057,56 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Symptoms</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Symptom</h4>
                   <div className="flex flex-wrap gap-1">
-                    {log.symptoms.map((symptom, index) => (
-                      <span key={index} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
-                        {symptom}
-                      </span>
-                    ))}
+                    <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
+                      {log.symptom_name}
+                    </span>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Stress Level</h4>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-orange-500 h-2 rounded-full" 
-                        style={{ width: `${(log.stressLevel / 10) * 100}%` }}
-                      ></div>
+                {log.stress_level && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-1">Stress Level</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-orange-500 h-2 rounded-full" 
+                          style={{ width: `${(log.stress_level / 10) * 100}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm text-gray-600">{log.stress_level}/10</span>
                     </div>
-                    <span className="text-sm text-gray-600">{log.stressLevel}/10</span>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Sleep Quality</h4>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-purple-500 h-2 rounded-full" 
-                        style={{ width: `${(log.sleepQuality / 10) * 100}%` }}
-                      ></div>
+                {log.sleep_quality && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-1">Sleep Quality</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-purple-500 h-2 rounded-full" 
+                          style={{ width: `${(log.sleep_quality / 10) * 100}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm text-gray-600">{log.sleep_quality}/10</span>
                     </div>
-                    <span className="text-sm text-gray-600">{log.sleepQuality}/10</span>
                   </div>
-                </div>
+                )}
               </div>
 
               {log.notes && (
                 <div className="mt-3 p-3 bg-gray-50 rounded-md">
                   <h4 className="text-sm font-medium text-gray-700 mb-1">Notes</h4>
                   <p className="text-sm text-gray-600">{log.notes}</p>
+                </div>
+              )}
+              
+              {log.duration_minutes && (
+                <div className="mt-3 flex items-center text-sm text-gray-600">
+                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                  Duration: {log.duration_minutes} minutes
                 </div>
               )}
             </div>

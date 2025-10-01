@@ -16,11 +16,14 @@ from .profile import router as profile_router
 from .notifications import router as notifications_router
 from .recommendations import router as recommendations_router
 from .optimization import router as optimization_router
-from .endpoints.user_sync import router as user_sync_router
+from .user_sync import router as user_sync_router
 from .financial import router as financial_router
 from .analytics import router as analytics_router
 from .goals import router as goals_router
 from .appointments import router as appointments_router
+from .symptom_logs import router as symptom_logs_router
+from .personalization import router as personalization_router
+from .ibs_assessment import router as ibs_assessment_router
 
 api_router = APIRouter()
 
@@ -42,5 +45,8 @@ api_router.include_router(financial_router, prefix="/financial", tags=["financia
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(goals_router, prefix="/goals", tags=["goals"])
 api_router.include_router(appointments_router, prefix="/appointments", tags=["appointments"])
+api_router.include_router(symptom_logs_router, prefix="/symptom-logs", tags=["symptom-logs"])
+api_router.include_router(personalization_router, prefix="/personalization", tags=["personalization"])
+api_router.include_router(ibs_assessment_router, tags=["ibs-assessment"])
 
 __all__ = ["api_router"]

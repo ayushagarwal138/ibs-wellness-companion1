@@ -316,7 +316,7 @@ class RecommendationService:
         reactions = self.db.query(FoodReaction).filter(
             and_(
                 FoodReaction.user_id == user_id,
-                FoodReaction.consumed_at >= start_date,
+                FoodReaction.reaction_occurred_at >= start_date,
                 FoodReaction.severity.in_([
                     ReactionSeverityEnum.MODERATE,
                     ReactionSeverityEnum.SEVERE,

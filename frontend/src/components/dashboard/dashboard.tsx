@@ -27,170 +27,48 @@ import {
   Clock,
   Shield,
   Lightbulb,
-  Plus
+  Plus,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import { dynamicDashboardService, DynamicDashboardData } from '@/services/dynamic-dashboard-service';
 
-interface DashboardData {
-  aiPredictions: {
-    riskLevel: 'low' | 'medium' | 'high';
-    nextFlareRisk: number;
-    triggerFoods: string[];
-    recommendations: string[];
-    indianRecommendations?: {
-      recommendedDishes: Array<{
-        dishName: string;
-        region: string;
-        ibsFriendlyScore: number;
-        spiceLevel: number;
-        benefits: string;
-      }>;
-      beneficialSpices: Array<{
-        spiceName: string;
-        digestiveBenefit: string;
-        recommendedAmount: string;
-      }>;
-      lifestyleTips: string[];
-    };
-  };
-  recentSymptoms: {
-    date: string;
-    severity: number;
-    symptoms: string[];
-  }[];
-  weeklyStats: {
-    avgSeverity: number;
-    symptomFreeDays: number;
-    totalLogs: number;
-    adherenceRate: number;
-  };
-  insights: {
-    type: 'positive' | 'warning' | 'info';
-    title: string;
-    description: string;
-    action?: string;
-  }[];
-  upcomingReminders: {
-    type: 'medication' | 'appointment' | 'log';
-    title: string;
-    time: string;
-    priority: 'high' | 'medium' | 'low';
-  }[];
-}
-
-// Mock data - in real app, this would come from API
-const mockDashboardData: DashboardData = {
-  aiPredictions: {
-    riskLevel: 'medium',
-    nextFlareRisk: 35,
-    triggerFoods: ['Dairy products', 'Spicy foods', 'High-fat meals'],
-    recommendations: [
-      'Consider reducing dairy intake this week',
-      'Increase fiber gradually with oats and bananas',
-      'Practice stress management techniques before meals',
-      'Take probiotics consistently for gut health'
-    ],
-    indianRecommendations: {
-      recommendedDishes: [
-        {
-          dishName: 'Khichdi with Ghee',
-          region: 'Pan-Indian',
-          ibsFriendlyScore: 9.2,
-          spiceLevel: 1,
-          benefits: 'Easy to digest, provides complete protein and gentle fiber'
-        },
-        {
-          dishName: 'Moong Dal Soup',
-          region: 'North Indian',
-          ibsFriendlyScore: 8.8,
-          spiceLevel: 2,
-          benefits: 'Light protein source, anti-inflammatory properties'
-        },
-        {
-          dishName: 'Curd Rice (Thayir Sadam)',
-          region: 'South Indian',
-          ibsFriendlyScore: 8.5,
-          spiceLevel: 1,
-          benefits: 'Probiotic-rich, cooling effect on digestive system'
-        },
-        {
-          dishName: 'Bottle Gourd Curry (Lauki)',
-          region: 'North Indian',
-          ibsFriendlyScore: 8.7,
-          spiceLevel: 2,
-          benefits: 'High water content, gentle on stomach, low FODMAP'
-        }
-      ],
-      beneficialSpices: [
-        {
-          spiceName: 'Cumin (Jeera)',
-          digestiveBenefit: 'Aids digestion and reduces bloating',
-          recommendedAmount: '1/2 tsp daily'
-        },
-        {
-          spiceName: 'Ginger (Adrak)',
-          digestiveBenefit: 'Anti-inflammatory, reduces nausea',
-          recommendedAmount: '1 inch piece daily'
-        },
-        {
-          spiceName: 'Turmeric (Haldi)',
-          digestiveBenefit: 'Anti-inflammatory, promotes gut healing',
-          recommendedAmount: '1/4 tsp daily'
-        },
-        {
-          spiceName: 'Fennel Seeds (Saunf)',
-          digestiveBenefit: 'Reduces gas and improves digestion',
-          recommendedAmount: '1 tsp after meals'
-        }
-      ],
-      lifestyleTips: [
-        'Eat smaller, frequent meals throughout the day',
-        'Chew food slowly and mindfully',
-        'Drink warm water with meals instead of cold',
-        'Practice yoga poses like Pawanmuktasana for digestion'
-      ]
-    }
-  },
-  recentSymptoms: [
-    { date: '2024-01-15', severity: 6, symptoms: ['Bloating', 'Abdominal pain'] },
-    { date: '2024-01-14', severity: 3, symptoms: ['Mild discomfort'] },
-    { date: '2024-01-13', severity: 8, symptoms: ['Severe cramping', 'Diarrhea'] },
-    { date: '2024-01-12', severity: 2, symptoms: ['Slight bloating'] },
-    { date: '2024-01-11', severity: 5, symptoms: ['Gas', 'Discomfort'] }
-  ],
-  weeklyStats: {
-    avgSeverity: 4.8,
-    symptomFreeDays: 2,
-    totalLogs: 12,
-    adherenceRate: 85
-  },
-  insights: [
-    {
-      type: 'warning',
-      title: 'Stress Pattern Detected',
-      description: 'Your symptoms tend to worsen during high-stress periods. Consider stress management techniques.',
-      action: 'View stress management tips'
-    },
-    {
-      type: 'positive',
-      title: 'Medication Adherence Improving',
-      description: 'Great job! Your medication adherence has improved by 15% this month.',
-    },
-    {
-      type: 'info',
-      title: 'Dietary Pattern Analysis',
-      description: 'You have fewer symptoms on days when you eat smaller, more frequent meals.',
-      action: 'View meal planning suggestions'
-    }
-  ],
-  upcomingReminders: [
-    { type: 'medication', title: 'Take Probiotics', time: '2:00 PM', priority: 'high' },
-    { type: 'log', title: 'Log Evening Symptoms', time: '8:00 PM', priority: 'medium' },
-    { type: 'appointment', title: 'Dr. Smith Checkup', time: 'Tomorrow 10:00 AM', priority: 'high' }
-  ]
-};
+// Use the dynamic interface from the service
+type DashboardData = DynamicDashboardData;
 
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData>(mockDashboardData);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDashboardData = async (showRefreshIndicator = false) => {
+    try {
+      if (showRefreshIndicator) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      const dashboardData = await dynamicDashboardService.getDashboardData();
+      setData(dashboardData);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError('Failed to load dashboard data. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const handleRefresh = () => {
+    loadDashboardData(true);
+  };
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
@@ -216,6 +94,38 @@ export default function Dashboard() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Your Dashboard</h2>
+          <p className="text-gray-600">Fetching your personalized health insights...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => loadDashboardData()} className="flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -226,6 +136,16 @@ export default function Dashboard() {
             <p className="text-gray-600 mt-1">Your personalized health insights and AI-powered recommendations</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
             <Button variant="outline" size="sm">
               <Calendar className="h-4 w-4 mr-2" />
               View Calendar
@@ -243,6 +163,9 @@ export default function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-6 w-6 text-blue-600" />
               AI Health Predictions
+              <Badge variant="outline" className="ml-auto text-xs">
+                {data.aiPredictions.modelVersion}
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -254,12 +177,17 @@ export default function Dashboard() {
                   {data.aiPredictions.riskLevel.toUpperCase()} RISK
                 </div>
                 <p className="text-xs text-gray-600 mt-1">Current risk level</p>
+                <div className="mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {Math.round(data.aiPredictions.confidence * 100)}% confidence
+                  </Badge>
+                </div>
               </div>
 
               {/* Flare Risk */}
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">{data.aiPredictions.nextFlareRisk}%</div>
-                <p className="text-xs text-gray-600">Flare risk (next 7 days)</p>
+                <p className="text-xs text-gray-600">Flare risk ({data.aiPredictions.timeline})</p>
                 <Progress value={data.aiPredictions.nextFlareRisk} className="mt-2 h-2" />
               </div>
 
@@ -269,6 +197,23 @@ export default function Dashboard() {
                 <p className="text-xs text-gray-600">Identified trigger foods</p>
               </div>
             </div>
+
+            {/* Key Factors */}
+            {data.aiPredictions.keyFactors.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4 text-blue-500" />
+                  Key Risk Factors
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {data.aiPredictions.keyFactors.map((factor, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {factor}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* AI Recommendations */}
             <div className="mt-6">
@@ -280,70 +225,40 @@ export default function Dashboard() {
                 {data.aiPredictions.recommendations.map((rec, index) => (
                   <div key={index} className="bg-white p-3 rounded-lg border border-blue-200 text-sm">
                     <div className="flex items-start gap-2">
-                      <Star className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <span>{rec}</span>
+                      <CheckCircle className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-700">{rec}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Indian Food Recommendations */}
-            {data.aiPredictions.indianRecommendations && (
-              <div className="mt-6 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 rounded-lg border border-orange-200">
+            {/* Personalized Recommendations Tabs */}
+            {data.personalizedRecommendations && (
+              <div className="mt-6">
                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <Utensils className="h-4 w-4 text-orange-500" />
-                  Indian Food Recommendations
+                  <Heart className="h-4 w-4 text-red-500" />
+                  Detailed Recommendations
                 </h4>
-                <Tabs defaultValue="dishes" className="w-full">
+                <Tabs defaultValue="dietary" className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="dishes">Recommended Dishes</TabsTrigger>
-                    <TabsTrigger value="spices">Beneficial Spices</TabsTrigger>
-                    <TabsTrigger value="lifestyle">Lifestyle Tips</TabsTrigger>
+                    <TabsTrigger value="dietary">Dietary</TabsTrigger>
+                    <TabsTrigger value="lifestyle">Lifestyle</TabsTrigger>
+                    <TabsTrigger value="medical">Medical</TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="dishes" className="mt-4">
+                  <TabsContent value="dietary" className="mt-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {data.aiPredictions.indianRecommendations.recommendedDishes.map((dish, index) => (
-                        <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
+                      {data.personalizedRecommendations.dietary.map((rec, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg border border-green-200">
                           <div className="flex items-start justify-between mb-2">
-                            <h5 className="font-medium text-gray-800">{dish.dishName}</h5>
-                            <Badge variant="secondary" className="text-xs">
-                              {dish.ibsFriendlyScore}/10
+                            <h5 className="font-medium text-green-700">{rec.category}</h5>
+                            <Badge variant="outline" className="text-xs">
+                              Priority: {rec.priority}
                             </Badge>
                           </div>
-                          <p className="text-xs text-gray-600 mb-2">{dish.region}</p>
-                          <p className="text-sm text-gray-700 mb-2">{dish.benefits}</p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Spice Level:</span>
-                            <div className="flex gap-1">
-                              {[...Array(5)].map((_, i) => (
-                                <div
-                                  key={i}
-                                  className={`w-2 h-2 rounded-full ${
-                                    i < dish.spiceLevel ? 'bg-red-400' : 'bg-gray-200'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="spices" className="mt-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {data.aiPredictions.indianRecommendations.beneficialSpices.map((spice, index) => (
-                        <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
-                          <h5 className="font-medium text-gray-800 mb-1">{spice.spiceName}</h5>
-                          <p className="text-sm text-gray-700 mb-2">{spice.digestiveBenefit}</p>
-                          <div className="flex items-center gap-2">
-                            <Pill className="h-3 w-3 text-green-500" />
-                            <span className="text-xs text-green-600 font-medium">
-                              {spice.recommendedAmount}
-                            </span>
-                          </div>
+                          <p className="text-sm text-gray-700 mb-2">{rec.recommendation}</p>
+                          <p className="text-xs text-gray-500">{rec.reasoning}</p>
                         </div>
                       ))}
                     </div>
@@ -351,12 +266,33 @@ export default function Dashboard() {
                   
                   <TabsContent value="lifestyle" className="mt-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {data.aiPredictions.indianRecommendations.lifestyleTips.map((tip, index) => (
-                        <div key={index} className="bg-white p-3 rounded-lg border border-orange-200">
-                          <div className="flex items-start gap-2">
-                            <Heart className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm text-gray-700">{tip}</span>
+                      {data.personalizedRecommendations.lifestyle.map((rec, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg border border-blue-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <h5 className="font-medium text-blue-700">{rec.category}</h5>
+                            <Badge variant="outline" className="text-xs">
+                              Priority: {rec.priority}
+                            </Badge>
                           </div>
+                          <p className="text-sm text-gray-700 mb-2">{rec.recommendation}</p>
+                          <p className="text-xs text-gray-500">{rec.reasoning}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="medical" className="mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {data.personalizedRecommendations.medical.map((rec, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg border border-purple-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <h5 className="font-medium text-purple-700">{rec.category}</h5>
+                            <Badge variant="outline" className="text-xs">
+                              Priority: {rec.priority}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2">{rec.recommendation}</p>
+                          <p className="text-xs text-gray-500">{rec.reasoning}</p>
                         </div>
                       ))}
                     </div>
@@ -383,6 +319,18 @@ export default function Dashboard() {
               <div className="mt-4">
                 <Progress value={data.weeklyStats.avgSeverity * 10} className="h-2" />
               </div>
+              {data.weeklyStats.improvementTrend !== 0 && (
+                <div className="mt-2 flex items-center gap-1">
+                  {data.weeklyStats.improvementTrend > 0 ? (
+                    <TrendingUp className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className={`text-xs ${data.weeklyStats.improvementTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {Math.abs(data.weeklyStats.improvementTrend)}% vs last week
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -455,25 +403,36 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {data.recentSymptoms.map((symptom, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium">{symptom.date}</span>
-                            <Badge variant="outline" className={`text-xs ${getSeverityColor(symptom.severity)} text-white`}>
-                              {symptom.severity}/10
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {symptom.symptoms.map((s, i) => (
-                              <span key={i} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
-                                {s}
-                              </span>
-                            ))}
+                    {data.recentSymptoms.length === 0 ? (
+                      <div className="text-center py-8">
+                        <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                        <p className="text-gray-500">No recent symptoms logged</p>
+                        <p className="text-xs text-gray-400">Keep up the great work!</p>
+                      </div>
+                    ) : (
+                      data.recentSymptoms.map((symptom, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium">{symptom.date}</span>
+                              <Badge variant="outline" className={`text-xs ${getSeverityColor(symptom.severity)} text-white`}>
+                                {symptom.severity}/10
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {symptom.symptoms.map((s, i) => (
+                                <span key={i} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                            {symptom.notes && (
+                              <p className="text-xs text-gray-500 mt-1">{symptom.notes}</p>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -488,21 +447,20 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {data.aiPredictions.triggerFoods.map((food, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
-                        <div className="flex items-center gap-3">
-                          <AlertTriangle className="h-4 w-4 text-orange-500" />
-                          <span className="font-medium text-orange-800">{food}</span>
-                        </div>
-                        <Button variant="outline" size="sm" className="text-xs">
-                          View Details
-                        </Button>
+                    {data.aiPredictions.triggerFoods.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No trigger foods identified yet</p>
+                        <p className="text-xs text-gray-400">Continue logging to identify patterns</p>
                       </div>
-                    ))}
-                    <Button variant="outline" className="w-full mt-4">
-                      <PieChart className="h-4 w-4 mr-2" />
-                      View Food Analysis
-                    </Button>
+                    ) : (
+                      data.aiPredictions.triggerFoods.map((food, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                          <span className="text-sm font-medium text-red-800">{food}</span>
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -510,30 +468,31 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="insights" className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {data.insights.map((insight, index) => (
                 <Card key={index} className={`border-l-4 ${
                   insight.type === 'positive' ? 'border-l-green-500 bg-green-50' :
                   insight.type === 'warning' ? 'border-l-yellow-500 bg-yellow-50' :
                   'border-l-blue-500 bg-blue-50'
                 }`}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {insight.type === 'positive' && <CheckCircle className="h-5 w-5 text-green-600" />}
-                          {insight.type === 'warning' && <AlertTriangle className="h-5 w-5 text-yellow-600" />}
-                          {insight.type === 'info' && <Lightbulb className="h-5 w-5 text-blue-600" />}
-                          <h3 className="font-semibold text-gray-900">{insight.title}</h3>
-                        </div>
-                        <p className="text-gray-700 mb-3">{insight.description}</p>
-                        {insight.action && (
-                          <Button variant="outline" size="sm">
-                            {insight.action}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      {insight.type === 'positive' && <CheckCircle className="h-5 w-5 text-green-600" />}
+                      {insight.type === 'warning' && <AlertTriangle className="h-5 w-5 text-yellow-600" />}
+                      {insight.type === 'info' && <Lightbulb className="h-5 w-5 text-blue-600" />}
+                      {insight.title}
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        {insight.priority}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-700 mb-3">{insight.description}</p>
+                    {insight.action && (
+                      <Button variant="outline" size="sm" className="text-xs">
+                        {insight.action}
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -572,7 +531,7 @@ export default function Dashboard() {
                     <div className="text-center">
                       <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-500">Chart visualization would go here</p>
-                      <p className="text-xs text-gray-400">Showing food categories and their impact</p>
+                      <p className="text-xs text-gray-400">Showing food impact on symptoms</p>
                     </div>
                   </div>
                 </CardContent>
@@ -590,25 +549,36 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {data.upcomingReminders.map((reminder, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {getPriorityIcon(reminder.priority)}
-                        <div>
-                          <p className="font-medium text-gray-900">{reminder.title}</p>
-                          <p className="text-sm text-gray-600">{reminder.time}</p>
+                  {data.upcomingReminders.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Bell className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No upcoming reminders</p>
+                      <p className="text-xs text-gray-400">You're all caught up!</p>
+                    </div>
+                  ) : (
+                    data.upcomingReminders.map((reminder, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          {getPriorityIcon(reminder.priority)}
+                          <div>
+                            <h4 className="font-medium text-gray-900">{reminder.title}</h4>
+                            <p className="text-sm text-gray-600">{reminder.time}</p>
+                            {reminder.description && (
+                              <p className="text-xs text-gray-500 mt-1">{reminder.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {reminder.type}
+                          </Badge>
+                          <Button variant="outline" size="sm">
+                            Mark Done
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {reminder.type}
-                        </Badge>
-                        <Button variant="outline" size="sm">
-                          Mark Done
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>

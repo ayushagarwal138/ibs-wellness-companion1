@@ -82,13 +82,17 @@ class MLService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/ml/predictions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders(),
-        },
-        body: JSON.stringify(request),
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (request.timeframe) params.append('timeframe', request.timeframe);
+      if (request.include_recommendations !== undefined) params.append('include_recommendations', request.include_recommendations.toString());
+      
+      const queryString = params.toString();
+      const url = `${API_BASE_URL}/api/v1/ml/predictions${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {

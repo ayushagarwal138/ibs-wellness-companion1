@@ -1,16 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import SymptomStats from './symptom-stats';
 import DietStats from './diet-stats';
+import { dashboardAnalyticsService, DashboardAnalytics } from '@/services/dashboard-analytics-service';
+import { useAuth } from '@/contexts/auth-context';
 
 type DashboardView = 'overview' | 'symptoms' | 'diet';
 
 export default function MainDashboard() {
+  const { user, loading: authLoading } = useAuth();
   const [activeView, setActiveView] = useState<DashboardView>('overview');
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Only load analytics when auth is complete and user is authenticated
+    if (!authLoading && user) {
+      loadDashboardAnalytics();
+    }
+  }, [authLoading, user]);
+
+  const loadDashboardAnalytics = async () => {
+    try {
+      setIsLoading(true);
+      console.log('Loading dashboard analytics for user:', user?.email);
+      const dashboardData = await dashboardAnalyticsService.getDashboardAnalytics();
+      setAnalytics(dashboardData);
+    } catch (error) {
+      console.error('Failed to load dashboard analytics:', error);
+      // Fallback to basic analytics if service fails
+      setAnalytics({
+        totalSymptomLogs: 0,
+        mealsLogged: 0,
+        foodReactions: 0,
+        avgWellnessScore: 0,
+        symptomLogsChange: '+0%',
+        mealsLoggedChange: '+0%',
+        foodReactionsChange: '+0%',
+        wellnessScoreChange: '+0%',
+        recentActivity: []
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show loading state while auth is loading or data is loading
+  if (authLoading || (isLoading && !analytics)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeView) {
@@ -41,8 +87,8 @@ export default function MainDashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">127</div>
-                  <p className="text-xs text-muted-foreground">+12% from last month</p>
+                  <div className="text-2xl font-bold">{analytics?.totalSymptomLogs || 0}</div>
+                  <p className="text-xs text-muted-foreground">{analytics?.symptomLogsChange || '+0%'} from last month</p>
                 </CardContent>
               </Card>
 
@@ -64,8 +110,8 @@ export default function MainDashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">89</div>
-                  <p className="text-xs text-muted-foreground">+8% from last month</p>
+                  <div className="text-2xl font-bold">{analytics?.mealsLogged || 0}</div>
+                  <p className="text-xs text-muted-foreground">{analytics?.mealsLoggedChange || '+0%'} from last month</p>
                 </CardContent>
               </Card>
 
@@ -86,8 +132,8 @@ export default function MainDashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">23</div>
-                  <p className="text-xs text-muted-foreground">-5% from last month</p>
+                  <div className="text-2xl font-bold">{analytics?.foodReactions || 0}</div>
+                  <p className="text-xs text-muted-foreground">{analytics?.foodReactionsChange || '+0%'} from last month</p>
                 </CardContent>
               </Card>
 
@@ -109,8 +155,8 @@ export default function MainDashboard() {
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">7.2</div>
-                  <p className="text-xs text-muted-foreground">+0.3 from last month</p>
+                  <div className="text-2xl font-bold">{analytics?.avgWellnessScore?.toFixed(1) || '0.0'}</div>
+                  <p className="text-xs text-muted-foreground">{analytics?.wellnessScoreChange || '+0%'} from last month</p>
                 </CardContent>
               </Card>
             </div>
@@ -122,34 +168,27 @@ export default function MainDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Logged breakfast meal</p>
-                      <p className="text-xs text-gray-500">2 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Recorded mild symptoms</p>
-                      <p className="text-xs text-gray-500">4 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Food reaction to dairy</p>
-                      <p className="text-xs text-gray-500">Yesterday</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Completed weekly wellness check</p>
-                      <p className="text-xs text-gray-500">2 days ago</p>
-                    </div>
-                  </div>
+                  {analytics?.recentActivity?.length ? (
+                     analytics.recentActivity.map((activity, index) => {
+                       const colorClass = activity.color === 'blue' ? 'bg-blue-500' :
+                                         activity.color === 'yellow' ? 'bg-yellow-500' :
+                                         activity.color === 'red' ? 'bg-red-500' :
+                                         activity.color === 'green' ? 'bg-green-500' :
+                                         'bg-gray-500';
+                       
+                       return (
+                         <div key={index} className="flex items-center space-x-4">
+                           <div className={`w-2 h-2 ${colorClass} rounded-full`}></div>
+                           <div className="flex-1">
+                             <p className="text-sm font-medium">{activity.description}</p>
+                             <p className="text-xs text-gray-500">{activity.timeAgo}</p>
+                           </div>
+                         </div>
+                       );
+                     })
+                   ) : (
+                     <p className="text-sm text-gray-500">No recent activity</p>
+                   )}
                 </div>
               </CardContent>
             </Card>

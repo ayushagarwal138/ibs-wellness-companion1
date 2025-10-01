@@ -15,14 +15,14 @@ import logging
 from pathlib import Path
 
 from app.core.config import settings
-# from app.core.logging import setup_logging  # Comment out for now
+from app.core.logging import setup_logging
 from app.core.database import engine, create_tables
 from app.api.v1 import auth, symptoms, diet, medications, chat, ml_predictions, real_time_predictions, users, onboarding, firebase, oauth
-# from app.core.exceptions import IBSException  # Comment out for now
+from app.core.exceptions import IBSException
 
 
 # Setup logging
-# setup_logging()  # Comment out for now
+setup_logging()
 logger = logging.getLogger(__name__)
 
 

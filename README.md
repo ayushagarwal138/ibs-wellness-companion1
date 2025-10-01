@@ -133,6 +133,15 @@ cd frontend && npm test
 
 ## 📚 Documentation
 
+### Setup & Environment
+- [Environment Setup Guide](./docs/environment-setup.md) - Comprehensive environment setup instructions
+- [Setup Guide](./docs/setup-guide.md) - Quick setup reference
+
+### Technical Documentation
+- [Technical Summary](./docs/technical-summary.md) - Debugging sessions and technical fixes
+- [ML Integration Fixes](./docs/ml-integration-fixes.md) - ML integration troubleshooting
+
+### API & Architecture
 - [API Documentation](./docs/api.md)
 - [Database Schema](./docs/database.md)
 - [ML Models](./docs/ml-models.md)

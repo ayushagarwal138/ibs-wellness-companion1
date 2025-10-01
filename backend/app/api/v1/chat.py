@@ -166,7 +166,7 @@ async def send_message_quick(
     chat_service = ChatService(db)
     
     try:
-        response = chat_service.send_message(
+        response = await chat_service.send_message(
             user=current_user,
             session_id=message_data.session_id,
             message=message_data.message,

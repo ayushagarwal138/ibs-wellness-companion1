@@ -5,7 +5,7 @@ API endpoints for generating personalized dietary and lifestyle recommendations
 based on user data, symptoms, and ML predictions.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -27,11 +27,22 @@ router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 # Global enhanced recommendation service instance
 enhanced_recommendation_service = None
 
-def get_enhanced_recommendation_service(db: AsyncSession = Depends(get_db)) -> EnhancedRecommendationService:
+async def get_enhanced_recommendation_service(db: AsyncSession = Depends(get_db)) -> EnhancedRecommendationService:
     """Get or create enhanced recommendation service instance."""
     global enhanced_recommendation_service
     if enhanced_recommendation_service is None:
-        enhanced_recommendation_service = EnhancedRecommendationService(db)
+        # Create a synchronous session for the service that expects Session
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from app.core.config import settings
+        
+        # Create a synchronous engine and session
+        sync_database_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+        sync_engine = create_engine(sync_database_url)
+        sync_session_factory = sessionmaker(bind=sync_engine)
+        sync_session = sync_session_factory()
+        
+        enhanced_recommendation_service = EnhancedRecommendationService(sync_session)
     return enhanced_recommendation_service
 
 @router.get("/personalized")
@@ -102,7 +113,7 @@ async def _prepare_user_data(user: User, db: AsyncSession) -> Dict[str, Any]:
     # Get recent symptoms (last 30 days)
     recent_symptoms_query = select(SymptomLog).where(
         SymptomLog.user_id == user.id,
-        SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=30)
+        SymptomLog.logged_at >= datetime.now(timezone.utc) - timedelta(days=30)
     ).order_by(SymptomLog.logged_at.desc())
     
     result = await db.execute(recent_symptoms_query)
@@ -111,7 +122,7 @@ async def _prepare_user_data(user: User, db: AsyncSession) -> Dict[str, Any]:
     # Get recent diet logs (last 14 days)
     recent_diet_query = select(DietLog).where(
         DietLog.user_id == user.id,
-        DietLog.consumed_at >= datetime.utcnow() - timedelta(days=14)
+        DietLog.consumed_at >= datetime.now(timezone.utc) - timedelta(days=14)
     ).order_by(DietLog.consumed_at.desc())
     
     result = await db.execute(recent_diet_query)
@@ -119,7 +130,7 @@ async def _prepare_user_data(user: User, db: AsyncSession) -> Dict[str, Any]:
     
     return {
         "user_id": user.id,
-        "age": (datetime.utcnow() - user.date_of_birth).days // 365 if user.date_of_birth else 30,
+        "age": (datetime.now(timezone.utc).date() - user.date_of_birth).days // 365 if user.date_of_birth else 30,
         "gender": user.gender.value if user.gender and hasattr(user.gender, 'value') else "unknown",
         "ibs_type": user.ibs_type.value if user.ibs_type and hasattr(user.ibs_type, 'value') else "unknown",
         "recent_symptoms": [
@@ -145,7 +156,7 @@ async def _get_dietary_patterns(user_id: str, db: AsyncSession) -> Dict[str, Any
     """Get user's dietary patterns for the last 30 days."""
     diet_query = select(DietLog).where(
         DietLog.user_id == user_id,
-        DietLog.consumed_at >= datetime.utcnow() - timedelta(days=30)
+        DietLog.consumed_at >= datetime.now(timezone.utc) - timedelta(days=30)
     )
     
     result = await db.execute(diet_query)

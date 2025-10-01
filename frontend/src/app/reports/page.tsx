@@ -785,7 +785,7 @@ export default function ReportsPage() {
                 </div>
                 <div className="mb-2">
                   <div className="flex flex-wrap gap-1">
-                    {suggestion.foods.map((food, foodIndex) => (
+                    {(suggestion.foods || []).map((food, foodIndex) => (
                       <span key={foodIndex} className="bg-gray-100 px-2 py-1 rounded text-sm">
                         {food}
                       </span>

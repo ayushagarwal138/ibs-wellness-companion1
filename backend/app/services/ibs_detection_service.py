@@ -117,10 +117,10 @@ class IBSDetectionService:
         stmt = select(FoodReaction).filter(
             and_(
                 FoodReaction.user_id == user_id,
-                FoodReaction.consumed_at >= start_date,
-                FoodReaction.consumed_at <= end_date
+                FoodReaction.reaction_occurred_at >= start_date,
+                FoodReaction.reaction_occurred_at <= end_date
             )
-        ).order_by(desc(FoodReaction.consumed_at))
+        ).order_by(desc(FoodReaction.reaction_occurred_at))
         
         result = await self.db.execute(stmt)
         reactions = result.scalars().all()
@@ -130,7 +130,7 @@ class IBSDetectionService:
                 "food_name": reaction.food_name,
                 "severity": reaction.severity,
                 "symptoms": reaction.symptoms,
-                "consumed_at": reaction.consumed_at,
+                "consumed_at": reaction.reaction_occurred_at,
                 "reaction_time": reaction.reaction_time_hours
             }
             for reaction in reactions

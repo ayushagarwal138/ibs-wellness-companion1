@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Login Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard Login Test</h1>
+    <button id="loginBtn">Login with API</button>
+    <button id="testDashboardBtn" disabled>Test Dashboard Analytics</button>
+    <button id="goToDashboardBtn" disabled>Go to Dashboard</button>
+    <div id="status"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const FRONTEND_BASE = 'http://localhost:3000';
+        
+        let authToken = null;
+        let userId = null;
+
+        function addStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            statusDiv.appendChild(div);
+        }
+
+        async function loginUser() {
+            try {
+                addStatus('Attempting to login...', 'info');
+                
+                const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'test.dashboard@example.com',
+                        password: 'TestPassword123!'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Login failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                authToken = data.access_token;
+                userId = data.user.id;
+
+                // Store in localStorage for the frontend
+                localStorage.setItem('access_token', authToken);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                addStatus(`Login successful! User ID: ${userId}`, 'success');
+                
+                document.getElementById('testDashboardBtn').disabled = false;
+                document.getElementById('goToDashboardBtn').disabled = false;
+                
+            } catch (error) {
+                addStatus(`Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDashboardAnalytics() {
+            if (!authToken) {
+                addStatus('Please login first', 'error');
+                return;
+            }
+
+            try {
+                addStatus('Testing dashboard analytics...', 'info');
+
+                // Test diet logs endpoint
+                const dietResponse = await fetch(`${API_BASE}/api/v1/diet/logs`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!dietResponse.ok) {
+                    throw new Error(`Diet logs request failed: ${dietResponse.status}`);
+                }
+
+                const dietData = await dietResponse.json();
+                addStatus(`Diet logs found: ${dietData.items.length} total`, 'success');
+
+                // Filter for current month (last 30 days)
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                const currentMonthLogs = dietData.items.filter(log => {
+                    const logDate = new Date(log.consumed_at);
+                    return logDate >= thirtyDaysAgo;
+                });
+
+                addStatus(`Current month diet logs: ${currentMonthLogs.length}`, 'success');
+
+                // Test symptom logs
+                const symptomResponse = await fetch(`${API_BASE}/api/v1/symptom-logs`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (symptomResponse.ok) {
+                    const symptomData = await symptomResponse.json();
+                    addStatus(`Symptom logs: ${symptomData.data ? symptomData.data.length : 0}`, 'success');
+                }
+
+                // Test food reactions
+                const reactionResponse = await fetch(`${API_BASE}/api/v1/diet/reactions`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (reactionResponse.ok) {
+                    const reactionData = await reactionResponse.json();
+                    addStatus(`Food reactions: ${reactionData.items ? reactionData.items.length : 0}`, 'success');
+                }
+
+                addStatus('Dashboard analytics test completed!', 'success');
+
+            } catch (error) {
+                addStatus(`Analytics test error: ${error.message}`, 'error');
+            }
+        }
+
+        function goToDashboard() {
+            if (!authToken) {
+                addStatus('Please login first', 'error');
+                return;
+            }
+
+            addStatus('Redirecting to dashboard...', 'info');
+            window.location.href = `${FRONTEND_BASE}/dashboard`;
+        }
+
+        document.getElementById('loginBtn').addEventListener('click', loginUser);
+        document.getElementById('testDashboardBtn').addEventListener('click', testDashboardAnalytics);
+        document.getElementById('goToDashboardBtn').addEventListener('click', goToDashboard);
+    </script>
+</body>
+</html>

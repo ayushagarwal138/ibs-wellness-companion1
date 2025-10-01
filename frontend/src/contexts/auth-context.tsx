@@ -136,18 +136,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(data.user)
       
       // Set up analytics and notifications for the user
-      analyticsService.setUser(data.user.id, {
-        email: data.user.email,
-        first_name: data.user.first_name,
-        last_name: data.user.last_name,
-        ibs_type: data.user.ibs_type,
-      })
-      
-      // Initialize notifications
-      await notificationService.requestPermission()
-      
-      // Track login event
-      analyticsService.trackUserAction('login', 'authentication', 'success')
+      try {
+        analyticsService.setUser(data.user.id, {
+          email: data.user.email,
+          first_name: data.user.first_name,
+          last_name: data.user.last_name,
+          ibs_type: data.user.ibs_type,
+        })
+        
+        // Initialize notifications (non-blocking)
+        notificationService.requestPermission().catch(console.error)
+        
+        // Track login event
+        analyticsService.trackUserAction('login', 'authentication', 'success')
+      } catch (error) {
+        console.error('Analytics/notification setup error:', error)
+      }
       
       toast.success('Login successful!')
       
@@ -209,15 +213,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(data.user)
       
       // Set up analytics for new user
-      analyticsService.setUser(data.user.id, {
-        email: data.user.email,
-        first_name: data.user.first_name,
-        last_name: data.user.last_name,
-        registration_date: new Date().toISOString(),
-      })
-      
-      // Track registration event
-      analyticsService.trackUserAction('register', 'authentication', 'success')
+      try {
+        analyticsService.setUser(data.user.id, {
+          email: data.user.email,
+          first_name: data.user.first_name,
+          last_name: data.user.last_name,
+          registration_date: new Date().toISOString(),
+        })
+        
+        // Track registration event
+        analyticsService.trackUserAction('register', 'authentication', 'success')
+      } catch (error) {
+        console.error('Analytics setup error:', error)
+      }
       
       toast.success('Registration successful!')
       

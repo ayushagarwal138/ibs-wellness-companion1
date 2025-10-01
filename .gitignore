@@ -40,6 +40,7 @@ venv.bak/
 .venv/
 backend/venv/
 backend/env/
+test_env/
 
 # Next.js
 .next/

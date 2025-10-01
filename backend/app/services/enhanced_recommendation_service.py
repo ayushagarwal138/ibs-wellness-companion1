@@ -12,7 +12,7 @@ import logging
 import joblib
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -27,6 +27,7 @@ from app.models.user import User
 from app.models.diet import FoodReaction, ReactionSeverityEnum
 from app.schemas.chat import IBSAssessment, IBSSeverity, Recommendation, RecommendationType
 from app.services.recommendation_service import RecommendationService
+from app.core.dynamic_config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +41,16 @@ class EnhancedRecommendationService(RecommendationService):
         self.scaler = None
         self.feature_selector = None
         self.feature_names = []
+        self.config = get_config()
         self.load_ml_models()
         
-        # Enhanced FODMAP database with external data insights
-        self.fodmap_database = self._load_enhanced_fodmap_data()
+        # Initialize dynamic data service for database-driven content
+        from app.services.dynamic_data_service import DynamicDataService
+        self.dynamic_data_service = DynamicDataService(db)
         
-        # Nutritional guidelines based on external datasets
-        self.nutrition_guidelines = self._load_nutrition_guidelines()
+        # Initialize user personalization service
+        from app.services.user_personalization_service import UserPersonalizationService
+        self.personalization_service = UserPersonalizationService(db)
     
     def load_ml_models(self):
         """Load the enhanced ML models and preprocessing components."""
@@ -138,58 +142,7 @@ class EnhancedRecommendationService(RecommendationService):
         self.load_ml_models()
         logger.info("Enhanced models reloaded successfully")
     
-    def _load_enhanced_fodmap_data(self) -> Dict[str, Any]:
-        """Load enhanced FODMAP data with external dataset insights."""
-        return {
-            'high_fodmap_foods': {
-                'fruits': ['apple', 'pear', 'mango', 'watermelon', 'cherries'],
-                'vegetables': ['onion', 'garlic', 'cauliflower', 'mushrooms', 'asparagus'],
-                'grains': ['wheat', 'rye', 'barley'],
-                'dairy': ['milk', 'yogurt', 'ice_cream'],
-                'legumes': ['beans', 'lentils', 'chickpeas'],
-                'sweeteners': ['honey', 'agave', 'sorbitol', 'mannitol']
-            },
-            'low_fodmap_alternatives': {
-                'fruits': ['banana', 'blueberries', 'strawberries', 'orange', 'kiwi'],
-                'vegetables': ['carrot', 'spinach', 'bell_pepper', 'cucumber', 'tomato'],
-                'grains': ['rice', 'quinoa', 'oats', 'corn'],
-                'dairy': ['lactose_free_milk', 'hard_cheese', 'butter'],
-                'proteins': ['chicken', 'fish', 'eggs', 'tofu'],
-                'sweeteners': ['maple_syrup', 'stevia', 'sugar']
-            },
-            'portion_guidelines': {
-                'banana': '1 medium (100g)',
-                'blueberries': '1/4 cup (40g)',
-                'spinach': '1 cup (30g)',
-                'rice': '1/2 cup cooked (75g)',
-                'chicken': '3-4 oz (85-115g)'
-            }
-        }
-    
-    def _load_nutrition_guidelines(self) -> Dict[str, Any]:
-        """Load nutrition guidelines based on external dataset analysis."""
-        return {
-            'daily_targets': {
-                'fiber_soluble': {'min': 10, 'max': 15, 'unit': 'g'},
-                'fiber_insoluble': {'min': 5, 'max': 10, 'unit': 'g'},
-                'protein': {'min': 0.8, 'max': 1.2, 'unit': 'g/kg_body_weight'},
-                'fat': {'min': 20, 'max': 35, 'unit': '% of calories'},
-                'carbs': {'min': 45, 'max': 65, 'unit': '% of calories'},
-                'water': {'min': 2000, 'max': 3000, 'unit': 'ml'}
-            },
-            'ibs_specific_nutrients': {
-                'peppermint_oil': {'dose': '0.2-0.4ml', 'frequency': '3x daily', 'benefit': 'antispasmodic'},
-                'probiotics': {'cfu': '10^9-10^11', 'strains': ['Bifidobacterium', 'Lactobacillus']},
-                'omega3': {'dose': '1-2g', 'frequency': 'daily', 'benefit': 'anti-inflammatory'},
-                'vitamin_d': {'dose': '1000-2000IU', 'frequency': 'daily', 'benefit': 'immune_support'}
-            },
-            'meal_timing': {
-                'frequency': '4-6 small meals',
-                'spacing': '2-3 hours apart',
-                'last_meal': '3 hours before bed',
-                'hydration': 'between meals, not during'
-            }
-        }
+
     
     def predict_symptom_risk(self, user_features: Dict[str, Any], model_name: str = 'logistic_regression') -> Dict[str, Any]:
         """
@@ -204,7 +157,7 @@ class EnhancedRecommendationService(RecommendationService):
         """
         if model_name not in self.ml_models:
             logger.warning(f"Model {model_name} not available, using fallback")
-            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 0.5}
+            return self._calculate_rule_based_risk(user_features)
         
         try:
             model = self.ml_models[model_name]
@@ -219,10 +172,21 @@ class EnhancedRecommendationService(RecommendationService):
             else:
                 risk_probability = model.predict(feature_vector.reshape(1, -1))[0]
             
-            # Determine risk level
-            if risk_probability > 0.7:
+            # Check if model is returning constant predictions (likely biased)
+            # If probability is exactly 1.0 or 0.0, use rule-based fallback
+            if risk_probability >= 0.99 or risk_probability <= 0.01:
+                logger.warning(f"Model {model_name} returning constant prediction, using rule-based fallback")
+                return self._calculate_rule_based_risk(user_features)
+            
+            # Use personalized thresholds if available
+            personalized_thresholds = user_features.get('personalized_thresholds', {})
+            high_threshold = personalized_thresholds.get('high_risk_threshold', 0.7)
+            medium_threshold = personalized_thresholds.get('medium_risk_threshold', 0.4)
+            
+            # Determine risk level using personalized thresholds
+            if risk_probability > high_threshold:
                 risk_level = 'High'
-            elif risk_probability > 0.4:
+            elif risk_probability > medium_threshold:
                 risk_level = 'Medium'
             else:
                 risk_level = 'Low'
@@ -236,11 +200,68 @@ class EnhancedRecommendationService(RecommendationService):
             
         except Exception as e:
             logger.error(f"Error in ML prediction: {e}")
-            return {'risk_probability': 0.5, 'risk_level': 'Medium', 'confidence': 0.5}
+            return self._calculate_rule_based_risk(user_features)
+    
+    def _calculate_rule_based_risk(self, user_features: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate risk using rule-based approach when ML models fail or return biased results."""
+        import random
+        
+        # Get dynamic configuration for weights and thresholds
+        ml_config = self.config.ml_model
+        
+        # Extract key features with defaults
+        severe_symptoms = user_features.get('severe_symptoms', 0)
+        avg_pain_level = user_features.get('avg_pain_level', 0)
+        stress_level = user_features.get('stress_level', 5)
+        sleep_score = user_features.get('sleep_score', 7)
+        fodmap_load_score = user_features.get('fodmap_load_score', 5)
+        food_reactions = user_features.get('food_reactions', 0)
+        severe_food_reactions = user_features.get('severe_food_reactions', 0)
+        
+        # Calculate weighted risk score using dynamic weights
+        risk_score = 0.0
+        
+        # Symptom severity
+        risk_score += (severe_symptoms / 10.0) * ml_config.symptom_weight
+        risk_score += (avg_pain_level / 10.0) * ml_config.symptom_weight
+        
+        # Stress and sleep
+        risk_score += (stress_level / 10.0) * ml_config.stress_weight
+        risk_score += (1 - sleep_score / 10.0) * ml_config.sleep_weight  # Lower sleep = higher risk
+        
+        # Diet factors
+        risk_score += (fodmap_load_score / 10.0) * 0.15
+        risk_score += (food_reactions / 20.0) * 0.05
+        risk_score += (severe_food_reactions / 10.0) * 0.05
+        
+        # Wellness composite
+        wellness_composite = user_features.get('wellness_composite', 5)
+        risk_score += (1 - wellness_composite / 10.0) * 0.20  # Lower wellness = higher risk
+        
+        # Add small random variation (±5%)
+        risk_score += random.uniform(-0.05, 0.05)
+        
+        # Ensure score is between 0 and 1
+        risk_score = max(0.0, min(1.0, risk_score))
+        
+        # Determine risk level using dynamic thresholds
+        if risk_score > ml_config.high_risk_threshold:
+            risk_level = 'High'
+        elif risk_score > ml_config.medium_risk_threshold:
+            risk_level = 'Medium'
+        else:
+            risk_level = 'Low'
+        
+        return {
+            'risk_probability': float(risk_score),
+            'risk_level': risk_level,
+            'confidence': self.config.recommendations.fallback_confidence,
+            'model_used': ml_config.fallback_model_version
+        }
     
     def _prepare_feature_vector(self, user_features: Dict[str, Any]) -> np.ndarray:
         """Prepare feature vector for ML model prediction."""
-        # Default feature values - ensure exactly 15 features to match ML model
+        # Default feature values - use only 15 features to match existing trained models
         default_features = {
             'total_symptom_logs': 0,
             'severe_symptoms': 0,
@@ -262,7 +283,7 @@ class EnhancedRecommendationService(RecommendationService):
         # Update with provided features
         default_features.update(user_features)
         
-        # Create feature vector with exactly 15 features in consistent order
+        # Create feature vector with exactly 15 features in consistent order (matching trained models)
         feature_order = [
             'total_symptom_logs', 'severe_symptoms', 'moderate_symptoms', 
             'avg_pain_level', 'bowel_movement_logs', 'food_reactions',
@@ -273,7 +294,7 @@ class EnhancedRecommendationService(RecommendationService):
         
         feature_vector = np.array([default_features.get(name, 0) for name in feature_order])
         
-        # Ensure exactly 15 features
+        # Ensure exactly 15 features for existing models
         if len(feature_vector) != 15:
             feature_vector = np.pad(feature_vector, (0, max(0, 15 - len(feature_vector))))[:15]
         
@@ -329,7 +350,7 @@ class EnhancedRecommendationService(RecommendationService):
                 'nutrition_optimization': nutrition_recommendations,
                 'personalization_score': self._calculate_personalization_score(user_features),
                 'confidence_level': ml_predictions.get('confidence', 0),
-                'last_updated': datetime.utcnow().isoformat()
+                'last_updated': datetime.now(timezone.utc).isoformat()
             }
             
         except Exception as e:
@@ -350,36 +371,48 @@ class EnhancedRecommendationService(RecommendationService):
         trigger_foods = await self._identify_trigger_foods(user_id, db)
         safe_foods = await self._identify_safe_foods(user_id, db)
         
+        # Get dynamic FODMAP data and nutrition guidelines
+        high_fodmap_foods = await self.dynamic_data_service.get_high_fodmap_foods()
+        low_fodmap_alternatives = await self.dynamic_data_service.get_low_fodmap_alternatives()
+        
         # Risk level based recommendations
         risk_level = ml_predictions.get('risk_level', 'moderate')
         
         if risk_level == 'high':
+            # Use dynamic data for high-risk recommendations
+            high_fodmap_list = ', '.join(high_fodmap_foods[:5]) if high_fodmap_foods else 'High FODMAP foods'
+            low_fodmap_list = ', '.join(low_fodmap_alternatives[:5]) if low_fodmap_alternatives else 'Low FODMAP alternatives'
+            
             recommendations.extend([
                 {
                     'category': 'eliminate',
-                    'recommendation': f"Eliminate {', '.join(trigger_foods[:5] if trigger_foods else ['High FODMAP foods', 'Dairy products', 'Gluten-containing grains'])}",
+                    'recommendation': f"Eliminate {', '.join(trigger_foods[:5] if trigger_foods else [high_fodmap_list])}",
                     'priority': 'high',
                     'rationale': 'These foods have been identified as your primary triggers based on symptom correlation. Eliminating them immediately for 2-4 weeks can help reduce symptoms.'
                 },
                 {
                     'category': 'include',
-                    'recommendation': 'Include Bone broth, Ginger tea, Peppermint tea, Rice, Bananas',
+                    'recommendation': f'Include {low_fodmap_list}',
                     'priority': 'high',
                     'rationale': 'These foods are gentle on the digestive system and may help reduce inflammation. Include daily during symptom flare-ups.'
                 }
             ])
         
         elif risk_level == 'moderate':
+            # Get moderate FODMAP foods for monitoring
+            moderate_foods = high_fodmap_foods[:3] if high_fodmap_foods else ['Caffeine', 'Spicy foods', 'High-fat foods']
+            safe_alternatives = low_fodmap_alternatives[:5] if low_fodmap_alternatives else ['Oats', 'Lean proteins', 'Cooked vegetables', 'Herbal teas']
+            
             recommendations.extend([
                 {
                     'category': 'moderate',
-                    'recommendation': f"Monitor {', '.join(trigger_foods[:3] if trigger_foods else ['Caffeine', 'Spicy foods', 'High-fat foods'])} carefully",
+                    'recommendation': f"Monitor {', '.join(trigger_foods[:3] if trigger_foods else moderate_foods)} carefully",
                     'priority': 'medium',
                     'rationale': 'These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks.'
                 },
                 {
                     'category': 'include',
-                    'recommendation': f"Incorporate {', '.join(safe_foods[:5] if safe_foods else ['Oats', 'Lean proteins', 'Cooked vegetables', 'Herbal teas'])} as staples",
+                    'recommendation': f"Incorporate {', '.join(safe_foods[:5] if safe_foods else safe_alternatives)} as staples",
                     'priority': 'medium',
                     'rationale': 'These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning.'
                 }
@@ -401,12 +434,15 @@ class EnhancedRecommendationService(RecommendationService):
                 }
             ])
         
-        # Add FODMAP-specific recommendations
+        # Add FODMAP-specific recommendations using dynamic thresholds
         fodmap_load = user_features.get('fodmap_load', 0)
-        if fodmap_load > 7:
+        fodmap_threshold = self.config.nutrition.fodmap_threshold
+        
+        if fodmap_load > fodmap_threshold:
+            high_fodmap_to_eliminate = ', '.join(high_fodmap_foods[:4]) if high_fodmap_foods else 'High FODMAP foods'
             recommendations.append({
                 'category': 'eliminate',
-                'recommendation': 'Eliminate High FODMAP foods (onions, garlic, wheat, beans) and Artificial sweeteners',
+                'recommendation': f'Eliminate {high_fodmap_to_eliminate} and Artificial sweeteners',
                 'priority': 'high',
                 'rationale': f'Your FODMAP load is high ({fodmap_load}/10) - reducing these may significantly improve symptoms. Follow strict low-FODMAP diet for 4-6 weeks.'
             })
@@ -679,7 +715,7 @@ class EnhancedRecommendationService(RecommendationService):
             ],
             'personalization_score': 25.0,
             'confidence_level': ml_predictions.get('confidence', 50),
-            'last_updated': datetime.utcnow().isoformat()
+            'last_updated': datetime.now(timezone.utc).isoformat()
         }
 
     async def _generate_ml_driven_recommendations(
@@ -734,33 +770,56 @@ class EnhancedRecommendationService(RecommendationService):
         try:
             recommendations = []
             
-            # Basic nutrition recommendations
-            recommendations.extend([
-                {
-                    'type': 'nutrition',
-                    'title': 'Hydration Focus',
-                    'description': 'Maintain adequate hydration with 8-10 glasses of water daily',
-                    'priority': 'medium'
-                },
-                {
-                    'type': 'nutrition',
-                    'title': 'Fiber Balance',
-                    'description': 'Gradually increase soluble fiber intake with oats and bananas',
-                    'priority': 'medium'
-                },
+            # Get personalized nutrition guidelines from dynamic data service
+            nutrition_guidelines = await self.dynamic_data_service.get_personalized_nutrition_guidelines(user_id)
+            
+            # Hydration recommendations based on dynamic guidelines
+            water_target = nutrition_guidelines.get('daily_targets', {}).get('water', {})
+            water_min = water_target.get('min', 2000)
+            water_max = water_target.get('max', 3000)
+            
+            recommendations.append({
+                'type': 'nutrition',
+                'title': 'Hydration Focus',
+                'description': f'Maintain adequate hydration with {water_min//250}-{water_max//250} glasses of water daily',
+                'priority': 'medium'
+            })
+            
+            # Fiber recommendations based on dynamic guidelines
+            fiber_soluble = nutrition_guidelines.get('daily_targets', {}).get('fiber_soluble', {})
+            fiber_min = fiber_soluble.get('min', 10)
+            fiber_max = fiber_soluble.get('max', 15)
+            
+            recommendations.append({
+                'type': 'nutrition',
+                'title': 'Fiber Balance',
+                'description': f'Gradually increase soluble fiber intake to {fiber_min}-{fiber_max}g daily with oats and bananas',
+                'priority': 'medium'
+            })
+            
+            # Add IBS-specific nutrient recommendations
+            ibs_nutrients = nutrition_guidelines.get('ibs_specific_nutrients', {})
+            if ibs_nutrients:
+                for nutrient, details in ibs_nutrients.items():
+                    recommendations.append({
+                        'type': 'nutrition',
+                        'title': f'{nutrient.replace("_", " ").title()} Supplementation',
+                        'description': f'Consider {details.get("dose", "recommended dose")} {details.get("frequency", "daily")} for {details.get("benefit", "digestive support")}',
+                        'priority': 'low'
+                    })
+            
+            return recommendations
+            
+        except Exception as e:
+            logger.error(f"Error generating nutrition optimization recommendations: {str(e)}")
+            return [
                 {
                     'type': 'nutrition',
                     'title': 'Meal Timing',
                     'description': 'Eat smaller, more frequent meals to reduce digestive stress',
                     'priority': 'low'
                 }
-            ])
-            
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"Error getting nutrition recommendations: {str(e)}")
-            return []
+            ]
 
     async def generate_personalized_meal_plan(self, 
                                       user: User,
@@ -833,7 +892,7 @@ class EnhancedRecommendationService(RecommendationService):
             symptom_result = await db.execute(
                 select(SymptomLog).where(
                     SymptomLog.user_id == user.id,
-                    SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=30)
+                    SymptomLog.logged_at >= datetime.now(timezone.utc) - timedelta(days=30)
                 )
             )
             recent_symptoms = symptom_result.scalars().all()
@@ -853,7 +912,7 @@ class EnhancedRecommendationService(RecommendationService):
             food_result = await db.execute(
                 select(FoodReaction).where(
                     FoodReaction.user_id == user.id,
-                    FoodReaction.reaction_occurred_at >= datetime.utcnow() - timedelta(days=30)
+                    FoodReaction.reaction_occurred_at >= datetime.now(timezone.utc) - timedelta(days=30)
                 )
             )
             food_reactions = food_result.scalars().all()
@@ -867,7 +926,7 @@ class EnhancedRecommendationService(RecommendationService):
             med_result = await db.execute(
                 select(MedicationLog).where(
                     MedicationLog.user_id == user.id,
-                    MedicationLog.taken_at >= datetime.utcnow() - timedelta(days=30)
+                    MedicationLog.taken_at >= datetime.now(timezone.utc) - timedelta(days=30)
                 )
             )
             medications = med_result.scalars().all()

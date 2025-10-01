@@ -10,8 +10,12 @@ from .diet import *
 from .analytics import *
 from .goal import *
 from .appointment import *
+from .response import *
 
 __all__ = [
+    # Response schema
+    "StandardResponse",
+    
     # Auth schemas
     "Token",
     "TokenData",

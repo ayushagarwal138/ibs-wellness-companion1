@@ -105,6 +105,7 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields to prevent validation errors
 
 
 # Global settings instance
