@@ -16,7 +16,7 @@ import logging
 import json
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
 
 from models.ibs_severity_classifier import IBSSeverityClassifier
 from models.flareup_predictor import FlareupPredictor
@@ -31,7 +31,7 @@ def load_training_data():
     """Load the training data."""
     logger.info("📊 Loading training data...")
     
-    data_dir = Path(__file__).parent / "data"
+    data_dir = Path(__file__).parent.parent.parent / "data"
     
     # Load training data
     train_data = pd.read_csv(data_dir / "train_data.csv")
@@ -61,11 +61,21 @@ def train_severity_classifier(train_data, val_data, checkpoint_dir):
     
     classifier = IBSSeverityClassifier()
     
-    # Create severity labels from severity_score
+    # Create severity labels from severity_score using 5 categories
     train_data_copy = train_data.copy()
-    train_data_copy['severity_label'] = train_data_copy['severity_score'].apply(
-        lambda x: 'mild' if x <= 3 else 'moderate' if x <= 6 else 'severe'
-    )
+    def categorize_severity(score):
+        if score <= 2:
+            return 'none'
+        elif score <= 4:
+            return 'mild'
+        elif score <= 6:
+            return 'moderate'
+        elif score <= 8:
+            return 'severe'
+        else:
+            return 'very_severe'
+    
+    train_data_copy['severity_label'] = train_data_copy['severity_score'].apply(categorize_severity)
     
     # Train the model
     results = classifier.train(train_data_copy, target_column='severity_label')

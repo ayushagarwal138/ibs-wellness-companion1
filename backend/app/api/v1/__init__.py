@@ -32,7 +32,9 @@ api_router.include_router(oauth_router, prefix="/auth", tags=["oauth"])
 api_router.include_router(users_router, prefix="/users", tags=["users"])
 api_router.include_router(user_sync_router, prefix="/sync", tags=["user-sync"])
 api_router.include_router(symptoms_router, prefix="/symptoms", tags=["symptoms"])
-api_router.include_router(medications_router, prefix="/medications", tags=["medications"])
+api_router.include_router(
+    medications_router, prefix="/medications", tags=["medications"]
+)
 api_router.include_router(diet_router, prefix="/diet", tags=["diet"])
 api_router.include_router(ml_predictions_router, prefix="/ml", tags=["ml-predictions"])
 api_router.include_router(chat_router, prefix="/chat", tags=["chat"])
@@ -40,13 +42,21 @@ api_router.include_router(onboarding_router, prefix="/onboarding", tags=["onboar
 api_router.include_router(profile_router, tags=["profile"])
 api_router.include_router(notifications_router, tags=["notifications"])
 api_router.include_router(recommendations_router, tags=["recommendations"])
-api_router.include_router(optimization_router, prefix="/optimization", tags=["optimization"])
+api_router.include_router(
+    optimization_router, prefix="/optimization", tags=["optimization"]
+)
 api_router.include_router(financial_router, prefix="/financial", tags=["financial"])
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(goals_router, prefix="/goals", tags=["goals"])
-api_router.include_router(appointments_router, prefix="/appointments", tags=["appointments"])
-api_router.include_router(symptom_logs_router, prefix="/symptom-logs", tags=["symptom-logs"])
-api_router.include_router(personalization_router, prefix="/personalization", tags=["personalization"])
+api_router.include_router(
+    appointments_router, prefix="/appointments", tags=["appointments"]
+)
+api_router.include_router(
+    symptom_logs_router, prefix="/symptom-logs", tags=["symptom-logs"]
+)
+api_router.include_router(
+    personalization_router, prefix="/personalization", tags=["personalization"]
+)
 api_router.include_router(ibs_assessment_router, tags=["ibs-assessment"])
 
 __all__ = ["api_router"]

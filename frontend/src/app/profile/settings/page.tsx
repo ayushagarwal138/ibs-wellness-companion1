@@ -13,6 +13,7 @@ import { toast } from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { SyncStatusIndicator } from '@/components/ui/sync-status-indicator';
+import AccountManagement from '@/components/profile/AccountManagement';
 
 export default function ProfileSettingsPage() {
   const { user, updateProfile } = useAuth();
@@ -117,12 +118,17 @@ export default function ProfileSettingsPage() {
           </div>
 
           {/* Profile Form */}
-          <ProfileForm
-            initialData={profileData}
-            onSave={handleSaveProfile}
-            onSync={handleSyncProfile}
-            isLoading={isLoading}
-          />
+          <div className="mb-8">
+            <ProfileForm
+              initialData={profileData}
+              onSave={handleSaveProfile}
+              onSync={handleSyncProfile}
+              isLoading={isLoading}
+            />
+          </div>
+
+          {/* Account Management */}
+          <AccountManagement />
         </div>
       </div>
     </ProtectedRoute>

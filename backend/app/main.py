@@ -17,8 +17,8 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.database import engine, create_tables
-from app.api.v1 import auth, symptoms, diet, medications, chat, ml_predictions, real_time_predictions, users, onboarding, firebase, oauth
-from app.core.exceptions import IBSException
+from app.api.v1 import api_router
+from app.api.v1 import real_time_predictions, firebase, oauth
 
 
 # Setup logging
@@ -31,23 +31,23 @@ async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     logger.info("Starting IBS Wellness Companion API...")
-    
+
     # Create database tables
     await create_tables()
-    
+
     # Initialize ML models (if needed)
     # await load_ml_models()
-    
+
     logger.info("Application startup complete")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down IBS Wellness Companion API...")
-    
+
     # Cleanup resources
     await engine.dispose()
-    
+
     logger.info("Application shutdown complete")
 
 
@@ -65,7 +65,7 @@ app = FastAPI(
 # Security middleware
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=settings.ALLOWED_HOSTS.split(",")  # Convert string to list
+    allowed_hosts=settings.ALLOWED_HOSTS.split(","),  # Convert string to list
 )
 
 # CORS middleware
@@ -103,8 +103,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={
             "error": "HTTP_ERROR",
             "message": exc.detail,
-            "status_code": exc.status_code
-        }
+            "status_code": exc.status_code,
+        },
     )
 
 
@@ -112,23 +112,23 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
     logger.error(f"Unexpected error: {exc}", exc_info=True)
-    
+
     if settings.DEBUG:
         return JSONResponse(
             status_code=500,
             content={
                 "error": "INTERNAL_SERVER_ERROR",
                 "message": str(exc),
-                "type": type(exc).__name__
-            }
+                "type": type(exc).__name__,
+            },
         )
-    
+
     return JSONResponse(
         status_code=500,
         content={
             "error": "INTERNAL_SERVER_ERROR",
-            "message": "An unexpected error occurred"
-        }
+            "message": "An unexpected error occurred",
+        },
     )
 
 
@@ -146,12 +146,11 @@ async def root():
     return {
         "message": "Welcome to the IBS Wellness Companion API",
         "version": settings.VERSION,
-        "docs": "/docs"
+        "docs": "/docs",
     }
 
 
-# Include API routers
-from app.api.v1 import api_router
+# Include routers
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(real_time_predictions.router, prefix="/api/v1")
 app.include_router(firebase.router, prefix="/api/v1")

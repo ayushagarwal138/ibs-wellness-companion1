@@ -58,8 +58,8 @@ export const Invoices: React.FC = () => {
   const [formData, setFormData] = useState<InvoiceCreate>({
     invoice_number: '',
     amount: 0,
-    issue_date: new Date().toISOString().split('T')[0],
-    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    issue_date: new Date().toISOString().split('T')[0] || '',
+    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] || '',
     description: ''
   });
 
@@ -193,8 +193,8 @@ export const Invoices: React.FC = () => {
     setFormData({
       invoice_number: '',
       amount: 0,
-      issue_date: new Date().toISOString().split('T')[0],
-      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      issue_date: new Date().toISOString().split('T')[0] || '',
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] || '',
       description: ''
     });
     setEditingId(null);

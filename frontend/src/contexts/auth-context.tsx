@@ -34,6 +34,7 @@ interface AuthContextType {
   refreshToken: () => Promise<void>
   updateProfile: (data: Partial<User>) => Promise<void>
   checkOnboardingStatus: () => Promise<boolean>
+  deleteAccount: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -407,6 +408,77 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  const deleteAccount = async () => {
+    try {
+      setLoading(true)
+      
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('access_token')
+        if (!token) {
+          throw new Error('No authentication token found')
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/v1/users/account`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          let errorMessage = 'Account deletion failed'
+          
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.detail || errorData.message || errorMessage
+          } catch (parseError) {
+            // If we can't parse the error response, use status-based messages
+            if (response.status === 401) {
+              errorMessage = 'Unauthorized - please log in again'
+            } else if (response.status === 403) {
+              errorMessage = 'Access denied - insufficient permissions'
+            } else if (response.status === 404) {
+              errorMessage = 'Account not found'
+            } else if (response.status >= 500) {
+              errorMessage = 'Server error - please try again later'
+            }
+          }
+          
+          throw new Error(errorMessage)
+        }
+
+        // Track account deletion event before clearing user data
+        if (user) {
+          analyticsService.trackUserAction('delete_account', 'account_management', 'success')
+        }
+
+        // Clear all user data and tokens
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        setUser(null)
+        
+        toast.success('Account deleted successfully')
+        router.push('/')
+      }
+    } catch (error: any) {
+      // Enhanced error handling with specific error types
+      let errorMessage = 'Account deletion failed'
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = 'Network error - please check your connection'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      console.error('Delete account error:', error)
+      toast.error(errorMessage)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const value: AuthContextType = {
     user,
     loading,
@@ -416,6 +488,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshToken,
     updateProfile,
     checkOnboardingStatus,
+    deleteAccount,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

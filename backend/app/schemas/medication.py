@@ -11,23 +11,34 @@ from app.models.medication import MedicationTypeEnum, AdherenceEnum
 
 class MedicationLogBase(BaseModel):
     """Base schema for medication logs."""
-    medication_name: str = Field(..., max_length=200, description="Name of the medication")
+
+    medication_name: str = Field(
+        ..., max_length=200, description="Name of the medication"
+    )
     medication_type: MedicationTypeEnum = Field(..., description="Type of medication")
     dosage: str = Field(..., max_length=100, description="Dosage information")
-    scheduled_time: Optional[time] = Field(None, description="Scheduled time for medication")
-    taken_at: Optional[datetime] = Field(None, description="When medication was actually taken")
+    scheduled_time: Optional[time] = Field(
+        None, description="Scheduled time for medication"
+    )
+    taken_at: Optional[datetime] = Field(
+        None, description="When medication was actually taken"
+    )
     adherence_status: AdherenceEnum = Field(..., description="Adherence status")
     notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
-    side_effects: Optional[str] = Field(None, max_length=500, description="Any side effects experienced")
+    side_effects: Optional[str] = Field(
+        None, max_length=500, description="Any side effects experienced"
+    )
 
 
 class MedicationLogCreate(MedicationLogBase):
     """Schema for creating a medication log."""
+
     pass
 
 
 class MedicationLogUpdate(BaseModel):
     """Schema for updating a medication log."""
+
     medication_id: Optional[int] = None
     dosage_amount: Optional[float] = Field(None, gt=0)
     dosage_unit: Optional[str] = Field(None, max_length=20)
@@ -46,6 +57,7 @@ class MedicationLogUpdate(BaseModel):
 
 class MedicationLogResponse(MedicationLogBase):
     """Schema for medication log responses."""
+
     id: int
     user_id: int
     created_at: datetime
@@ -57,6 +69,7 @@ class MedicationLogResponse(MedicationLogBase):
 
 class MedicationLogList(BaseModel):
     """Schema for paginated medication log list."""
+
     items: List[MedicationLogResponse]
     total: int
     page: int
@@ -66,8 +79,11 @@ class MedicationLogList(BaseModel):
 
 class MedicationStats(BaseModel):
     """Schema for medication statistics."""
+
     total_logs: int
-    adherence_rate: float = Field(..., ge=0, le=100, description="Adherence rate as percentage")
+    adherence_rate: float = Field(
+        ..., ge=0, le=100, description="Adherence rate as percentage"
+    )
     most_taken_medication: Optional[str] = None
     medications_by_type: dict
     adherence_by_status: dict
@@ -76,6 +92,7 @@ class MedicationStats(BaseModel):
 
 class MedicationSchedule(BaseModel):
     """Schema for medication schedule."""
+
     medication_name: str
     medication_type: MedicationTypeEnum
     dosage: str
@@ -88,6 +105,7 @@ class MedicationSchedule(BaseModel):
 
 class MedicationReminder(BaseModel):
     """Schema for medication reminders."""
+
     id: int
     medication_name: str
     scheduled_time: time
@@ -101,6 +119,7 @@ class MedicationReminder(BaseModel):
 
 class AdherenceReport(BaseModel):
     """Schema for adherence reports."""
+
     date_range: dict
     overall_adherence_rate: float
     medication_adherence: dict

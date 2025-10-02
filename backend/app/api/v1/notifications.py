@@ -16,6 +16,7 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 class FCMTokenRequest(BaseModel):
     """Request schema for FCM token registration."""
+
     token: str
     device_type: Optional[str] = "web"
     device_id: Optional[str] = None
@@ -23,6 +24,7 @@ class FCMTokenRequest(BaseModel):
 
 class FCMTokenResponse(BaseModel):
     """Response schema for FCM token registration."""
+
     success: bool
     message: str
 
@@ -31,16 +33,16 @@ class FCMTokenResponse(BaseModel):
 async def register_fcm_token(
     request: FCMTokenRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Register FCM token for push notifications.
-    
+
     Args:
         request: FCM token registration data
         current_user: The current authenticated user
         db: Database session
-        
+
     Returns:
         Success response
     """
@@ -48,21 +50,21 @@ async def register_fcm_token(
         # For now, we'll just acknowledge the token registration
         # In a production app, you would store this in the database
         # associated with the user for sending targeted notifications
-        
+
         # TODO: Store FCM token in database
         # - Create a user_fcm_tokens table
-        # - Store token, device_type, device_id, user_id, created_at, updated_at
+        # - Store token, device_type, device_id, user_id, created_at,
+        #   updated_at
         # - Handle token updates and cleanup of old tokens
-        
+
         return FCMTokenResponse(
-            success=True,
-            message="FCM token registered successfully"
+            success=True, message="FCM token registered successfully"
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to register FCM token: {str(e)}"
+            detail=f"Failed to register FCM token: {str(e)}",
         )
 
 
@@ -70,29 +72,28 @@ async def register_fcm_token(
 async def unregister_fcm_token(
     request: FCMTokenRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Unregister FCM token.
-    
+
     Args:
         request: FCM token to unregister
         current_user: The current authenticated user
         db: Database session
-        
+
     Returns:
         Success response
     """
     try:
         # TODO: Remove FCM token from database
-        
+
         return FCMTokenResponse(
-            success=True,
-            message="FCM token unregistered successfully"
+            success=True, message="FCM token unregistered successfully"
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unregister FCM token: {str(e)}"
+            detail=f"Failed to unregister FCM token: {str(e)}",
         )

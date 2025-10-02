@@ -16,7 +16,7 @@ from app.schemas.chat import (
     ChatMessageResponse,
     ChatSessionList,
     ChatMessageList,
-    UserChatStats
+    UserChatStats,
 )
 from app.services.chat_service import ChatService
 from app.models.user import User
@@ -25,20 +25,22 @@ from app.models.user import User
 router = APIRouter()
 
 
-@router.post("/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_chat_session(
     session_data: ChatSessionCreate,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Create a new chat session.
-    
+
     Args:
         session_data: Chat session creation data
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         The created chat session
     """
@@ -50,59 +52,55 @@ async def create_chat_session(
 async def get_user_chat_sessions(
     limit: int = Query(20, ge=1, le=100, description="Number of sessions to retrieve"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Get user's chat sessions.
-    
+
     Args:
         limit: Maximum number of sessions to retrieve
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         List of user's chat sessions
     """
     chat_service = ChatService(db)
     sessions = await chat_service.get_user_sessions(current_user, limit)
-    
-    return ChatSessionList(
-        sessions=sessions,
-        total=len(sessions),
-        page=1,
-        size=limit
-    )
+
+    return ChatSessionList(sessions=sessions, total=len(sessions), page=1, size=limit)
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
 async def get_chat_session(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Get a specific chat session.
-    
+
     Args:
         session_id: Chat session ID
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         The requested chat session
     """
     chat_service = ChatService(db)
-    
+
     # Verify session belongs to user
-    sessions = await chat_service.get_user_sessions(current_user, 1000)  # Get all sessions
+    sessions = await chat_service.get_user_sessions(
+        current_user, 1000
+    )  # Get all sessions
     session = next((s for s in sessions if s.id == session_id), None)
-    
+
     if not session:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chat session not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found"
         )
-    
+
     return session
 
 
@@ -111,38 +109,38 @@ async def send_message(
     session_id: str,
     message_data: ChatMessageSend,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Send a message to the chatbot.
-    
+
     Args:
         session_id: Chat session ID
         message_data: Message data
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         Chatbot response with assessment and recommendations
     """
     chat_service = ChatService(db)
-    
+
     # Use session_id from URL, but allow override from message_data
     effective_session_id = message_data.session_id or session_id
-    
+
     try:
         response = await chat_service.send_message(
             user=current_user,
             session_id=effective_session_id,
             message=message_data.message,
-            include_assessment=message_data.include_context
+            include_assessment=message_data.include_context,
         )
         return response
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing message: {str(e)}"
+            detail=f"Error processing message: {str(e)}",
         )
 
 
@@ -150,34 +148,34 @@ async def send_message(
 async def send_message_quick(
     message_data: ChatMessageSend,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Send a message to the chatbot (creates new session if needed).
-    
+
     Args:
         message_data: Message data
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         Chatbot response with assessment and recommendations
     """
     chat_service = ChatService(db)
-    
+
     try:
         response = await chat_service.send_message(
             user=current_user,
             session_id=message_data.session_id,
             message=message_data.message,
-            include_assessment=message_data.include_context
+            include_assessment=message_data.include_context,
         )
         return response
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing message: {str(e)}"
+            detail=f"Error processing message: {str(e)}",
         )
 
 
@@ -186,36 +184,35 @@ async def get_session_messages(
     session_id: str,
     limit: int = Query(50, ge=1, le=200, description="Number of messages to retrieve"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Get messages from a chat session.
-    
+
     Args:
         session_id: Chat session ID
         limit: Maximum number of messages to retrieve
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         List of messages from the session
     """
     chat_service = ChatService(db)
-    
+
     try:
-        messages = await chat_service.get_session_history(current_user, session_id, limit)
-        
-        return ChatMessageList(
-            messages=messages,
-            total=len(messages),
-            page=1,
-            size=limit
+        messages = await chat_service.get_session_history(
+            current_user, session_id, limit
         )
-        
+
+        return ChatMessageList(
+            messages=messages, total=len(messages), page=1, size=limit
+        )
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving messages: {str(e)}"
+            detail=f"Error retrieving messages: {str(e)}",
         )
 
 
@@ -223,11 +220,11 @@ async def get_session_messages(
 async def delete_chat_session(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Delete a chat session and all its messages.
-    
+
     Args:
         session_id: Chat session ID
         current_user: Current authenticated user
@@ -245,45 +242,47 @@ async def delete_chat_session(
 @router.get("/stats", response_model=UserChatStats)
 async def get_user_chat_stats(
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Get user's chat statistics.
-    
+
     Args:
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         User's chat statistics
     """
     chat_service = ChatService(db)
-    
+
     # Get user sessions to calculate stats
     sessions = await chat_service.get_user_sessions(current_user, 1000)
-    
+
     total_sessions = len(sessions)
     total_messages = 0
     last_chat = None
-    
+
     if sessions:
         last_chat = sessions[0].started_at  # Sessions are ordered by started_at desc
-        
+
         # Calculate total messages (this would be more efficient with a direct query)
         for session in sessions:
             messages = chat_service.get_session_history(current_user, session.id, 1000)
             total_messages += len(messages)
-    
-    avg_messages_per_session = total_messages / total_sessions if total_sessions > 0 else 0
-    
+
+    avg_messages_per_session = (
+        total_messages / total_sessions if total_sessions > 0 else 0
+    )
+
     # Get current IBS severity (would need to implement this)
     current_severity = "unknown"  # This would come from the IBS detection service
-    
+
     return UserChatStats(
         total_sessions=total_sessions,
         total_messages=total_messages,
         avg_messages_per_session=avg_messages_per_session,
         last_chat=last_chat,
         current_ibs_severity=current_severity,
-        improvement_trend=None  # This would be calculated based on historical assessments
+        improvement_trend=None,  # Calculated based on historical assessments
     )

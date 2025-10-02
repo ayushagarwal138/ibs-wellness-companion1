@@ -28,16 +28,18 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
 )
 
+
 # Base class for all models
 class Base(DeclarativeBase):
     """Base class for all database models."""
+
     metadata = MetaData(
         naming_convention={
             "ix": "ix_%(column_0_label)s",
             "uq": "uq_%(table_name)s_%(column_0_name)s",
             "ck": "ck_%(table_name)s_%(constraint_name)s",
-            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-            "pk": "pk_%(table_name)s"
+            "fk": ("fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s"),
+            "pk": "pk_%(table_name)s",
         }
     )
 
@@ -61,7 +63,7 @@ async def create_tables():
     async with engine.begin() as conn:
         # Import all models here to ensure they are registered
         from app.models import user, symptom, medication, diet  # noqa
-        
+
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created successfully")
 

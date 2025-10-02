@@ -22,6 +22,7 @@ router = APIRouter(prefix="/oauth", tags=["oauth"])
 
 class OAuthRequest(BaseModel):
     """OAuth authentication request schema."""
+
     provider: str
     provider_id: str
     email: EmailStr
@@ -32,6 +33,7 @@ class OAuthRequest(BaseModel):
 
 class OAuthUserCreate(BaseModel):
     """OAuth user creation schema."""
+
     email: EmailStr
     first_name: str
     last_name: str
@@ -42,32 +44,27 @@ class OAuthUserCreate(BaseModel):
 
 
 @router.post("/", response_model=AuthResponse)
-async def oauth_login(
-    oauth_data: OAuthRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def oauth_login(oauth_data: OAuthRequest, db: AsyncSession = Depends(get_db)):
     """
     Handle OAuth login/registration for Google and GitHub.
-    
+
     Args:
         oauth_data: OAuth authentication data
         db: Database session
-        
+
     Returns:
         Access and refresh tokens with user data
     """
     # Check if user exists by email
-    result = await db.execute(
-        select(User).where(User.email == oauth_data.email)
-    )
+    result = await db.execute(select(User).where(User.email == oauth_data.email))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         # Create new user from OAuth data
-        name_parts = oauth_data.name.split(' ', 1)
-        first_name = name_parts[0] if name_parts else ''
-        last_name = name_parts[1] if len(name_parts) > 1 else ''
-        
+        name_parts = oauth_data.name.split(" ", 1)
+        first_name = name_parts[0] if name_parts else ""
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+
         user = User(
             id=uuid.uuid4(),
             email=oauth_data.email,
@@ -77,9 +74,9 @@ async def oauth_login(
             is_verified=True,  # OAuth users are pre-verified
             is_active=True,
             # Set a random password hash since OAuth users don't use passwords
-            password_hash="oauth_user_no_password"
+            password_hash="oauth_user_no_password",
         )
-        
+
         db.add(user)
         await db.commit()
         await db.refresh(user)
@@ -89,19 +86,20 @@ async def oauth_login(
             user.avatar = oauth_data.image
             await db.commit()
             await db.refresh(user)
-    
+
     # Update last login
     from datetime import datetime
+
     user.last_login_at = datetime.utcnow()
     await db.commit()
-    
+
     # Create tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
-    
+
     # Prepare user response
     user_response = UserResponse(
         id=str(user.id),
@@ -112,21 +110,21 @@ async def oauth_login(
         is_verified=user.is_verified,
         created_at=user.created_at,
         last_login=user.last_login_at,
-        phone_number=getattr(user, 'phone_number', None),
+        phone_number=getattr(user, "phone_number", None),
         date_of_birth=user.date_of_birth,
-        gender=getattr(user, 'gender', None),
+        gender=getattr(user, "gender", None),
         height_cm=user.height_cm,
         weight_kg=user.weight_kg,
-        ibs_type=getattr(user, 'ibs_type', None),
-        diagnosis_date=user.diagnosis_date
+        ibs_type=getattr(user, "ibs_type", None),
+        diagnosis_date=user.diagnosis_date,
     )
-    
+
     return AuthResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=user_response.dict()
+        user=user_response.dict(),
     )
 
 
@@ -134,7 +132,7 @@ async def oauth_login(
 async def get_oauth_providers():
     """
     Get available OAuth providers.
-    
+
     Returns:
         List of available OAuth providers
     """
@@ -143,12 +141,16 @@ async def get_oauth_providers():
             {
                 "name": "google",
                 "display_name": "Google",
-                "enabled": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
+                "enabled": bool(
+                    settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET
+                ),
             },
             {
-                "name": "github", 
+                "name": "github",
                 "display_name": "GitHub",
-                "enabled": bool(settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET)
-            }
+                "enabled": bool(
+                    settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET
+                ),
+            },
         ]
     }

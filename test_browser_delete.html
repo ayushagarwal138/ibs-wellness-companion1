@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Browser DELETE Request</title>
+</head>
+<body>
+    <h1>Test Browser DELETE Request</h1>
+    <button id="testDelete">Test Account Deletion</button>
+    <div id="results"></div>
+
+    <script>
+        const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiMTljOWZiZS1kNzZmLTQ3ZDQtYTM5Yy0xNmRiZTBlZTNmMDQiLCJleHAiOjE3NTkzODUzNTF9.gpeg0U8fAwFW0BxFELu0GQVDjbJ76Yo_VK8ABKyQeG4";
+        const API_BASE_URL = "http://localhost:8000";
+
+        async function testDeleteAccount() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing account deletion...</p>';
+
+            try {
+                console.log("Making DELETE request to:", `${API_BASE_URL}/api/v1/users/account`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/v1/users/account`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                console.log("Response status:", response.status);
+                console.log("Response ok:", response.ok);
+                console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
+                resultsDiv.innerHTML += `<p>Response status: ${response.status}</p>`;
+                resultsDiv.innerHTML += `<p>Response ok: ${response.ok}</p>`;
+
+                if (!response.ok) {
+                    console.log("Response not ok, trying to parse error...");
+                    try {
+                        const errorData = await response.json();
+                        console.log("Error data:", errorData);
+                        resultsDiv.innerHTML += `<p>Error data: ${JSON.stringify(errorData)}</p>`;
+                    } catch (parseError) {
+                        console.log("Could not parse error response:", parseError);
+                        resultsDiv.innerHTML += `<p>Could not parse error response: ${parseError.message}</p>`;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("Success response:", data);
+                resultsDiv.innerHTML += `<p>Success response: ${JSON.stringify(data)}</p>`;
+                
+            } catch (error) {
+                console.error("Delete account error:", error);
+                console.error("Error type:", error.constructor.name);
+                console.error("Error message:", error.message);
+                
+                resultsDiv.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                resultsDiv.innerHTML += `<p style="color: red;">Error type: ${error.constructor.name}</p>`;
+            }
+        }
+
+        document.getElementById('testDelete').addEventListener('click', testDeleteAccount);
+    </script>
+</body>
+</html>

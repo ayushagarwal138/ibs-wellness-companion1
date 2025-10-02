@@ -14,6 +14,7 @@ from uuid import UUID
 # Payment Method Schemas
 class PaymentMethodCreate(BaseModel):
     """Schema for creating a payment method."""
+
     type: str = Field(..., max_length=50)  # Changed from enum to string
     provider: str = Field(..., max_length=50)  # Made required
     provider_payment_method_id: str = Field(..., max_length=255)  # Made required
@@ -26,11 +27,13 @@ class PaymentMethodCreate(BaseModel):
 
 class PaymentMethodUpdate(BaseModel):
     """Schema for updating a payment method."""
+
     is_default: Optional[bool] = None
 
 
 class PaymentMethodResponse(BaseModel):
     """Schema for payment method response."""
+
     id: str
     user_id: str
     type: str  # Changed from enum to string
@@ -51,6 +54,7 @@ class PaymentMethodResponse(BaseModel):
 # Billing Address Schemas
 class BillingAddressCreate(BaseModel):
     """Schema for creating a billing address."""
+
     street_address: str = Field(..., max_length=255)  # Changed from address_line_1
     city: str = Field(..., max_length=100)
     state: str = Field(..., max_length=100)
@@ -61,6 +65,7 @@ class BillingAddressCreate(BaseModel):
 
 class BillingAddressUpdate(BaseModel):
     """Schema for updating a billing address."""
+
     street_address: Optional[str] = Field(None, max_length=255)
     city: Optional[str] = Field(None, max_length=100)
     state: Optional[str] = Field(None, max_length=100)
@@ -71,6 +76,7 @@ class BillingAddressUpdate(BaseModel):
 
 class BillingAddressResponse(BaseModel):
     """Schema for billing address response."""
+
     id: UUID
     user_id: UUID
     street_address: str
@@ -89,6 +95,7 @@ class BillingAddressResponse(BaseModel):
 # Transaction Schemas
 class TransactionCreate(BaseModel):
     """Schema for creating a transaction."""
+
     payment_method_id: Optional[str] = None
     type: str = Field(..., max_length=50)  # Changed from enum to string
     amount: Decimal = Field(..., description="Amount with up to 2 decimal places")
@@ -101,12 +108,14 @@ class TransactionCreate(BaseModel):
 
 class TransactionUpdate(BaseModel):
     """Schema for updating a transaction."""
+
     status: Optional[str] = Field(None, max_length=50)  # Changed from enum to string
     description: Optional[str] = Field(None, max_length=500)
 
 
 class TransactionResponse(BaseModel):
     """Schema for transaction response."""
+
     id: str
     user_id: str
     payment_method_id: Optional[str]
@@ -131,6 +140,7 @@ class TransactionResponse(BaseModel):
 # Subscription Schemas
 class SubscriptionCreate(BaseModel):
     """Schema for creating a subscription."""
+
     payment_method_id: Optional[str] = None
     plan_name: str = Field(..., max_length=100)
     plan_description: Optional[str] = None
@@ -144,6 +154,7 @@ class SubscriptionCreate(BaseModel):
 
 class SubscriptionUpdate(BaseModel):
     """Schema for updating a subscription."""
+
     payment_method_id: Optional[str] = None
     cancel_at_period_end: Optional[bool] = None
     features: Optional[Dict[str, Any]] = None
@@ -154,6 +165,7 @@ class SubscriptionUpdate(BaseModel):
 
 class SubscriptionResponse(BaseModel):
     """Schema for subscription response."""
+
     id: str
     user_id: str
     payment_method_id: Optional[str]
@@ -182,45 +194,64 @@ class SubscriptionResponse(BaseModel):
 # Medication Cost Schemas
 class MedicationCostCreate(BaseModel):
     """Schema for creating a medication cost entry."""
+
     medication_id: int
-    cost_per_unit: Decimal = Field(..., description="Cost per unit with up to 2 decimal places")
+    cost_per_unit: Decimal = Field(
+        ..., description="Cost per unit with up to 2 decimal places"
+    )
     quantity: int = Field(..., gt=0)
-    total_cost: Decimal = Field(..., description="Total cost with up to 2 decimal places")
+    total_cost: Decimal = Field(
+        ..., description="Total cost with up to 2 decimal places"
+    )
     currency: str = Field(default="USD", max_length=3)
     pharmacy_name: Optional[str] = None
     prescription_number: Optional[str] = None
     insurance_covered: bool = False
-    insurance_copay: Optional[Decimal] = Field(None, description="Insurance copay with up to 2 decimal places")
-    out_of_pocket: Optional[Decimal] = Field(None, description="Out of pocket cost with up to 2 decimal places")
+    insurance_copay: Optional[Decimal] = Field(
+        None, description="Insurance copay with up to 2 decimal places"
+    )
+    out_of_pocket: Optional[Decimal] = Field(
+        None, description="Out of pocket cost with up to 2 decimal places"
+    )
     purchase_date: datetime
     notes: Optional[str] = None
 
-    @field_validator('total_cost')
+    @field_validator("total_cost")
     @classmethod
     def validate_total_cost(cls, v, info):
-        if info.data and 'cost_per_unit' in info.data and 'quantity' in info.data:
-            expected_total = info.data['cost_per_unit'] * info.data['quantity']
-            if abs(v - expected_total) > Decimal('0.01'):
-                raise ValueError('Total cost must equal cost_per_unit * quantity')
+        if info.data and "cost_per_unit" in info.data and "quantity" in info.data:
+            expected_total = info.data["cost_per_unit"] * info.data["quantity"]
+            if abs(v - expected_total) > Decimal("0.01"):
+                raise ValueError("Total cost must equal cost_per_unit * quantity")
         return v
 
 
 class MedicationCostUpdate(BaseModel):
     """Schema for updating a medication cost entry."""
-    cost_per_unit: Optional[Decimal] = Field(None, description="Cost per unit with up to 2 decimal places")
+
+    cost_per_unit: Optional[Decimal] = Field(
+        None, description="Cost per unit with up to 2 decimal places"
+    )
     quantity: Optional[int] = Field(None, gt=0)
-    total_cost: Optional[Decimal] = Field(None, description="Total cost with up to 2 decimal places")
+    total_cost: Optional[Decimal] = Field(
+        None, description="Total cost with up to 2 decimal places"
+    )
     pharmacy_name: Optional[str] = None
     prescription_number: Optional[str] = None
     insurance_covered: Optional[bool] = None
-    insurance_copay: Optional[Decimal] = Field(None, description="Insurance copay with up to 2 decimal places")
-    out_of_pocket: Optional[Decimal] = Field(None, description="Out of pocket cost with up to 2 decimal places")
+    insurance_copay: Optional[Decimal] = Field(
+        None, description="Insurance copay with up to 2 decimal places"
+    )
+    out_of_pocket: Optional[Decimal] = Field(
+        None, description="Out of pocket cost with up to 2 decimal places"
+    )
     purchase_date: Optional[datetime] = None
     notes: Optional[str] = None
 
 
 class MedicationCostResponse(BaseModel):
     """Schema for medication cost response."""
+
     id: str
     user_id: str
     medication_id: int
@@ -245,29 +276,39 @@ class MedicationCostResponse(BaseModel):
 # Invoice Schemas
 class InvoiceLineItem(BaseModel):
     """Schema for invoice line item."""
+
     description: str
     quantity: int = Field(..., gt=0)
-    unit_price: Decimal = Field(..., description="Unit price with up to 2 decimal places")
-    total_price: Decimal = Field(..., description="Total price with up to 2 decimal places")
+    unit_price: Decimal = Field(
+        ..., description="Unit price with up to 2 decimal places"
+    )
+    total_price: Decimal = Field(
+        ..., description="Total price with up to 2 decimal places"
+    )
 
 
 class InvoiceCreate(BaseModel):
     """Schema for creating an invoice."""
+
     invoice_date: datetime
     due_date: Optional[datetime] = None
     line_items: List[InvoiceLineItem]
-    tax_amount: Decimal = Field(default=Decimal('0.00'), description="Tax amount with up to 2 decimal places")
+    tax_amount: Decimal = Field(
+        default=Decimal("0.00"), description="Tax amount with up to 2 decimal places"
+    )
     notes: Optional[str] = None
 
 
 class InvoiceUpdate(BaseModel):
     """Schema for updating an invoice."""
+
     status: Optional[str] = Field(None, max_length=50)  # Changed from enum to string
     paid_at: Optional[datetime] = None
 
 
 class InvoiceResponse(BaseModel):
     """Schema for invoice response."""
+
     id: str
     user_id: str
     transaction_id: Optional[str]
@@ -292,6 +333,7 @@ class InvoiceResponse(BaseModel):
 # Financial Summary Schemas
 class FinancialSummaryResponse(BaseModel):
     """Schema for financial summary response."""
+
     total_spent: Decimal
     medication_costs: Decimal
     subscription_costs: Decimal
