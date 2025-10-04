@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
 import { analyticsService } from '@/lib/analytics'
 import { notificationService } from '@/lib/notifications'
+import { API_CONFIG } from '@/lib/config'
 
 interface User {
   id: string
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
-  const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000'
+
 
   // Ensure component is mounted before accessing localStorage
   useEffect(() => {
@@ -85,7 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -115,7 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setLoading(true)
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,7 +187,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const firstName = nameParts[0] || ''
       const lastName = nameParts.slice(1).join(' ') || ''
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +255,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (typeof window !== 'undefined') {
         const token = localStorage.getItem('access_token')
         if (token) {
-          await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+          await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/logout`, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${token}`,
@@ -287,7 +288,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error('No refresh token')
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -321,7 +322,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/onboarding-status`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/users/onboarding-status`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -377,7 +378,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/profile`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/users/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -418,7 +419,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           throw new Error('No authentication token found')
         }
 
-        const response = await fetch(`${API_BASE_URL}/api/v1/users/account`, {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/users/account`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',

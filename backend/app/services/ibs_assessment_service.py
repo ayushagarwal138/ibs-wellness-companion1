@@ -7,7 +7,8 @@ personalized recommendation generation based on user data and symptoms.
 
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from dataclasses import dataclass
 import logging
 import uuid
@@ -64,7 +65,7 @@ class IBSAssessmentService:
     async def conduct_comprehensive_assessment(
         self,
         user: User,
-        db: Session,
+        db: AsyncSession,
         include_recent_data: bool = True,
         assessment_type: str = "comprehensive",
         custom_data: Optional[Dict[str, Any]] = None,
@@ -139,7 +140,7 @@ class IBSAssessmentService:
             raise
 
     async def conduct_quick_assessment(
-        self, user: User, db: Session, quick_data: Dict[str, Any]
+        self, user: User, db: AsyncSession, quick_data: Dict[str, Any]
     ) -> IBSAssessmentResult:
         """
         Conduct a quick IBS assessment based on current symptoms.
@@ -191,7 +192,7 @@ class IBSAssessmentService:
             raise
 
     async def _gather_user_data(
-        self, user: User, db: Session, include_recent_data: bool
+        self, user: User, db: AsyncSession, include_recent_data: bool
     ) -> Dict[str, Any]:
         """Gather comprehensive user data for assessment."""
         data = {
@@ -206,35 +207,32 @@ class IBSAssessmentService:
 
         if include_recent_data:
             # Get recent symptom logs (last 30 days)
-            recent_symptoms = (
-                db.query(SymptomLog)
-                .filter(
+            result = await db.execute(
+                select(SymptomLog).filter(
                     SymptomLog.user_id == user.id,
                     SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=30),
                 )
-                .all()
             )
+            recent_symptoms = result.scalars().all()
 
             # Get recent diet logs
-            recent_diet = (
-                db.query(DietLog)
-                .filter(
+            result = await db.execute(
+                select(DietLog).filter(
                     DietLog.user_id == user.id,
-                    DietLog.logged_at >= datetime.utcnow() - timedelta(days=30),
+                    DietLog.consumed_at >= datetime.utcnow() - timedelta(days=30),
                 )
-                .all()
             )
+            recent_diet = result.scalars().all()
 
             # Get recent food reactions
-            recent_reactions = (
-                db.query(FoodReaction)
-                .filter(
+            result = await db.execute(
+                select(FoodReaction).filter(
                     FoodReaction.user_id == user.id,
-                    FoodReaction.reaction_date
+                    FoodReaction.reaction_occurred_at
                     >= datetime.utcnow() - timedelta(days=30),
                 )
-                .all()
             )
+            recent_reactions = result.scalars().all()
 
             data.update(
                 {

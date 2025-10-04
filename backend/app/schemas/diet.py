@@ -121,6 +121,8 @@ class DietLogResponse(BaseModel):
     restaurant_name: Optional[str] = None
     meal_companions: Optional[int] = None
     stress_level_before: Optional[int] = None
+    mood_before: Optional[int] = None
+    mood_after: Optional[int] = None
     notes: Optional[str] = None
     consumed_at: datetime
     time_since_last_meal_hours: Optional[float] = None

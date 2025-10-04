@@ -11,7 +11,7 @@ from sqlalchemy import and_, func, desc, or_, select
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, get_optional_current_user
 from app.models.user import User
-from app.models.diet import FoodReaction, DietLog, ReactionSeverityEnum, MealTypeEnum
+from app.models.diet import FoodReaction, DietLog, ReactionSeverityEnum, MealTypeEnum, Food
 from app.models.food_item import FoodItem
 from app.schemas.diet import (
     FoodReactionCreate,
@@ -240,6 +240,8 @@ async def create_diet_log(
             portion_description=diet_data.portion_size,
             notes=diet_data.notes,
             consumed_at=consumed_time,
+            mood_before=diet_data.mood_before,
+            mood_after=diet_data.mood_after,
         )
 
         db.add(diet_log)
@@ -620,9 +622,33 @@ async def get_diet_stats(
     )
     total_meals = total_meals_result.scalar() or 0
 
-    # Total calories (note: DietLog model doesn't have calories field based on schema)
-    # Using placeholder for now
-    average_daily_calories = 0
+    # Calculate average daily calories
+    calories_result = await db.execute(
+        select(
+            func.sum(
+                (DietLog.portion_size_g / 100.0) * Food.calories_per_100g
+            ).label("total_calories"),
+            func.count(
+                func.distinct(func.date(DietLog.consumed_at))
+            ).label("days_count")
+        )
+        .select_from(DietLog).join(Food)
+        .where(
+            and_(
+                DietLog.user_id == current_user.id,
+                DietLog.consumed_at >= start_date,
+                Food.calories_per_100g.isnot(None),
+                DietLog.portion_size_g.isnot(None)
+            )
+        )
+    )
+    
+    calories_row = calories_result.fetchone()
+    total_calories = calories_row.total_calories or 0
+    days_with_data = calories_row.days_count or 1
+    average_daily_calories = (
+        float(total_calories) / days_with_data if total_calories else 0
+    )
 
     # Meals by type
     meals_by_type_result = await db.execute(
@@ -644,10 +670,57 @@ async def get_diet_stats(
         for row in meals_by_type_result.fetchall()
     }
 
-    # Most frequent foods (simplified)
-    frequent_foods = []
-    # This would require parsing food_items JSON field
-    # For now, returning empty list
+    # Most consumed foods
+    most_consumed_result = await db.execute(
+        select(
+            Food.name,
+            func.count(DietLog.id).label("consumption_count")
+        )
+        .select_from(DietLog).join(Food)
+        .where(
+            and_(
+                DietLog.user_id == current_user.id,
+                DietLog.consumed_at >= start_date
+            )
+        )
+        .group_by(Food.name)
+        .order_by(desc("consumption_count"))
+        .limit(5)
+    )
+    
+    frequent_foods = [row.name for row in most_consumed_result.fetchall()]
+
+    # Calculate mood correlation
+    mood_correlation = {}
+    mood_logs_result = await db.execute(
+        select(
+            DietLog.mood_before,
+            DietLog.mood_after
+        )
+        .where(
+            and_(
+                DietLog.user_id == current_user.id,
+                DietLog.consumed_at >= start_date,
+                DietLog.mood_before.isnot(None),
+                DietLog.mood_after.isnot(None)
+            )
+        )
+    )
+    
+    mood_data = mood_logs_result.fetchall()
+    if mood_data:
+        # Calculate average mood before and after eating
+        total_before = sum(row.mood_before for row in mood_data)
+        total_after = sum(row.mood_after for row in mood_data)
+        count = len(mood_data)
+        
+        avg_before = total_before / count
+        avg_after = total_after / count
+        
+        mood_correlation = {
+            "Before Eating": round(avg_before, 1),
+            "After Eating": round(avg_after, 1)
+        }
 
     # Nutritional trends (placeholder)
     nutritional_trends = {"calories": "stable", "variety": "increasing"}
@@ -657,7 +730,7 @@ async def get_diet_stats(
         average_daily_calories=average_daily_calories,
         meals_by_type=meals_by_type,
         most_consumed_foods=frequent_foods,
-        mood_correlation={},  # TODO: Implement mood correlation
+        mood_correlation=mood_correlation,
     )
 
 

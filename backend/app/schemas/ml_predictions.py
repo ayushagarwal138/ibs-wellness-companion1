@@ -13,7 +13,9 @@ class SeverityPredictionRequest(BaseModel):
     symptoms: Dict[str, float] = Field(
         ..., description="Symptom severity scores (0-10)"
     )
-    triggers: Optional[Dict[str, Any]] = Field(None, description="Potential triggers")
+    triggers: Optional[Dict[str, Any]] = Field(
+        None, description="Potential triggers"
+    )
     user_context: Optional[Dict[str, Any]] = Field(
         None, description="User context data"
     )
@@ -34,7 +36,11 @@ class SeverityPredictionRequest(BaseModel):
                     "stress_level": 8,
                     "sleep_quality": 4,
                 },
-                "user_context": {"age": 32, "gender": "female", "ibs_type": "IBS-D"},
+                "user_context": {
+                    "age": 32,
+                    "gender": "female",
+                    "ibs_type": "IBS-D"
+                },
             }
         }
     }
@@ -42,10 +48,16 @@ class SeverityPredictionRequest(BaseModel):
 
 class SeverityPredictionResponse(BaseModel):
     severity_level: str = Field(..., description="Predicted severity level")
-    severity_score: float = Field(..., description="Numerical severity score (0-10)")
+    severity_score: float = Field(
+        ..., description="Numerical severity score (0-10)"
+    )
     confidence: float = Field(..., description="Model confidence (0-1)")
-    contributing_factors: List[str] = Field(..., description="Key contributing factors")
-    recommendations: List[str] = Field(..., description="Immediate recommendations")
+    contributing_factors: List[str] = Field(
+        ..., description="Key contributing factors"
+    )
+    recommendations: List[str] = Field(
+        ..., description="Immediate recommendations"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -53,8 +65,12 @@ class SeverityPredictionResponse(BaseModel):
                 "severity_level": "moderate",
                 "severity_score": 6.5,
                 "confidence": 0.85,
-                "contributing_factors": ["high_stress", "dietary_triggers"],
-                "recommendations": ["stress_management", "dietary_modification"],
+                "contributing_factors": [
+                    "high_stress", "dietary_triggers"
+                ],
+                "recommendations": [
+                    "stress_management", "dietary_modification"
+                ],
             }
         }
     }
@@ -67,7 +83,9 @@ class FlareupPredictionRequest(BaseModel):
     lifestyle_factors: Dict[str, Any] = Field(
         ..., description="Current lifestyle factors"
     )
-    prediction_horizon: int = Field(7, description="Days ahead to predict", ge=1, le=30)
+    prediction_horizon: int = Field(
+        7, description="Days ahead to predict", ge=1, le=30
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -92,9 +110,13 @@ class FlareupPredictionRequest(BaseModel):
 
 
 class FlareupPredictionResponse(BaseModel):
-    flareup_probability: float = Field(..., description="Probability of flareup (0-1)")
+    flareup_probability: float = Field(
+        ..., description="Probability of flareup (0-1)"
+    )
     risk_level: str = Field(..., description="Risk level (low/moderate/high)")
-    peak_risk_days: List[int] = Field(..., description="Days with highest risk")
+    peak_risk_days: List[int] = Field(
+        ..., description="Days with highest risk"
+    )
     risk_factors: List[str] = Field(..., description="Identified risk factors")
     prevention_strategies: List[str] = Field(
         ..., description="Recommended prevention strategies"
@@ -107,7 +129,9 @@ class FlareupPredictionResponse(BaseModel):
                 "risk_level": "moderate",
                 "peak_risk_days": [3, 5, 7],
                 "risk_factors": ["increasing_stress", "dietary_inconsistency"],
-                "prevention_strategies": ["stress_reduction", "dietary_monitoring"],
+                "prevention_strategies": [
+                    "stress_reduction", "dietary_monitoring"
+                ],
             }
         }
     }
@@ -118,7 +142,9 @@ class RecommendationRequest(BaseModel):
     current_symptoms: Dict[str, float] = Field(
         ..., description="Current symptom levels"
     )
-    preferences: Optional[Dict[str, Any]] = Field(None, description="User preferences")
+    preferences: Optional[Dict[str, Any]] = Field(
+        None, description="User preferences"
+    )
     recommendation_types: List[str] = Field(
         ..., description="Types of recommendations requested"
     )
@@ -142,7 +168,9 @@ class RecommendationRequest(BaseModel):
                     "exercise_preference": "yoga",
                     "supplement_tolerance": "high",
                 },
-                "recommendation_types": ["dietary", "lifestyle", "supplements"],
+                "recommendation_types": [
+                    "dietary", "lifestyle", "supplements"
+                ],
             }
         }
     }
@@ -170,7 +198,7 @@ class RecommendationResponse(BaseModel):
                         {
                             "id": "reduce_fodmaps",
                             "title": "Reduce High FODMAP Foods",
-                            "description": "Limit onions, garlic, and wheat products",
+                            "description": "Limit onions, garlic, wheat",
                             "priority": "high",
                         }
                     ],
@@ -178,13 +206,15 @@ class RecommendationResponse(BaseModel):
                         {
                             "id": "stress_management",
                             "title": "Daily Stress Management",
-                            "description": "Practice 10 minutes of meditation daily",
+                            "description": "Practice 10 min meditation daily",
                             "priority": "medium",
                         }
                     ],
                 },
                 "personalization_score": 0.92,
-                "implementation_priority": ["dietary", "lifestyle", "supplements"],
+                "implementation_priority": [
+                    "dietary", "lifestyle", "supplements"
+                ],
                 "expected_timeline": {
                     "dietary": "1-2 weeks",
                     "lifestyle": "2-4 weeks",
@@ -195,36 +225,77 @@ class RecommendationResponse(BaseModel):
     }
 
 
-class ModelInfoResponse(BaseModel):
-    model_name: str = Field(..., description="Name of the ML model")
-    model_version: str = Field(..., description="Version of the model")
-    last_trained: datetime = Field(..., description="Last training date")
-    accuracy_metrics: Dict[str, float] = Field(
-        ..., description="Model accuracy metrics"
+class ModelMetrics(BaseModel):
+    name: str = Field(..., description="Name of the ML model")
+    type: str = Field(..., description="Model type (classifier/regressor)")
+    accuracy: Optional[float] = Field(
+        None, description="Accuracy for classifiers"
     )
-    supported_features: List[str] = Field(..., description="Supported input features")
+    r2_score: Optional[float] = Field(
+        None, description="R² score for regressors"
+    )
+    rmse: Optional[float] = Field(None, description="RMSE for regressors")
+    status: str = Field(
+        ..., description="Model status (active/training/error/outdated)"
+    )
+    last_trained: str = Field(..., description="Last training date")
+    version: str = Field(..., description="Model version")
+    features_count: int = Field(..., description="Number of features")
+    training_samples: int = Field(..., description="Number of training samples")
+    confidence_threshold: Optional[float] = Field(
+        None, description="Confidence threshold for predictions"
+    )
 
     model_config = {
         "protected_namespaces": (),
         "json_schema_extra": {
             "example": {
-                "model_name": "IBS_Severity_Predictor_v2",
-                "model_version": "2.1.0",
-                "last_trained": "2024-01-10T15:30:00Z",
-                "accuracy_metrics": {
-                    "precision": 0.87,
-                    "recall": 0.84,
-                    "f1_score": 0.85,
-                },
-                "supported_features": [
-                    "abdominal_pain",
-                    "bloating",
-                    "gas",
-                    "diarrhea",
-                    "constipation",
-                    "stress_level",
-                    "sleep_quality",
+                "name": "Severity Classifier",
+                "type": "classifier",
+                "accuracy": 0.988,
+                "status": "active",
+                "last_trained": "2025-10-03T12:18:35.126478",
+                "version": "v1.0.0",
+                "features_count": 15,
+                "training_samples": 1000,
+                "confidence_threshold": 0.8
+            }
+        }
+    }
+
+
+class ModelInfoResponse(BaseModel):
+    models: List[ModelMetrics] = Field(
+        ..., description="List of all available models"
+    )
+    total_models: int = Field(..., description="Total number of models")
+    active_models: int = Field(..., description="Number of active models")
+    average_performance: float = Field(
+        ..., description="Average performance across all models"
+    )
+    last_updated: datetime = Field(..., description="Last update timestamp")
+
+    model_config = {
+        "protected_namespaces": (),
+        "json_schema_extra": {
+            "example": {
+                "models": [
+                    {
+                        "name": "Severity Classifier",
+                        "type": "classifier",
+                        "accuracy": 0.988,
+                        "status": "active",
+                        "last_trained": "2025-10-03T12:18:35.126478",
+                        "version": "v1.0.0",
+                        "features_count": 15,
+                        "training_samples": 1000,
+                        "confidence_threshold": 0.8
+                    }
                 ],
+                "total_models": 9,
+                "active_models": 9,
+                "average_performance": 0.985,
+                "last_updated": "2025-10-03T12:18:35.126478"
             }
         }
     }
@@ -233,13 +304,19 @@ class ModelInfoResponse(BaseModel):
 class PredictionHistoryRequest(BaseModel):
     prediction_type: Optional[str] = Field(
         None,
-        description="Filter by prediction type (severity, flareup, recommendations)",
+        description="Filter by prediction type (severity, flareup, etc.)",
     )
     days_back: int = Field(
-        default=30, ge=1, le=365, description="Number of days back to retrieve (1-365)"
+        default=30,
+        ge=1,
+        le=365,
+        description="Number of days back to retrieve (1-365)"
     )
     limit: int = Field(
-        default=50, ge=1, le=200, description="Maximum number of predictions to return"
+        default=50,
+        ge=1,
+        le=200,
+        description="Maximum number of predictions to return"
     )
 
 
@@ -257,7 +334,9 @@ class PredictionHistoryItem(BaseModel):
 
 
 class PredictionHistoryResponse(BaseModel):
-    predictions: List[Dict[str, Any]] = Field(..., description="Historical predictions")
+    predictions: List[Dict[str, Any]] = Field(
+        ..., description="Historical predictions"
+    )
     total_count: int = Field(..., description="Total number of predictions")
     date_range: Dict[str, datetime] = Field(
         ..., description="Date range of predictions"
@@ -284,8 +363,173 @@ class PredictionHistoryResponse(BaseModel):
                     "end": "2024-01-15T23:59:59Z",
                 },
                 "accuracy_trend": [
-                    {"week": "2024-W02", "accuracy": 0.87, "prediction_count": 12}
+                    {
+                        "week": "2024-W02",
+                        "accuracy": 0.87,
+                        "prediction_count": 12
+                    }
                 ],
             }
         }
     }
+
+
+# Legacy schemas for backward compatibility
+class MLPredictionRequest(BaseModel):
+    symptoms: Dict[str, float] = Field(
+        ..., description="Symptom severity scores"
+    )
+    triggers: Optional[Dict[str, Any]] = Field(
+        None, description="Potential triggers"
+    )
+    user_context: Optional[Dict[str, Any]] = Field(
+        None, description="User context"
+    )
+
+
+class MLPredictionResponse(BaseModel):
+    risk_level: str = Field(..., description="Risk level")
+    confidence: float = Field(..., description="Confidence score")
+    severity: str = Field(..., description="Severity level")
+    timeline: str = Field(..., description="Timeline")
+    key_factors: List[str] = Field(..., description="Key factors")
+    recommendations: List[str] = Field(..., description="Recommendations")
+
+
+class PersonalizedRecommendationsResponse(BaseModel):
+    recommendations: List[Dict[str, Any]] = Field(
+        ..., description="Personalized recommendations"
+    )
+    confidence: float = Field(..., description="Confidence score")
+
+
+class RealtimePredictionResponse(BaseModel):
+    prediction: str = Field(..., description="Real-time prediction")
+    confidence: float = Field(..., description="Confidence score")
+    timestamp: datetime = Field(..., description="Prediction timestamp")
+
+
+class MedicationEffectivenessRequest(BaseModel):
+    medication_history: List[Dict[str, Any]] = Field(
+        ..., description="History of medications taken"
+    )
+    current_symptoms: Dict[str, float] = Field(
+        ..., description="Current symptom levels"
+    )
+    user_profile: Dict[str, Any] = Field(
+        ..., description="User profile information"
+    )
+    prediction_period: Optional[int] = Field(
+        None, description="Prediction period in days"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "medication_history": [
+                    {
+                        "medication": "probiotics",
+                        "dosage": "1 capsule daily",
+                        "frequency": "once daily",
+                        "adherence_rate": 0.9,
+                        "effectiveness_score": 6,
+                        "side_effects": [],
+                        "duration_days": 28
+                    }
+                ],
+                "current_symptoms": {
+                    "abdominal_pain": 5.0,
+                    "diarrhea": 3.0,
+                    "bloating": 7.0,
+                    "constipation": 2.0,
+                    "nausea": 1.0
+                },
+                "user_profile": {
+                    "age": 32,
+                    "weight": 65,
+                    "ibs_type": "IBS-D",
+                    "comorbidities": []
+                },
+                "prediction_period": 30
+            }
+        }
+    }
+
+
+class MedicationEffectivenessResponse(BaseModel):
+    effectiveness_score: float = Field(..., description="Effectiveness score (0-1)")
+    predicted_improvement: Dict[str, float] = Field(..., description="Predicted symptom improvement")
+    confidence: float = Field(..., description="Prediction confidence")
+
+
+class DietaryTriggerRequest(BaseModel):
+    foods_consumed: List[str] = Field(..., description="List of foods consumed")
+    meal_timing: List[str] = Field(..., description="Meal timing information")
+    symptoms: Dict[str, float] = Field(..., description="Symptom levels")
+
+
+class DietaryTriggerResponse(BaseModel):
+    trigger_foods: List[str] = Field(..., description="Identified trigger foods")
+    trigger_probability: Dict[str, float] = Field(..., description="Probability for each trigger")
+    recommendations: List[str] = Field(..., description="Dietary recommendations")
+
+
+class StressSymptomCorrelationRequest(BaseModel):
+    stress_levels: Dict[str, float] = Field(..., description="Stress level data")
+    symptoms: Dict[str, float] = Field(..., description="Symptom data")
+    timeframe_days: int = Field(7, description="Analysis timeframe in days")
+
+
+class StressSymptomCorrelationResponse(BaseModel):
+    correlation_score: float = Field(..., description="Stress-symptom correlation")
+    stress_triggers: List[str] = Field(..., description="Identified stress triggers")
+    management_strategies: List[str] = Field(..., description="Stress management strategies")
+
+
+class SleepQualityImpactRequest(BaseModel):
+    sleep_hours: float = Field(..., description="Hours of sleep")
+    sleep_quality: float = Field(..., description="Sleep quality score (1-10)")
+    symptoms: Dict[str, float] = Field(..., description="Symptom levels")
+
+
+class SleepQualityImpactResponse(BaseModel):
+    impact_score: float = Field(..., description="Sleep impact on symptoms")
+    sleep_recommendations: List[str] = Field(..., description="Sleep improvement recommendations")
+    predicted_improvement: Dict[str, float] = Field(..., description="Predicted symptom improvement")
+
+
+class ExerciseToleranceRequest(BaseModel):
+    exercise_type: str = Field(..., description="Type of exercise")
+    duration_minutes: int = Field(..., description="Exercise duration")
+    intensity: str = Field(..., description="Exercise intensity")
+    symptoms: Dict[str, float] = Field(..., description="Symptom levels")
+
+
+class ExerciseToleranceResponse(BaseModel):
+    tolerance_score: float = Field(..., description="Exercise tolerance score")
+    recommended_modifications: List[str] = Field(..., description="Exercise modifications")
+    optimal_timing: str = Field(..., description="Optimal exercise timing")
+
+
+class SymptomProgressionRequest(BaseModel):
+    current_symptoms: Dict[str, float] = Field(..., description="Current symptom levels")
+    historical_data: List[Dict[str, Any]] = Field(..., description="Historical symptom data")
+    prediction_days: int = Field(7, description="Days to predict ahead")
+
+
+class SymptomProgressionResponse(BaseModel):
+    progression_forecast: Dict[str, List[float]] = Field(..., description="Symptom progression forecast")
+    trend_analysis: Dict[str, str] = Field(..., description="Trend analysis for each symptom")
+    intervention_recommendations: List[str] = Field(..., description="Recommended interventions")
+
+
+class TreatmentResponseRequest(BaseModel):
+    treatment_plan: Dict[str, Any] = Field(..., description="Current treatment plan")
+    baseline_symptoms: Dict[str, float] = Field(..., description="Baseline symptom levels")
+    treatment_duration: int = Field(..., description="Treatment duration in days")
+
+
+class TreatmentResponseResponse(BaseModel):
+    response_probability: float = Field(..., description="Treatment response probability")
+    expected_timeline: Dict[str, str] = Field(..., description="Expected improvement timeline")
+    monitoring_recommendations: List[str] = Field(..., description="Monitoring recommendations")

@@ -13,7 +13,8 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 
 from app.core.database import get_db
@@ -33,15 +34,28 @@ enhanced_recommendation_service = None
 
 
 def get_enhanced_recommendation_service(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> EnhancedRecommendationService:
     global enhanced_recommendation_service
     if enhanced_recommendation_service is None:
-        enhanced_recommendation_service = EnhancedRecommendationService(db)
+        # Create a synchronous session for the service that expects Session
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from app.core.config import settings
+
+        # Create a synchronous engine and session
+        sync_database_url = settings.DATABASE_URL.replace(
+            "postgresql+asyncpg://", "postgresql://"
+        )
+        sync_engine = create_engine(sync_database_url)
+        sync_session_factory = sessionmaker(bind=sync_engine)
+        sync_session = sync_session_factory()
+
+        enhanced_recommendation_service = EnhancedRecommendationService(sync_session)
     return enhanced_recommendation_service
 
 
-def get_ml_integration_service(db: Session = Depends(get_db)) -> MLIntegrationService:
+def get_ml_integration_service(db: AsyncSession = Depends(get_db)) -> MLIntegrationService:
     """Get or create the ML integration service instance."""
     return MLIntegrationService(db)
 
@@ -77,7 +91,7 @@ class BatchPredictionRequest(BaseModel):
 async def stream_predictions(
     request: RealTimePredictionRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     service: EnhancedRecommendationService = Depends(
         get_enhanced_recommendation_service
     ),
@@ -125,7 +139,7 @@ async def stream_predictions(
                 user_data["recent_symptoms"] = await _get_enhanced_symptom_trends(
                     current_user.id, db
                 )
-                flareup_prediction = ml_service.predict_flareup_risk(user_data, 7)
+                flareup_prediction = await ml_service.predict_flareup_risk(user_data, 7)
                 flareup_time = (
                     datetime.utcnow() - flareup_start
                 ).total_seconds() * 1000
@@ -188,7 +202,10 @@ async def enhanced_prediction(
     request: RealTimePredictionRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
 ):
     """Enhanced prediction with additional ML features and data processing."""
     try:
@@ -208,9 +225,9 @@ async def enhanced_prediction(
         user_data["environmental_factors"] = await _get_environmental_factors()
 
         # Run all predictions in parallel for better performance
-        severity_task = asyncio.create_task(_async_severity_prediction(user_data))
-        flareup_task = asyncio.create_task(_async_flareup_prediction(user_data))
-        recommendations_task = asyncio.create_task(_async_recommendations(user_data))
+        severity_task = asyncio.create_task(_async_severity_prediction(user_data, service))
+        flareup_task = asyncio.create_task(_async_flareup_prediction(user_data, service))
+        recommendations_task = asyncio.create_task(_async_recommendations(user_data, service, current_user))
 
         # Wait for all predictions to complete
         severity_result, flareup_result, recommendations_result = await asyncio.gather(
@@ -255,7 +272,7 @@ async def batch_predictions(
     request: BatchPredictionRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     ml_service: MLIntegrationService = Depends(get_ml_integration_service),
 ):
     """Process batch predictions for multiple users or scenarios."""
@@ -293,7 +310,7 @@ async def batch_predictions(
                     )
                     batch_result["predictions"][
                         "flareup"
-                    ] = ml_service.predict_flareup_risk(user_data, request.days_ahead)
+                    ] = await ml_service.predict_flareup_risk(user_data, request.days_ahead)
                 elif pred_type == "recommendations":
                     batch_result["predictions"][
                         "recommendations"
@@ -323,28 +340,26 @@ async def batch_predictions(
 
 
 async def _prepare_enhanced_user_data(
-    user: User, db: Session, symptoms: Optional[Dict[str, Any]] = None
+    user: User, db: AsyncSession, symptoms: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Prepare enhanced user data with additional features."""
     # Get recent symptom logs (last 30 days)
-    recent_symptoms = (
-        db.query(SymptomLog)
-        .filter(
+    recent_symptoms_result = await db.execute(
+        select(SymptomLog).filter(
             SymptomLog.user_id == user.id,
             SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=30),
         )
-        .all()
     )
+    recent_symptoms = recent_symptoms_result.scalars().all()
 
     # Get recent diet logs
-    recent_diet = (
-        db.query(DietLog)
-        .filter(
+    recent_diet_result = await db.execute(
+        select(DietLog).filter(
             DietLog.user_id == user.id,
-            DietLog.logged_at >= datetime.utcnow() - timedelta(days=30),
+            DietLog.consumed_at >= datetime.utcnow() - timedelta(days=30),
         )
-        .all()
     )
+    recent_diet = recent_diet_result.scalars().all()
 
     return {
         "profile": {
@@ -368,7 +383,7 @@ async def _prepare_enhanced_user_data(
         "diet_history": [
             {
                 "foods": diet.foods or [],
-                "logged_at": diet.logged_at,
+                "consumed_at": diet.consumed_at,
                 "reactions": getattr(diet, "reactions", []),
             }
             for diet in recent_diet[-10:]  # Last 10 entries
@@ -376,17 +391,16 @@ async def _prepare_enhanced_user_data(
     }
 
 
-async def _get_enhanced_symptom_trends(user_id: str, db: Session) -> Dict[str, Any]:
+async def _get_enhanced_symptom_trends(user_id: str, db: AsyncSession) -> Dict[str, Any]:
     """Get enhanced symptom trends with more detailed analysis."""
     # Get symptoms from last 14 days
-    recent_symptoms = (
-        db.query(SymptomLog)
-        .filter(
+    recent_symptoms_result = await db.execute(
+        select(SymptomLog).filter(
             SymptomLog.user_id == user_id,
             SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=14),
         )
-        .all()
     )
+    recent_symptoms = recent_symptoms_result.scalars().all()
 
     if not recent_symptoms:
         return {
@@ -433,7 +447,7 @@ async def _get_enhanced_symptom_trends(user_id: str, db: Session) -> Dict[str, A
     }
 
 
-async def _extract_temporal_features(user_id: str, db: Session) -> Dict[str, Any]:
+async def _extract_temporal_features(user_id: str, db: AsyncSession) -> Dict[str, Any]:
     """Extract temporal features for enhanced predictions."""
     now = datetime.utcnow()
 
@@ -476,14 +490,10 @@ async def _async_flareup_prediction(
 
 
 async def _async_recommendations(
-    user_data: Dict[str, Any], service: EnhancedRecommendationService
+    user_data: Dict[str, Any], service: EnhancedRecommendationService, user: User
 ) -> Dict[str, Any]:
     """Async wrapper for recommendations using enhanced service."""
-    # Need to create a mock user object for the enhanced service
-    from app.models.user import User
-
-    mock_user = User(id=user_data.get("user_id", ""))
-    return service.generate_enhanced_recommendations(mock_user, user_data)
+    return await service.generate_enhanced_recommendations(user.id, user_data)
 
 
 async def _generate_insights(
@@ -546,7 +556,7 @@ def _format_stream_response(
 
 
 async def _store_enhanced_prediction(
-    db: Session,
+    db: AsyncSession,
     user_id: str,
     prediction_data: Dict[str, Any],
     input_data: Dict[str, Any],
@@ -556,7 +566,7 @@ async def _store_enhanced_prediction(
     logger.info(f"Stored enhanced prediction for user {user_id}")
 
 
-async def _store_batch_results(db: Session, results: List[Dict[str, Any]]):
+async def _store_batch_results(db: AsyncSession, results: List[Dict[str, Any]]):
     """Store batch prediction results."""
     # Implementation would store in database
     logger.info(f"Stored batch results for {len(results)} predictions")

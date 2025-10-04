@@ -24,6 +24,7 @@ from .appointments import router as appointments_router
 from .symptom_logs import router as symptom_logs_router
 from .personalization import router as personalization_router
 from .ibs_assessment import router as ibs_assessment_router
+from .real_time_training import router as real_time_training_router
 
 api_router = APIRouter()
 
@@ -58,5 +59,8 @@ api_router.include_router(
     personalization_router, prefix="/personalization", tags=["personalization"]
 )
 api_router.include_router(ibs_assessment_router, tags=["ibs-assessment"])
+api_router.include_router(
+    real_time_training_router, prefix="/training", tags=["real-time-training"]
+)
 
 __all__ = ["api_router"]

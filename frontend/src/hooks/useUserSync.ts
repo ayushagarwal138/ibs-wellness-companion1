@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/contexts/auth-context'
+import { UI_CONFIG } from '@/lib/config'
 
 interface SyncStatus {
   syncing: boolean
@@ -357,8 +358,8 @@ export function useUserSync(): UseUserSyncReturn {
       }
     }
 
-    // Check every 30 seconds
-    const interval = setInterval(checkSyncStatus, 30000)
+    // Check at configurable interval
+    const interval = setInterval(checkSyncStatus, UI_CONFIG.SYNC_CHECK_INTERVAL)
     
     return () => clearInterval(interval)
   }, [user, getSyncStatus])

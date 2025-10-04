@@ -199,3 +199,53 @@ async def get_optional_current_user(
         return user
     except Exception:
         return None
+
+
+def require_role(*allowed_roles: str):
+    """
+    Create a dependency that requires the user to have one of the specified 
+    roles.
+    
+    Args:
+        allowed_roles: List of allowed roles (e.g., "ADMIN", "DOCTOR")
+        
+    Returns:
+        A dependency function that checks user roles
+    """
+    def role_checker(
+        current_user: User = Depends(get_current_active_user)
+    ) -> User:
+        if current_user.role not in allowed_roles:
+            roles_str = ', '.join(allowed_roles)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required roles: {roles_str}"
+            )
+        return current_user
+    
+    return role_checker
+
+
+# Convenience dependencies for common role requirements
+def get_admin_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """Dependency that requires ADMIN role."""
+    if current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+
+
+def get_doctor_or_admin_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """Dependency that requires DOCTOR or ADMIN role."""
+    if current_user.role not in ["DOCTOR", "ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Doctor or Admin access required"
+        )
+    return current_user

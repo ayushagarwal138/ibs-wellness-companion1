@@ -16,6 +16,7 @@ import {
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Progress } from '../ui/progress';
+import { UI_CONFIG } from '@/lib/config';
 
 interface TestUser {
   id: string;
@@ -304,7 +305,7 @@ export default function TestDataGeneratorComponent() {
       // Update progress
       for (let i = 0; i <= 100; i += 10) {
         setGenerationProgress(i);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, UI_CONFIG.DELAY_SHORT));
       }
 
       scenario.expectedOutcomes = scenarioTemplate.expectedOutcomes;
@@ -341,7 +342,7 @@ export default function TestDataGeneratorComponent() {
         };
         
         results.push(result);
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, UI_CONFIG.DELAY_MEDIUM));
       }
       
       setTestResults(results);

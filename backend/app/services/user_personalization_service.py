@@ -9,24 +9,26 @@ behavior, preferences, and historical data.
 from typing import Dict, List, Any
 from datetime import datetime, timedelta
 import numpy as np
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.dynamic_config import get_config
 from app.services.dynamic_data_service import DynamicDataService
 from app.models.user import User
+from app.models.user_preferences import UserPreferences
 from app.models.symptom import SymptomLog
 from app.models.diet import DietLog
 
 
 class UserPersonalizationService:
-    """Service for providing personalized, adaptive recommendations and configurations."""
+    """Service for personalizing ML models and recommendations based on user data."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.config = get_config()
         self.dynamic_data_service = DynamicDataService(db)
 
-    def get_personalized_ml_thresholds(self, user_id: int) -> Dict[str, Any]:
+    async def get_personalized_ml_thresholds(self, user_id: int) -> Dict[str, Any]:
         """
         Get personalized ML model thresholds based on user's historical data and patterns.
 
@@ -36,44 +38,33 @@ class UserPersonalizationService:
         Returns:
             Dictionary containing personalized thresholds and weights
         """
-        user_profile = self._get_user_profile(user_id)
-        historical_patterns = self._analyze_historical_patterns(user_id)
+        user_profile = await self._get_user_profile(user_id)
+        historical_patterns = await self._analyze_historical_patterns(user_id)
+        preferences = await self._get_or_create_user_preferences(user_id)
 
-        # Base thresholds from config
-        base_config = self.config.ml_model
-
-        # Adaptive adjustments based on user patterns
+        # Use stored ML thresholds from UserPreferences or defaults
         personalized_thresholds = {
             "risk_thresholds": {
-                "high": self._adjust_threshold(
-                    base_config.risk_thresholds.high,
-                    historical_patterns.get("sensitivity_factor", 1.0),
-                    user_profile.get("risk_tolerance", "medium"),
-                ),
-                "medium": self._adjust_threshold(
-                    base_config.risk_thresholds.medium,
-                    historical_patterns.get("sensitivity_factor", 1.0),
-                    user_profile.get("risk_tolerance", "medium"),
-                ),
+                "high": preferences.ml_severity_threshold or 0.8,
+                "medium": preferences.ml_flareup_threshold or 0.6,
+                "medication": preferences.ml_medication_threshold or 0.7,
+                "recommendation": preferences.ml_recommendation_threshold or 0.5,
+                "realtime": preferences.ml_realtime_threshold or 0.6,
             },
-            "weights": {
-                "symptom_weight": self._adjust_weight(
-                    base_config.weights.symptom_weight,
-                    historical_patterns.get("symptom_correlation", 1.0),
-                ),
-                "stress_weight": self._adjust_weight(
-                    base_config.weights.stress_weight,
-                    historical_patterns.get("stress_correlation", 1.0),
-                ),
-                "sleep_weight": self._adjust_weight(
-                    base_config.weights.sleep_weight,
-                    historical_patterns.get("sleep_correlation", 1.0),
-                ),
+            "model_weights": {
+                "severity": preferences.severity_weight or 0.3,
+                "flareup": preferences.flareup_weight or 0.25,
+                "medication": preferences.medication_weight or 0.2,
+                "recommendation": preferences.recommendation_weight or 0.15,
+                "realtime": preferences.realtime_weight or 0.1,
             },
-            "confidence_threshold": self._adjust_confidence_threshold(
-                base_config.confidence_threshold,
-                historical_patterns.get("prediction_accuracy", 0.7),
-            ),
+            "confidence_threshold": 0.7,
+            "adaptation_level": self._calculate_adaptation_level(historical_patterns),
+            "learning_patterns": self._get_learning_patterns(user_id),
+            "personalization_score": preferences.personalization_score,
+            "engagement_score": preferences.engagement_score,
+            "learning_rate": preferences.learning_rate,
+            "adaptation_speed": preferences.adaptation_speed,
             "personalization_metadata": {
                 "last_updated": datetime.utcnow().isoformat(),
                 "data_points_used": historical_patterns.get("data_points", 0),
@@ -83,7 +74,74 @@ class UserPersonalizationService:
             },
         }
 
+        # Adjust thresholds based on user patterns and risk tolerance
+        risk_tolerance = user_profile.get("risk_tolerance", "medium")
+        if risk_tolerance == "low":
+            # More conservative thresholds for risk-averse users
+            for key in personalized_thresholds["risk_thresholds"]:
+                personalized_thresholds["risk_thresholds"][key] *= 0.8
+        elif risk_tolerance == "high":
+            # More aggressive thresholds for risk-tolerant users
+            for key in personalized_thresholds["risk_thresholds"]:
+                personalized_thresholds["risk_thresholds"][key] *= 1.2
+
         return personalized_thresholds
+
+    def update_ml_thresholds_from_feedback(
+        self, user_id: int, feedback: Dict[str, Any]
+    ) -> bool:
+        """
+        Update ML thresholds based on user feedback and model performance.
+
+        Args:
+            user_id: User ID
+            feedback: Dictionary containing feedback data
+
+        Returns:
+            Boolean indicating success
+        """
+        try:
+            preferences = self._get_or_create_user_preferences(user_id)
+            
+            # Update thresholds based on feedback
+            if "accuracy_feedback" in feedback:
+                accuracy = feedback["accuracy_feedback"]
+                if accuracy < 0.6:  # Poor accuracy, adjust thresholds
+                    # Make thresholds more conservative
+                    if preferences.ml_severity_threshold:
+                        preferences.ml_severity_threshold *= 0.9
+                    if preferences.ml_flareup_threshold:
+                        preferences.ml_flareup_threshold *= 0.9
+                elif accuracy > 0.8:  # Good accuracy, can be more aggressive
+                    if preferences.ml_severity_threshold:
+                        preferences.ml_severity_threshold *= 1.05
+                    if preferences.ml_flareup_threshold:
+                        preferences.ml_flareup_threshold *= 1.05
+
+            # Update learning metrics
+            if "engagement_score" in feedback:
+                preferences.engagement_score = feedback["engagement_score"]
+            
+            if "learning_progress" in feedback:
+                preferences.learning_progress = feedback["learning_progress"]
+
+            # Update adaptation speed based on user responsiveness
+            if "response_time" in feedback:
+                response_time = feedback["response_time"]
+                if response_time < 3600:  # Quick response (< 1 hour)
+                    preferences.adaptation_speed = min(1.0, 
+                        preferences.adaptation_speed + 0.1)
+                elif response_time > 86400:  # Slow response (> 1 day)
+                    preferences.adaptation_speed = max(0.1, 
+                        preferences.adaptation_speed - 0.1)
+
+            self.db.commit()
+            return True
+
+        except Exception as e:
+            print(f"Error updating ML thresholds: {str(e)}")
+            self.db.rollback()
+            return False
 
     def get_adaptive_recommendations(
         self, user_id: int, current_context: Dict[str, Any]
@@ -168,7 +226,7 @@ class UserPersonalizationService:
             print(f"Error updating learning patterns: {e}")
             return False
 
-    def get_personalized_nutrition_targets(self, user_id: int) -> Dict[str, Any]:
+    async def get_personalized_nutrition_targets(self, user_id: int) -> Dict[str, Any]:
         """
         Get personalized nutrition targets based on user's profile and patterns.
 
@@ -178,7 +236,7 @@ class UserPersonalizationService:
         Returns:
             Personalized nutrition targets and guidelines
         """
-        user_profile = self._get_user_profile(user_id)
+        user_profile = await self._get_user_profile(user_id)
         dietary_patterns = self._analyze_dietary_patterns(user_id)
 
         base_nutrition = self.dynamic_data_service.get_nutrition_guidelines()
@@ -196,12 +254,16 @@ class UserPersonalizationService:
 
         return personalized_nutrition
 
-    def _get_user_profile(self, user_id: int) -> Dict[str, Any]:
+    async def _get_user_profile(self, user_id: int) -> Dict[str, Any]:
         """Get comprehensive user profile including preferences and demographics."""
-        user = self.db.query(User).filter(User.id == user_id).first()
+        result = await self.db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
 
         if not user:
             return {}
+
+        # Get or create user preferences
+        preferences = await self._get_or_create_user_preferences(user_id)
 
         # Extract preferences from user's JSONB fields or use defaults
         privacy_settings = user.privacy_settings or {}
@@ -210,34 +272,41 @@ class UserPersonalizationService:
         profile = {
             "age": user.age,
             "gender": user.gender,
-            "activity_level": privacy_settings.get("activity_level", "moderate"),
-            "risk_tolerance": privacy_settings.get("risk_tolerance", "medium"),
-            "dietary_restrictions": privacy_settings.get("dietary_restrictions", []),
+            "activity_level": preferences.activity_level.value if preferences.activity_level else "moderate",
+            "risk_tolerance": preferences.risk_tolerance.value if preferences.risk_tolerance else "medium",
+            "dietary_restrictions": preferences.dietary_restrictions or privacy_settings.get("dietary_restrictions", []),
             "health_goals": privacy_settings.get("health_goals", []),
             "notification_preferences": notification_prefs,
+            "learning_progress": preferences.learning_progress.value if preferences.learning_progress else "initial",
+            "personalization_score": preferences.personalization_score,
+            "engagement_score": preferences.engagement_score,
         }
 
         return profile
 
-    def _analyze_historical_patterns(
+    async def _analyze_historical_patterns(
         self, user_id: int, days: int = 90
     ) -> Dict[str, Any]:
         """Analyze user's historical patterns for the last N days."""
         cutoff_date = datetime.utcnow() - timedelta(days=days)
 
         # Get symptom patterns
-        symptoms = (
-            self.db.query(SymptomLog)
-            .filter(SymptomLog.user_id == user_id, SymptomLog.logged_at >= cutoff_date)
-            .all()
+        result = await self.db.execute(
+            select(SymptomLog).filter(
+                SymptomLog.user_id == user_id, 
+                SymptomLog.logged_at >= cutoff_date
+            )
         )
+        symptoms = result.scalars().all()
 
         # Get diet patterns
-        _diet_logs = (
-            self.db.query(DietLog)
-            .filter(DietLog.user_id == user_id, DietLog.logged_at >= cutoff_date)
-            .all()
+        result = await self.db.execute(
+            select(DietLog).filter(
+                DietLog.user_id == user_id, 
+                DietLog.logged_at >= cutoff_date
+            )
         )
+        _diet_logs = result.scalars().all()
 
         if not symptoms:
             return {"data_points": 0, "sensitivity_factor": 1.0}
@@ -357,17 +426,16 @@ class UserPersonalizationService:
             reverse=True,
         )
 
-    def _calculate_engagement_score(self, user_id: int) -> float:
+    async def _calculate_engagement_score(self, user_id: int) -> float:
         """Calculate user engagement score based on activity."""
         # Count recent logs
-        recent_logs = (
-            self.db.query(SymptomLog)
-            .filter(
+        result = await self.db.execute(
+            select(SymptomLog).filter(
                 SymptomLog.user_id == user_id,
                 SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=7),
             )
-            .count()
         )
+        recent_logs = len(result.scalars().all())
 
         # Simple engagement score (0-1)
         return min(1.0, recent_logs / 7.0)
@@ -502,3 +570,36 @@ class UserPersonalizationService:
         # Simplified accuracy estimation
         # In real implementation, this would compare predictions vs actual outcomes
         return min(0.9, max(0.5, len(symptoms) / 100))
+
+    async def _get_or_create_user_preferences(self, user_id: int) -> UserPreferences:
+        """Get existing user preferences or create new ones with defaults."""
+        result = await self.db.execute(
+            select(UserPreferences).filter(UserPreferences.user_id == user_id)
+        )
+        preferences = result.scalar_one_or_none()
+        
+        if not preferences:
+            preferences = UserPreferences(user_id=user_id)
+            self.db.add(preferences)
+            await self.db.commit()
+            await self.db.refresh(preferences)
+        
+        return preferences
+
+    async def update_user_preferences(
+        self, user_id: int, preferences_data: Dict[str, Any]
+    ) -> bool:
+        """Update user preferences with new data."""
+        try:
+            preferences = await self._get_or_create_user_preferences(user_id)
+            
+            # Update preferences based on provided data
+            for key, value in preferences_data.items():
+                if hasattr(preferences, key):
+                    setattr(preferences, key, value)
+            
+            await self.db.commit()
+            return True
+        except Exception:
+            await self.db.rollback()
+            return False

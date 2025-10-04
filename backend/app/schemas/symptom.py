@@ -90,11 +90,12 @@ class SymptomStats(BaseModel):
     """Schema for symptom statistics."""
 
     total_logs: int
-    most_common_symptom: Optional[str] = None
-    average_severity: Optional[float] = None
-    symptoms_by_type: dict
-    symptoms_by_severity: dict
-    recent_trend: Optional[str] = None  # "improving", "worsening", "stable"
+    average_severity: float
+    most_common_symptoms: List[str]
+    severity_distribution: dict
+    bristol_distribution: dict
+    pain_locations: dict
+    weekly_trends: dict
 
 
 class SymptomAnalytics(BaseModel):

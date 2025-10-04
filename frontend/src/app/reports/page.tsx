@@ -34,6 +34,7 @@ import { downloadPDFReport } from '@/lib/pdf-generator';
 import { ShareReportModal } from '@/components/reports/share-report-modal';
 import { IndianDietRecommendations } from '@/components/reports/indian-diet-recommendations';
 import { LifestyleRecommendations } from '@/components/reports/lifestyle-recommendations';
+import { formatSmartNumber, formatConfidence, formatProbability } from '@/lib/number-formatting';
 
 interface MLPrediction {
   risk_level: 'low' | 'medium' | 'moderate' | 'high';
@@ -116,9 +117,9 @@ const mockReportData: ReportData = {
   },
   ml_predictions: {
     risk_level: 'medium',
-    confidence: 78,
-    next_flare_probability: 35,
-    predicted_severity: 4.5,
+    confidence: 0.78,
+    next_flare_probability: 0.35,
+    predicted_severity: 4.25,
     timeline: "next 7 days",
     key_factors: ["Stress levels", "Dairy consumption", "Sleep quality"]
   },
@@ -352,13 +353,13 @@ export default function ReportsPage() {
           score: mlReport.predictions?.predicted_severity || 5,
           description: getPersonalizedSeverityDescription(mlReport.predictions?.risk_level || 'medium', userProfile)
         },
-        ml_predictions: mlReport.predictions || {
-          risk_level: 'medium',
-          confidence: 0.75,
-          next_flare_probability: 0.3,
-          predicted_severity: 5,
-          timeline: 'Next week',
-          key_factors: ['Stress levels', 'Dietary patterns']
+        ml_predictions: {
+          risk_level: mlReport.predictions?.risk_level || 'medium',
+          confidence: mlReport.predictions?.confidence || 0.78,
+          next_flare_probability: mlReport.predictions?.next_flare_probability || 0.35,
+          predicted_severity: mlReport.predictions?.predicted_severity || 4.25,
+          timeline: mlReport.predictions?.timeline || 'Next week',
+          key_factors: mlReport.predictions?.key_factors || ['Stress levels', 'Dietary patterns']
         },
         recommendations: {
           immediate_actions: mlReport.predictions?.recommendations?.immediate_actions || [
@@ -401,6 +402,7 @@ export default function ReportsPage() {
         }
       };
 
+
       setReportData(transformedData);
     } catch (error) {
       console.error('Error fetching report data:', error);
@@ -422,9 +424,9 @@ export default function ReportsPage() {
         },
         ml_predictions: {
           risk_level: 'medium',
-          confidence: 0.75,
-          next_flare_probability: 0.3,
-          predicted_severity: 5,
+          confidence: 0.78,
+          next_flare_probability: 0.35,
+          predicted_severity: 4.25,
           timeline: 'Next week',
           key_factors: ['Stress levels', 'Dietary patterns', 'Sleep quality']
         },
@@ -623,7 +625,7 @@ export default function ReportsPage() {
             </p>
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-800">
-                <strong>Current Score:</strong> {reportData.severity_assessment.score}/10
+                <strong>Current Score:</strong> {formatSmartNumber(reportData.severity_assessment.score)}/10
               </p>
               <Progress 
                 value={reportData.severity_assessment.score * 10} 
@@ -693,7 +695,7 @@ export default function ReportsPage() {
               <Target className="h-4 w-4 text-blue-500" />
             </div>
             <div className="text-2xl font-bold text-blue-600 mb-1">
-              {reportData.ml_predictions.next_flare_probability}%
+              {formatProbability(reportData.ml_predictions.next_flare_probability)}
             </div>
             <p className="text-sm text-gray-600">in the {reportData.ml_predictions.timeline}</p>
             <Progress value={reportData.ml_predictions.next_flare_probability} className="mt-2" />
@@ -705,7 +707,7 @@ export default function ReportsPage() {
               <Shield className="h-4 w-4 text-green-500" />
             </div>
             <div className="text-2xl font-bold text-green-600 mb-1">
-              {reportData.ml_predictions.confidence}%
+              {formatConfidence(reportData.ml_predictions.confidence)}
             </div>
             <p className="text-sm text-gray-600">prediction accuracy</p>
             <Progress value={reportData.ml_predictions.confidence} className="mt-2" />
@@ -717,7 +719,7 @@ export default function ReportsPage() {
               <BarChart3 className="h-4 w-4 text-orange-500" />
             </div>
             <div className="text-2xl font-bold text-orange-600 mb-1">
-              {reportData.ml_predictions.predicted_severity}/10
+              {formatSmartNumber(reportData.ml_predictions.predicted_severity)}/10
             </div>
             <p className="text-sm text-gray-600">if symptoms occur</p>
             <Progress value={reportData.ml_predictions.predicted_severity * 10} className="mt-2" />
@@ -868,7 +870,7 @@ export default function ReportsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-600 mb-1">
-              {reportData.progress_metrics.symptom_control}%
+              {formatSmartNumber(reportData.progress_metrics.symptom_control)}%
             </div>
             <p className="text-sm text-gray-600">Symptom Control</p>
             <Progress value={reportData.progress_metrics.symptom_control} className="mt-2" />
@@ -876,7 +878,7 @@ export default function ReportsPage() {
           
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600 mb-1">
-              {reportData.progress_metrics.quality_of_life}%
+              {formatSmartNumber(reportData.progress_metrics.quality_of_life)}%
             </div>
             <p className="text-sm text-gray-600">Quality of Life</p>
             <Progress value={reportData.progress_metrics.quality_of_life} className="mt-2" />
@@ -884,7 +886,7 @@ export default function ReportsPage() {
           
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600 mb-1">
-              {reportData.progress_metrics.goal_achievement}%
+              {formatSmartNumber(reportData.progress_metrics.goal_achievement)}%
             </div>
             <p className="text-sm text-gray-600">Goal Achievement</p>
             <Progress value={reportData.progress_metrics.goal_achievement} className="mt-2" />
@@ -892,7 +894,7 @@ export default function ReportsPage() {
           
           <div className="text-center">
             <div className="text-3xl font-bold text-orange-600 mb-1">
-              {reportData.progress_metrics.consistency_score}%
+              {formatSmartNumber(reportData.progress_metrics.consistency_score)}%
             </div>
             <p className="text-sm text-gray-600">Tracking Consistency</p>
             <Progress value={reportData.progress_metrics.consistency_score} className="mt-2" />

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,8 +25,12 @@ import {
   Thermometer,
   Users,
   BookOpen,
-  Coffee
+  Coffee,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import { mlService, PersonalizedRecommendationsResponse } from '@/services/ml-service';
+import { toast } from 'react-hot-toast';
 
 interface LifestyleRecommendation {
   id: string;
@@ -448,11 +452,156 @@ const HealthMetrics: React.FC<{ profile: UserHealthProfile }> = ({ profile }) =>
 export const LifestyleRecommendations: React.FC<LifestyleRecommendationsProps> = ({ 
   userProfile = mockUserProfile 
 }) => {
-  // Filter recommendations based on user profile
-  const prioritizedRecommendations = mockRecommendations.sort((a, b) => {
+  const [recommendations, setRecommendations] = useState<LifestyleRecommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const transformMLRecommendations = (mlData: PersonalizedRecommendationsResponse): LifestyleRecommendation[] => {
+    const transformedRecommendations: LifestyleRecommendation[] = [];
+
+    // Transform lifestyle insights from ML service
+    mlData.lifestyle_insights.forEach((insight, index) => {
+      const category = insight.category.toLowerCase() as 'exercise' | 'stress' | 'sleep' | 'hydration' | 'mindfulness' | 'social';
+      
+      // Map category to our expected categories, default to 'mindfulness' for unknown categories
+      const mappedCategory: 'exercise' | 'stress' | 'sleep' | 'hydration' | 'mindfulness' | 'social' = 
+        ['exercise', 'stress', 'sleep', 'hydration', 'mindfulness', 'social'].includes(category) 
+          ? category 
+          : 'mindfulness';
+
+      transformedRecommendations.push({
+        id: `ml-lifestyle-${index}`,
+        category: mappedCategory,
+        title: insight.category,
+        description: insight.recommendation,
+        benefits: [
+          "Personalized for your IBS profile",
+          "Based on your symptom patterns",
+          "Tailored to your lifestyle factors"
+        ],
+        actionItems: [
+          insight.recommendation,
+          "Track your progress daily",
+          "Monitor symptom changes",
+          "Adjust based on your response"
+        ],
+        difficulty: insight.priority === 'high' ? 'easy' : insight.priority === 'medium' ? 'medium' : 'hard',
+        timeCommitment: "15-30 minutes daily",
+        frequency: "Daily",
+        priority: insight.priority as 'high' | 'medium' | 'low',
+        ibsSpecific: true,
+        tips: mlData.personalized_tips.slice(0, 3) // Use first 3 personalized tips
+      });
+    });
+
+    // Add recommendations from management strategy if available
+    if (mlData.management_strategy) {
+      transformedRecommendations.push({
+        id: 'ml-management-strategy',
+        category: 'mindfulness',
+        title: mlData.management_strategy.strategy,
+        description: mlData.management_strategy.approach,
+        benefits: [
+          "Comprehensive management approach",
+          "Evidence-based strategy",
+          "Personalized timeline"
+        ],
+        actionItems: [
+          mlData.management_strategy.approach,
+          "Follow the recommended timeline",
+          "Monitor your progress regularly",
+          "Adjust strategy as needed"
+        ],
+        difficulty: 'medium',
+        timeCommitment: mlData.management_strategy.timeline,
+        frequency: "Daily",
+        priority: 'high',
+        ibsSpecific: true,
+        tips: mlData.personalized_tips.slice(3, 6) // Use next 3 personalized tips
+      });
+    }
+
+    return transformedRecommendations;
+  };
+
+  const fetchRecommendations = async (showRefreshToast = false) => {
+    try {
+      setRefreshing(true);
+      setError(null);
+      
+      const mlData = await mlService.getPersonalizedRecommendations();
+      const transformedRecommendations = transformMLRecommendations(mlData);
+      
+      // If we don't have enough ML recommendations, supplement with some static ones
+      if (transformedRecommendations.length < 3) {
+        const supplementalRecommendations = mockRecommendations
+          .filter(rec => !transformedRecommendations.some(tr => tr.category === rec.category))
+          .slice(0, 6 - transformedRecommendations.length);
+        
+        transformedRecommendations.push(...supplementalRecommendations);
+      }
+      
+      setRecommendations(transformedRecommendations);
+      
+      if (showRefreshToast) {
+        toast.success('Lifestyle recommendations updated!');
+      }
+    } catch (error) {
+      console.error('Failed to fetch lifestyle recommendations:', error);
+      setError('Failed to load personalized recommendations');
+      // Fallback to static recommendations
+      setRecommendations(mockRecommendations);
+      toast.error('Using default recommendations due to connection issue');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecommendations();
+  }, []);
+
+  const handleRefresh = () => {
+    fetchRecommendations(true);
+  };
+
+  // Filter recommendations based on user profile and sort by priority
+  const prioritizedRecommendations = recommendations.sort((a, b) => {
     const priorityOrder = { high: 3, medium: 2, low: 1 };
     return priorityOrder[b.priority] - priorityOrder[a.priority];
   });
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Health Profile Overview */}
+        <HealthMetrics profile={userProfile} />
+
+        {/* Loading State */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-red-500" />
+              Personalized Lifestyle Recommendations
+            </CardTitle>
+            <p className="text-sm text-gray-600">
+              Loading personalized recommendations...
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
+                <p className="text-gray-600">Generating personalized lifestyle recommendations...</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -462,13 +611,26 @@ export const LifestyleRecommendations: React.FC<LifestyleRecommendationsProps> =
       {/* Lifestyle Recommendations */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-red-500" />
-            Personalized Lifestyle Recommendations
-          </CardTitle>
-          <p className="text-sm text-gray-600">
-            Evidence-based lifestyle changes tailored to your IBS profile and current health metrics
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-red-500" />
+                Personalized Lifestyle Recommendations
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                {error ? 'Default recommendations (connection issue)' : 'AI-powered lifestyle changes tailored to your IBS profile and current health metrics'}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="h-8 w-8 p-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </CardHeader>
         
         <CardContent>
@@ -491,17 +653,32 @@ export const LifestyleRecommendations: React.FC<LifestyleRecommendationsProps> =
               <div>
                 <h5 className="font-medium text-blue-800 mb-2">High Priority Actions:</h5>
                 <ul className="space-y-1 text-blue-700">
-                  <li>• Start 10-minute daily stress management routine</li>
-                  <li>• Establish consistent sleep schedule</li>
-                  <li>• Begin gentle 20-minute walks after meals</li>
+                  {prioritizedRecommendations
+                    .filter(rec => rec.priority === 'high')
+                    .slice(0, 3)
+                    .map((rec, index) => (
+                      <li key={index}>• {rec.actionItems[0]}</li>
+                    ))}
+                  {prioritizedRecommendations.filter(rec => rec.priority === 'high').length === 0 && (
+                    <li>• Focus on stress management and sleep quality</li>
+                  )}
                 </ul>
               </div>
               <div>
                 <h5 className="font-medium text-blue-800 mb-2">This Week's Goals:</h5>
                 <ul className="space-y-1 text-blue-700">
-                  <li>• Track stress levels and sleep quality</li>
-                  <li>• Try one new mindfulness technique</li>
-                  <li>• Connect with one supportive person about IBS</li>
+                  {prioritizedRecommendations
+                    .slice(0, 3)
+                    .map((rec, index) => (
+                      <li key={index}>• Track progress with {rec.title.toLowerCase()}</li>
+                    ))}
+                  {prioritizedRecommendations.length === 0 && (
+                    <>
+                      <li>• Track stress levels and sleep quality</li>
+                      <li>• Try one new mindfulness technique</li>
+                      <li>• Connect with one supportive person about IBS</li>
+                    </>
+                  )}
                 </ul>
               </div>
             </div>

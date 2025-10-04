@@ -11,7 +11,8 @@ from typing import List, Dict, Any
 from pathlib import Path
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import joblib
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 class MLIntegrationService:
     """Service for integrating ML models with the IBS chatbot system."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.models_path = Path(__file__).parent.parent.parent.parent / "ml-models"
         self.models = {}
@@ -93,7 +94,7 @@ class MLIntegrationService:
         # Standard scaler
         self.scalers["feature_scaler"] = StandardScaler()
 
-    def predict_flareup_risk(self, user: User, days_ahead: int = 7) -> Dict[str, Any]:
+    async def predict_flareup_risk(self, user: User, days_ahead: int = 7) -> Dict[str, Any]:
         """
         Predict the risk of IBS flare-up in the next N days.
 
@@ -106,7 +107,7 @@ class MLIntegrationService:
         """
         try:
             # Extract features from user data
-            features = self._extract_user_features(user)
+            features = await self._extract_user_features(user)
 
             if not features or len(features) < 5:
                 return {
@@ -192,7 +193,7 @@ class MLIntegrationService:
                 "model_used": "error_fallback",
             }
 
-    def enhance_severity_assessment(
+    async def enhance_severity_assessment(
         self, assessment: IBSAssessment, user: User
     ) -> IBSAssessment:
         """
@@ -207,7 +208,7 @@ class MLIntegrationService:
         """
         try:
             # Extract ML features
-            features = self._extract_user_features(user)
+            features = await self._extract_user_features(user)
 
             if features and len(features) >= 5:
                 # Get ML-based severity prediction
@@ -243,7 +244,7 @@ class MLIntegrationService:
             logger.error(f"Error in severity enhancement: {e}")
             return assessment
 
-    def generate_personalized_recommendations(
+    async def generate_personalized_recommendations(
         self, user: User, assessment: IBSAssessment
     ) -> List[Recommendation]:
         """
@@ -258,7 +259,7 @@ class MLIntegrationService:
         """
         try:
             # Extract user features for personalization
-            features = self._extract_user_features(user)
+            features = await self._extract_user_features(user)
             user_profile = self._build_user_profile(user, features)
 
             # Get base recommendations from rule-based system
@@ -317,7 +318,19 @@ class MLIntegrationService:
 
         except Exception as e:
             logger.error(f"Error generating onboarding predictions: {e}")
-            return self._get_fallback_predictions()
+            return {
+                "error": True,
+                "error_message": (
+                    "Unable to generate personalized predictions at this time. "
+                    "Please try again later or contact support if the issue "
+                    "persists."
+                ),
+                "user_guidance": (
+                    "You can still proceed with general IBS management "
+                    "strategies while we work to resolve this issue."
+                ),
+                "status": "FAILED"
+            }
 
     def _extract_onboarding_features(self, data: Dict[str, Any]) -> List[float]:
         """Extract numerical features from onboarding data for ML models."""
@@ -698,64 +711,21 @@ class MLIntegrationService:
 
         return tips[:5]  # Limit to top 5 tips
 
-    def _get_fallback_predictions(self) -> Dict[str, Any]:
-        """Provide fallback predictions when ML processing fails."""
-        return {
-            "risk_assessment": {
-                "level": "Moderate",
-                "score": 50.0,
-                "description": "Based on general IBS patterns, moderate management approach recommended.",
-                "confidence": 0.6,
-            },
-            "trigger_analysis": {
-                "primary_category": "mixed",
-                "insights": [
-                    "Consider keeping a symptom diary to identify personal triggers"
-                ],
-            },
-            "lifestyle_insights": [
-                {
-                    "category": "General",
-                    "insight": "Regular routines can help manage IBS symptoms",
-                    "recommendation": "Maintain consistent meal and sleep schedules",
-                    "priority": "Medium",
-                }
-            ],
-            "dietary_recommendations": [
-                {
-                    "type": "General",
-                    "title": "Balanced Approach",
-                    "description": "Focus on a balanced diet with regular meal timing",
-                    "priority": "Medium",
-                }
-            ],
-            "management_strategy": {
-                "strategy": "Balanced Approach",
-                "approach": "Combine dietary awareness with lifestyle modifications",
-                "timeline": "4-6 weeks for initial assessment",
-            },
-            "predicted_severity": "Moderate",
-            "personalized_tips": [
-                "Keep a food and symptom diary",
-                "Stay hydrated throughout the day",
-                "Practice stress management techniques",
-            ],
-        }
 
-    def _extract_user_features(self, user: User) -> List[float]:
+
+    async def _extract_user_features(self, user: User) -> List[float]:
         """Extract numerical features from user data for ML models."""
         features = []
 
         try:
             # Get recent symptom data (last 30 days)
-            recent_symptoms = (
-                self.db.query(SymptomLog)
-                .filter(
+            result = await self.db.execute(
+                select(SymptomLog).filter(
                     SymptomLog.user_id == user.id,
                     SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=30),
                 )
-                .all()
             )
+            recent_symptoms = result.scalars().all()
 
             # Symptom frequency features
             features.append(len(recent_symptoms))  # Total symptom logs
@@ -775,15 +745,14 @@ class MLIntegrationService:
             features.append(len(bm_logs))
 
             # Food reaction data
-            food_reactions = (
-                self.db.query(FoodReaction)
-                .filter(
+            result = await self.db.execute(
+                select(FoodReaction).filter(
                     FoodReaction.user_id == user.id,
-                    FoodReaction.reaction_date
+                    FoodReaction.reaction_occurred_at
                     >= datetime.utcnow() - timedelta(days=30),
                 )
-                .all()
             )
+            food_reactions = result.scalars().all()
 
             features.append(len(food_reactions))  # Number of food reactions
             severe_reactions = len(
@@ -792,14 +761,13 @@ class MLIntegrationService:
             features.append(severe_reactions)
 
             # Medication adherence
-            medications = (
-                self.db.query(MedicationLog)
-                .filter(
+            result = await self.db.execute(
+                select(MedicationLog).filter(
                     MedicationLog.user_id == user.id,
                     MedicationLog.taken_at >= datetime.utcnow() - timedelta(days=30),
                 )
-                .all()
             )
+            medications = result.scalars().all()
 
             features.append(len(medications))  # Medication logs
 

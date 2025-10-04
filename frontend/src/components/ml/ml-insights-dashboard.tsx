@@ -20,10 +20,24 @@ import {
   Utensils,
   Moon,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Database
 } from 'lucide-react';
-import { mlService, MLPredictionResponse, PersonalizedRecommendationsResponse } from '@/services/ml-service';
+import { 
+  mlService, 
+  MLPredictionResponse, 
+  PersonalizedRecommendationsResponse,
+  SeverityPredictionResponse,
+  FlareupPredictionResponse,
+  MedicationEffectivenessResponse,
+  ModelInfoResponse
+} from '@/services/ml-service';
+import { severityThresholdService, UserContext } from '@/services/severity-threshold-service';
 import { toast } from 'react-hot-toast';
+import { ModelInfoDashboard } from './model-info-dashboard';
+import { PredictionVisualizations } from './prediction-visualizations';
+import { TrainingStatus } from './training-status';
+import { formatSmartNumber, formatConfidence, formatProbability, formatScore } from '@/lib/number-formatting';
 
 interface MLInsightsDashboardProps {
   userId?: string;
@@ -45,20 +59,107 @@ interface InsightCard {
 export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardProps) {
   const [predictions, setPredictions] = useState<MLPredictionResponse | null>(null);
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendationsResponse | null>(null);
+  const [severityPrediction, setSeverityPrediction] = useState<SeverityPredictionResponse | null>(null);
+  const [flareupPrediction, setFlareupPrediction] = useState<FlareupPredictionResponse | null>(null);
+  const [medicationEffectiveness, setMedicationEffectiveness] = useState<MedicationEffectivenessResponse | null>(null);
+  const [modelInfo, setModelInfo] = useState<ModelInfoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'day' | 'week' | 'month'>('day');
+  const [userContext, setUserContext] = useState<UserContext>({ userId });
 
   const loadMLInsights = async () => {
     try {
       setLoading(true);
-      const [predictionsData, recommendationsData] = await Promise.all([
+      const [
+        predictionsData, 
+        recommendationsData, 
+        modelInfoData,
+        severityData,
+        flareupData,
+        medicationData
+      ] = await Promise.all([
         mlService.getPredictions(),
-        mlService.getPersonalizedRecommendations()
+        mlService.getPersonalizedRecommendations(),
+        mlService.getModelInfo(),
+        mlService.predictSeverity({
+          symptoms: {
+            pain_level: 6,
+            bloating: 7,
+            diarrhea: 4,
+            constipation: 2,
+            nausea: 3,
+            fatigue: 5
+          },
+          context: {
+            stress_level: 7,
+            sleep_quality: 5,
+            recent_meals: ['dairy', 'spicy food'],
+            medications: ['probiotics']
+          },
+          triggers: {
+            foods: ['dairy', 'spicy food'],
+            stress_level: 7,
+            sleep_quality: 5,
+            medications: ['probiotics']
+          }
+        }),
+        mlService.predictFlareup({
+          recent_symptoms: [
+            {
+              date: new Date().toISOString().split('T')[0] || '2024-01-01',
+              symptoms: {
+                abdominal_pain: 6,
+                bloating: 7,
+                diarrhea: 4,
+                constipation: 2
+              },
+              triggers: ['stress', 'dairy']
+            }
+          ],
+          lifestyle_factors: {
+            stress_level: 7,
+            sleep_quality: 5,
+            exercise_frequency: 3,
+            diet_adherence: 6
+          },
+          prediction_horizon: 7
+        }),
+        mlService.predictMedicationEffectiveness({
+          medication_history: [
+            {
+              medication: 'probiotics',
+              dosage: '1 capsule daily',
+              frequency: 'once daily',
+              adherence_rate: 0.9,
+              effectiveness_score: 6,
+              side_effects: [],
+              duration_days: 28
+            }
+          ],
+          current_symptoms: {
+            abdominal_pain: 6,
+            diarrhea: 4,
+            bloating: 7,
+            constipation: 2,
+            nausea: 2
+          },
+          user_profile: {
+            age: 30,
+            weight: 65,
+            ibs_type: 'IBS-M',
+            comorbidities: []
+          },
+          prediction_period: 30
+        })
       ]);
       
       setPredictions(predictionsData);
       setRecommendations(recommendationsData);
+      setModelInfo(modelInfoData);
+      setSeverityPrediction(severityData);
+      setFlareupPrediction(flareupData);
+      setMedicationEffectiveness(medicationData);
     } catch (error) {
       console.error('Failed to load ML insights:', error);
       toast.error('Failed to load AI insights');
@@ -84,15 +185,13 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
     loadMLInsights();
   }, [selectedTimeframe]);
 
-  const getRiskColor = (riskLevel: string) => {
-    switch (riskLevel.toLowerCase()) {
-      case 'high': return 'border-red-300 bg-red-50';
-      case 'medium': return 'border-yellow-300 bg-yellow-50';
-      case 'low': return 'border-green-300 bg-green-50';
-      default: return 'border-gray-300 bg-gray-50';
-    }
+  // Dynamic risk color based on personalized thresholds
+  const getRiskColor = async (riskScore: number) => {
+    const category = await severityThresholdService.getRiskCategory(riskScore, userContext);
+    return severityThresholdService.getRiskColor(category);
   };
 
+  // Legacy priority icon for string priorities (backward compatibility)
   const getPriorityIcon = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high': return <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />;
@@ -100,6 +199,42 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
       case 'low': return <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />;
       default: return <Activity className="h-4 w-4 text-gray-500 flex-shrink-0" />;
     }
+  };
+
+  // Dynamic priority icon based on risk score
+  const getRiskPriorityIcon = async (riskScore: number) => {
+    const category = await severityThresholdService.getRiskCategory(riskScore, userContext);
+    switch (category) {
+      case 'high': return <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />;
+      case 'medium': return <Clock className="h-4 w-4 text-yellow-500 flex-shrink-0" />;
+      case 'low': return <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />;
+      default: return <Activity className="h-4 w-4 text-gray-500 flex-shrink-0" />;
+    }
+  };
+
+  // Component for risk display with dynamic colors
+  const RiskBadge = ({ riskScore, label }: { riskScore: number; label?: string }) => {
+    const [colorClass, setColorClass] = useState('border-gray-300 bg-gray-50');
+    const [icon, setIcon] = useState(<Activity className="h-4 w-4 text-gray-500 flex-shrink-0" />);
+
+    useEffect(() => {
+      const loadRiskInfo = async () => {
+        const color = await getRiskColor(riskScore);
+        const iconElement = await getRiskPriorityIcon(riskScore);
+        setColorClass(color);
+        setIcon(iconElement);
+      };
+      loadRiskInfo();
+    }, [riskScore]);
+
+    return (
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+          {label || `Risk: ${(riskScore * 100).toFixed(1)}%`}
+        </span>
+      </div>
+    );
   };
 
   const getCategoryIcon = (category: string) => {
@@ -168,13 +303,13 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                 <Target className="h-4 w-4 text-red-500 flex-shrink-0" />
               </div>
               <div className="text-lg lg:text-2xl xl:text-3xl font-bold text-red-600 mb-1 truncate">
-                {predictions.next_flare_probability}%
+                {formatProbability(predictions.next_flare_probability / 100)}
               </div>
               <p className="text-xs lg:text-sm text-gray-600 mb-2 break-words">
                 in the {predictions.timeline}
               </p>
               <div className="w-full">
-                <Progress value={predictions.next_flare_probability} className="h-2" />
+                <Progress value={Math.round(predictions.next_flare_probability)} className="h-2" />
               </div>
             </CardContent>
           </Card>
@@ -186,7 +321,7 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                 <TrendingUp className="h-4 w-4 text-blue-500 flex-shrink-0" />
               </div>
               <div className="text-lg lg:text-2xl xl:text-3xl font-bold text-blue-600 mb-1 truncate">
-                {predictions.predicted_severity}/10
+                {formatSmartNumber(predictions.predicted_severity, false)}/10
               </div>
               <p className="text-xs lg:text-sm text-gray-600 break-words">
                 Predicted severity
@@ -214,11 +349,14 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
       {/* Detailed Insights */}
       <div className="w-full overflow-hidden">
         <Tabs defaultValue="predictions" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-4">
+          <TabsList className="grid w-full grid-cols-7 mb-4">
             <TabsTrigger value="predictions" className="text-xs lg:text-sm truncate">Predictions</TabsTrigger>
             <TabsTrigger value="recommendations" className="text-xs lg:text-sm truncate">Recommendations</TabsTrigger>
             <TabsTrigger value="insights" className="text-xs lg:text-sm truncate">Insights</TabsTrigger>
             <TabsTrigger value="actions" className="text-xs lg:text-sm truncate">Actions</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs lg:text-sm truncate">Analytics</TabsTrigger>
+            <TabsTrigger value="models" className="text-xs lg:text-sm truncate">Models</TabsTrigger>
+            <TabsTrigger value="training" className="text-xs lg:text-sm truncate">Training</TabsTrigger>
           </TabsList>
 
           <TabsContent value="predictions" className="space-y-4">
@@ -276,6 +414,177 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                     </CardContent>
                   </Card>
                 )}
+
+                {/* New Specific Predictions */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Severity Prediction */}
+                  {severityPrediction && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
+                          <TrendingUp className="h-4 lg:h-5 w-4 lg:w-5 text-blue-500" />
+                          Severity Analysis
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Predicted Severity</span>
+                            <Badge variant={severityPrediction.severity_category === 'severe' ? 'destructive' : 
+                                          severityPrediction.severity_category === 'moderate' ? 'default' : 'secondary'}>
+                              {severityPrediction.severity_category}
+                            </Badge>
+                          </div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {formatSmartNumber(severityPrediction.predicted_severity)}/10
+                          </div>
+                          <Progress value={Math.round(severityPrediction.predicted_severity * 10)} className="h-2" />
+                          <div className="text-xs text-gray-500">
+                            Confidence: {formatConfidence(severityPrediction.confidence / 100)}
+                          </div>
+                          {severityPrediction.contributing_factors.length > 0 && (
+                            <div className="mt-3">
+                              <h5 className="text-sm font-medium text-gray-700 mb-2">Contributing Factors:</h5>
+                              <div className="space-y-1">
+                                {severityPrediction.contributing_factors.slice(0, 3).map((factor, index) => (
+                                  <div key={index} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                    {factor}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Flareup Prediction */}
+                  {flareupPrediction && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
+                          <AlertTriangle className="h-4 lg:h-5 w-4 lg:w-5 text-orange-500" />
+                          Flareup Risk
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Risk Level</span>
+                            <Badge variant={flareupPrediction.risk_level === 'high' ? 'destructive' : 
+                                          flareupPrediction.risk_level === 'moderate' ? 'default' : 'secondary'}>
+                              {flareupPrediction.risk_level}
+                            </Badge>
+                          </div>
+                          <div className="text-2xl font-bold text-orange-600">
+                            {formatProbability(flareupPrediction.flareup_probability / 100)}
+                          </div>
+                          <Progress value={Math.round(flareupPrediction.flareup_probability)} className="h-2" />
+                          <div className="text-xs text-gray-500">
+                            Confidence: {formatConfidence((flareupPrediction.confidence || 0) / 100)} • {flareupPrediction.timeline}
+                          </div>
+                          {flareupPrediction.risk_factors && flareupPrediction.risk_factors.length > 0 && (
+                            <div className="mt-3">
+                              <h5 className="text-sm font-medium text-gray-700 mb-2">Key Risk Factors:</h5>
+                              <div className="space-y-1">
+                                {flareupPrediction.risk_factors.slice(0, 3).map((factor, index) => (
+                                  <div key={index} className="text-xs text-gray-600 bg-orange-50 px-2 py-1 rounded">
+                                    {factor}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Medication Effectiveness */}
+                  {medicationEffectiveness && (
+                    <Card className="lg:col-span-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
+                          <Shield className="h-4 lg:h-5 w-4 lg:w-5 text-green-500" />
+                          Medication Effectiveness
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">Effectiveness Score</span>
+                              <div className="text-lg font-bold text-green-600">
+                                {formatSmartNumber(medicationEffectiveness.effectiveness_score, false)}/10
+                              </div>
+                            </div>
+                            <Progress value={Math.round(medicationEffectiveness.effectiveness_score * 10)} className="h-2" />
+                            <div className="text-xs text-gray-500">
+                              Confidence: {formatConfidence(medicationEffectiveness.confidence)}
+                            </div>
+                          </div>
+                          {medicationEffectiveness.monitoring_recommendations?.length > 0 && (
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-700 mb-2">Monitoring Recommendations:</h5>
+                              <div className="space-y-2">
+                                {medicationEffectiveness.monitoring_recommendations.slice(0, 3).map((rec, index) => (
+                                  <div key={index} className="text-xs text-gray-600 bg-green-50 px-2 py-1 rounded">
+                                    {rec}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Model Information */}
+                  {modelInfo && (
+                    <Card className="lg:col-span-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
+                          <Brain className="h-4 lg:h-5 w-4 lg:w-5 text-purple-500" />
+                          Model Information
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Model Details</h5>
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div><span className="font-medium">Name:</span> {modelInfo?.models?.[0]?.name || 'N/A'}</div>
+                              <div><span className="font-medium">Version:</span> {modelInfo?.models?.[0]?.version || 'N/A'}</div>
+                              <div><span className="font-medium">Last Trained:</span> {modelInfo?.models?.[0]?.last_trained ? new Date(modelInfo.models[0].last_trained).toLocaleDateString() : 'N/A'}</div>
+                            </div>
+                          </div>
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Performance Metrics</h5>
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div><span className="font-medium">Accuracy:</span> {modelInfo?.models?.[0]?.accuracy ? (modelInfo.models[0].accuracy * 100).toFixed(1) + '%' : 'N/A'}</div>
+                              <div><span className="font-medium">R² Score:</span> {modelInfo?.models?.[0]?.r2_score ? (modelInfo.models[0].r2_score * 100).toFixed(1) + '%' : 'N/A'}</div>
+                              <div><span className="font-medium">RMSE:</span> {modelInfo?.models?.[0]?.rmse ? modelInfo.models[0].rmse.toFixed(3) : 'N/A'}</div>
+                            </div>
+                          </div>
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">Model Statistics</h5>
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div><span className="font-medium">Features:</span> {modelInfo?.models?.[0]?.features_count || 'N/A'}</div>
+                              <div><span className="font-medium">Training Samples:</span> {modelInfo?.models?.[0]?.training_samples || 'N/A'}</div>
+                              <div><span className="font-medium">Status:</span> 
+                                <Badge variant={modelInfo?.models?.[0]?.status === 'active' ? 'default' : 'secondary'} className="ml-1 text-xs">
+                                  {modelInfo?.models?.[0]?.status || 'Unknown'}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               </>
             )}
           </TabsContent>
@@ -420,8 +729,20 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
               </Card>
             )}
           </TabsContent>
-        </Tabs>
-      </div>
+
+          <TabsContent value="analytics" className="space-y-4">
+            <PredictionVisualizations predictions={predictions} />
+          </TabsContent>
+
+          <TabsContent value="models" className="mt-4">
+          <ModelInfoDashboard />
+        </TabsContent>
+
+        <TabsContent value="training" className="mt-4">
+          <TrainingStatus />
+        </TabsContent>
+      </Tabs>
+    </div>
     </div>
   );
 }

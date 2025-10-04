@@ -1,6 +1,6 @@
 'use client';
 
-const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+import { API_CONFIG } from '@/lib/config';
 
 export interface UserAnalyticsResponse {
   user_id: string;
@@ -68,7 +68,7 @@ class AnalyticsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/analytics/user?timeframe=${timeframe}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/analytics/user?timeframe=${timeframe}`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -98,7 +98,7 @@ class AnalyticsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/analytics/system`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/analytics/system`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -128,7 +128,7 @@ class AnalyticsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/analytics/achievements`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/analytics/achievements`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });

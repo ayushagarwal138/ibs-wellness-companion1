@@ -1,6 +1,6 @@
 'use client';
 
-const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+import { API_CONFIG } from '@/lib/config';
 
 export interface DashboardAnalytics {
   totalSymptomLogs: number;
@@ -53,7 +53,7 @@ class DashboardAnalyticsService {
 
   private async fetchSymptomLogs(): Promise<any[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/symptom-logs`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/symptom-logs/?days=30`, {
         headers: this.getAuthHeaders(),
       });
       
@@ -62,7 +62,7 @@ class DashboardAnalyticsService {
       }
       
       const data = await response.json();
-      return data.items || [];
+      return data.data || [];
     } catch (error) {
       console.error('Failed to fetch symptom logs:', error);
       return [];
@@ -71,7 +71,7 @@ class DashboardAnalyticsService {
 
   private async fetchDietLogs(): Promise<any[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/diet/logs`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/diet/logs?size=100`, {
         headers: this.getAuthHeaders(),
       });
       
@@ -89,28 +89,16 @@ class DashboardAnalyticsService {
 
   private async fetchFoodReactions(): Promise<any[]> {
     try {
-      const headers = this.getAuthHeaders();
-      console.log('Fetching food reactions with headers:', headers);
-      
-      const response = await fetch(`${API_BASE_URL}/api/v1/diet/reactions`, {
-        headers,
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/diet/reactions?size=100`, {
+        headers: this.getAuthHeaders(),
       });
       
-      console.log('Food reactions response status:', response.status);
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Food reactions API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Food reactions data:', data);
-      return data.items || data.data || [];
+      return data.items || [];
     } catch (error) {
       console.error('Failed to fetch food reactions:', error);
       return [];
@@ -148,7 +136,7 @@ class DashboardAnalyticsService {
 
     // Calculate wellness score (average of inverse symptom severity)
     const avgWellnessScore = currentSymptomLogs.length > 0 
-      ? (10 - currentSymptomLogs.reduce((sum, log) => sum + (log.severity || 0), 0) / currentSymptomLogs.length)
+      ? (10 - currentSymptomLogs.reduce((sum, log) => sum + this.severityToNumber(log.severity), 0) / currentSymptomLogs.length)
       : 8.0;
 
     // Calculate percentage changes
@@ -183,13 +171,31 @@ class DashboardAnalyticsService {
     return `${sign}${Math.round(change)}%`;
   }
 
+  private severityToNumber(severity: string): number {
+    // Convert severity string to numeric value (1-5 scale)
+    switch (severity?.toLowerCase()) {
+      case 'none':
+        return 0;
+      case 'mild':
+        return 1;
+      case 'moderate':
+        return 2;
+      case 'severe':
+        return 3;
+      case 'very_severe':
+        return 4;
+      default:
+        return 0; // Default to none if unknown
+    }
+  }
+
   private calculateWellnessScoreChange(currentLogs: any[], previousLogs: any[]): string {
     const currentAvg = currentLogs.length > 0 
-      ? (10 - currentLogs.reduce((sum, log) => sum + (log.severity || 0), 0) / currentLogs.length)
+      ? (10 - currentLogs.reduce((sum, log) => sum + this.severityToNumber(log.severity), 0) / currentLogs.length)
       : 8.0;
     
     const previousAvg = previousLogs.length > 0 
-      ? (10 - previousLogs.reduce((sum, log) => sum + (log.severity || 0), 0) / previousLogs.length)
+      ? (10 - previousLogs.reduce((sum, log) => sum + this.severityToNumber(log.severity), 0) / previousLogs.length)
       : 8.0;
     
     const change = currentAvg - previousAvg;

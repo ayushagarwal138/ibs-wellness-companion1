@@ -100,21 +100,22 @@ export function SymptomLogForm({ onSubmit }: SymptomLogFormProps) {
     }
 
     try {
-      // If onSubmit is provided, use it (for local state management)
+      // Always submit to API first
+      await apiService.createSymptomLog(data as any) // Type assertion since API types are misaligned
+      
+      // Reset form after successful submission
+      setSeverity(5)
+      setNotes("")
+      setStressLevel(5)
+      setSleepQuality(5)
+      setDuration(30)
+      setSelectedSymptomId(null)
+      
+      // If onSubmit callback is provided, call it after successful API submission
       if (onSubmit) {
         onSubmit(data)
       } else {
-        // Otherwise submit directly to API
-        await apiService.createSymptomLog(data as any) // Type assertion since API types are misaligned
-        
         alert('Symptom logged successfully!')
-        // Reset form
-        setSeverity(5)
-        setNotes("")
-        setStressLevel(5)
-        setSleepQuality(5)
-        setDuration(30)
-        setSelectedSymptomId(null)
       }
     } catch (error) {
       console.error('Error submitting symptom log:', error)

@@ -937,12 +937,12 @@ class ChatService:
             assessment = await self.ibs_detection.assess_ibs_severity(user)
 
             # Enhance with ML insights
-            enhanced_assessment = self.ml_integration.enhance_severity_assessment(
+            enhanced_assessment = await self.ml_integration.enhance_severity_assessment(
                 assessment, user
             )
 
             # Get flare-up prediction for additional context
-            flareup_risk = self.ml_integration.predict_flareup_risk(user, days_ahead=7)
+            flareup_risk = await self.ml_integration.predict_flareup_risk(user, days_ahead=7)
 
             response_parts = [
                 f"Based on your recent data, your current IBS severity is: {enhanced_assessment.severity.value.upper()}",

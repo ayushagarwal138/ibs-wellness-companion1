@@ -1,6 +1,6 @@
 'use client';
 
-const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+import { API_CONFIG } from '@/lib/config';
 
 export enum GoalType {
   SYMPTOM_REDUCTION = 'symptom_reduction',
@@ -117,7 +117,7 @@ class GoalsService {
         ...(goalType && { goal_type: goalType })
       });
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/?${params}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/?${params}`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -147,7 +147,7 @@ class GoalsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/${goalId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/${goalId}`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -177,7 +177,7 @@ class GoalsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(goal),
@@ -207,7 +207,7 @@ class GoalsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/${goalId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/${goalId}`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(updates),
@@ -237,7 +237,7 @@ class GoalsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/${goalId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/${goalId}`, {
         method: 'DELETE',
         headers: this.getAuthHeaders(),
       });
@@ -262,7 +262,7 @@ class GoalsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/${goalId}/progress`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/${goalId}/progress`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(progress),
@@ -292,7 +292,7 @@ class GoalsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/goals/summary`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/goals/summary`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });

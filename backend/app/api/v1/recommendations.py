@@ -80,7 +80,7 @@ async def get_personalized_recommendations(
 
         # Generate enhanced recommendations
         recommendations = await service.generate_enhanced_recommendations(
-            current_user.id, ml_predictions, db
+            current_user.id, ml_predictions
         )
 
         # Transform to match frontend expected format
@@ -197,7 +197,7 @@ async def _prepare_user_data(user: User, db: AsyncSession) -> Dict[str, Any]:
     }
 
 
-async def _get_dietary_patterns(user_id: str, db: AsyncSession) -> Dict[str, Any]:
+async def _get_dietary_patterns(user_id: int, db: AsyncSession) -> Dict[str, Any]:
     """Get user's dietary patterns for the last 30 days."""
     diet_query = select(DietLog).where(
         DietLog.user_id == user_id,

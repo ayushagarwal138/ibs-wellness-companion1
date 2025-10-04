@@ -149,4 +149,86 @@ INSERT INTO food_items (
 -- Regional Specialties
 ('650e8400-e29b-41d4-a716-446655440098', 'Rajma', 'North Indian', 'high', 127, 6.4, 0.5, 8.7, 22.8, true, NOW()),
 ('650e8400-e29b-41d4-a716-446655440099', 'Chole', 'North Indian', 'high', 164, 7.6, 2.6, 8.9, 27.4, true, NOW()),
-('650e8400-e29b-41d4-a716-446655440100', 'Pongal', 'South Indian', 'low', 145, 1.8, 3.2, 4.5, 26.0, false, NOW());
+('650e8400-e29b-41d4-a716-446655440100', 'Pongal', 'South Indian', 'low', 145, 1.8, 3.2, 4.5, 26.0, false, NOW()),
+
+-- Additional North Indian Dishes
+('650e8400-e29b-41d4-a716-446655440101', 'Butter Chicken', 'North Indian', 'moderate', 285, 1.2, 22.5, 18.5, 8.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440102', 'Chicken Tikka Masala', 'North Indian', 'moderate', 265, 1.8, 18.2, 20.8, 12.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440103', 'Paneer Makhani', 'North Indian', 'low', 245, 1.5, 18.8, 12.5, 9.2, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440104', 'Aloo Matar', 'North Indian', 'low', 95, 3.2, 2.8, 3.5, 16.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440105', 'Saag Paneer', 'North Indian', 'low', 135, 3.8, 9.5, 8.2, 7.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440106', 'Dal Makhani', 'North Indian', 'moderate', 185, 5.8, 8.5, 9.2, 22.0, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440107', 'Kadhi Pakora', 'North Indian', 'moderate', 165, 2.8, 8.2, 6.5, 18.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440108', 'Stuffed Paratha', 'North Indian', 'high', 385, 4.2, 15.8, 12.5, 52.0, true, NOW()),
+
+-- Additional South Indian Dishes
+('650e8400-e29b-41d4-a716-446655440109', 'Medu Vada', 'South Indian', 'moderate', 295, 3.5, 19.2, 9.8, 24.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440110', 'Rava Dosa', 'South Indian', 'low', 185, 2.2, 4.8, 5.2, 35.0, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440111', 'Coconut Chutney', 'South Indian', 'low', 195, 9.2, 19.5, 2.8, 7.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440112', 'Tomato Rice', 'South Indian', 'low', 155, 1.5, 4.2, 3.8, 28.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440113', 'Bisi Bele Bath', 'South Indian', 'moderate', 165, 3.2, 5.8, 6.5, 26.0, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440114', 'Mysore Pak', 'South Indian', 'moderate', 485, 1.2, 28.5, 6.8, 52.0, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440115', 'Filter Coffee', 'South Indian', 'low', 8, 0.0, 0.2, 0.5, 1.2, false, NOW()),
+
+-- West Indian Dishes
+('650e8400-e29b-41d4-a716-446655440116', 'Gujarati Thali', 'West Indian', 'moderate', 285, 8.5, 12.5, 12.8, 38.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440117', 'Pav Bhaji', 'West Indian', 'high', 195, 4.2, 8.5, 6.8, 26.5, true, NOW()),
+('650e8400-e29b-41d4-a716-446655440118', 'Vada Pav', 'West Indian', 'high', 285, 3.8, 12.5, 8.2, 38.5, true, NOW()),
+('650e8400-e29b-41d4-a716-446655440119', 'Bhel Puri', 'West Indian', 'moderate', 165, 3.5, 6.8, 5.2, 24.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440120', 'Khandvi', 'West Indian', 'low', 125, 2.8, 4.5, 6.8, 16.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440121', 'Undhiyu', 'West Indian', 'moderate', 145, 5.2, 6.8, 5.5, 18.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440122', 'Handvo', 'West Indian', 'moderate', 185, 4.2, 8.5, 7.2, 22.5, false, NOW()),
+
+-- East Indian Dishes
+('650e8400-e29b-41d4-a716-446655440123', 'Fish Curry Bengali', 'East Indian', 'low', 165, 1.8, 8.5, 18.5, 6.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440124', 'Luchi', 'East Indian', 'high', 385, 2.5, 18.5, 8.8, 48.5, true, NOW()),
+('650e8400-e29b-41d4-a716-446655440125', 'Mishti Doi', 'East Indian', 'moderate', 125, 0.2, 4.8, 4.5, 18.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440126', 'Kosha Mangsho', 'East Indian', 'moderate', 285, 2.2, 18.5, 22.8, 8.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440127', 'Aloo Posto', 'East Indian', 'low', 165, 3.2, 8.5, 4.8, 18.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440128', 'Chingri Malai Curry', 'East Indian', 'low', 195, 1.5, 12.5, 16.8, 6.5, false, NOW()),
+
+-- Traditional Indian Breakfast Items
+('650e8400-e29b-41d4-a716-446655440129', 'Aloo Paratha', 'Indian Breakfast', 'moderate', 295, 3.8, 12.5, 8.5, 38.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440130', 'Methi Paratha', 'Indian Breakfast', 'low', 285, 5.2, 11.5, 9.8, 36.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440131', 'Besan Chilla', 'Indian Breakfast', 'low', 165, 4.8, 6.5, 8.8, 18.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440132', 'Rava Upma', 'Indian Breakfast', 'low', 95, 2.2, 2.8, 3.5, 16.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440133', 'Vermicelli Upma', 'Indian Breakfast', 'low', 105, 1.8, 3.2, 3.8, 18.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440134', 'Masala Oats', 'Indian Breakfast', 'low', 125, 4.5, 3.8, 5.2, 22.5, false, NOW()),
+
+-- Indian Street Food (IBS-Friendly Options)
+('650e8400-e29b-41d4-a716-446655440135', 'Corn Chaat', 'Indian Street Food', 'low', 125, 3.8, 2.5, 4.8, 24.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440136', 'Cucumber Chaat', 'Indian Street Food', 'low', 45, 2.8, 0.8, 1.5, 8.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440137', 'Sprouts Chaat', 'Indian Street Food', 'moderate', 95, 4.2, 1.8, 6.8, 16.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440138', 'Fruit Chaat', 'Indian Street Food', 'low', 65, 2.5, 0.5, 1.2, 15.5, false, NOW()),
+
+-- Traditional Indian Desserts (IBS-Friendly)
+('650e8400-e29b-41d4-a716-446655440139', 'Rice Kheer', 'Indian Desserts', 'moderate', 165, 0.8, 5.2, 4.8, 26.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440140', 'Carrot Halwa', 'Indian Desserts', 'low', 285, 3.2, 12.5, 6.8, 38.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440141', 'Coconut Laddu', 'Indian Desserts', 'low', 385, 8.5, 28.5, 4.8, 28.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440142', 'Banana Sheera', 'Indian Desserts', 'low', 195, 2.2, 6.8, 3.5, 32.5, false, NOW()),
+
+-- Indian Beverages
+('650e8400-e29b-41d4-a716-446655440143', 'Aam Panna', 'Indian Beverages', 'low', 45, 0.8, 0.2, 0.5, 11.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440144', 'Jaljeera', 'Indian Beverages', 'low', 25, 1.2, 0.2, 0.8, 5.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440145', 'Kokum Sharbat', 'Indian Beverages', 'low', 35, 1.5, 0.2, 0.5, 8.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440146', 'Thandai', 'Indian Beverages', 'moderate', 185, 2.8, 12.5, 6.8, 15.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440147', 'Sattu Drink', 'Indian Beverages', 'low', 85, 3.2, 1.8, 6.8, 14.5, false, NOW()),
+
+-- Indian Fermented Foods (Probiotic-Rich)
+('650e8400-e29b-41d4-a716-446655440148', 'Idli Sambhar', 'Indian Fermented', 'moderate', 125, 3.2, 2.8, 5.5, 22.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440149', 'Dosa with Chutney', 'Indian Fermented', 'low', 185, 2.8, 5.2, 5.8, 32.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440150', 'Fermented Rice', 'Indian Fermented', 'low', 145, 1.2, 2.8, 3.5, 28.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440151', 'Kanji', 'Indian Fermented', 'moderate', 45, 2.8, 0.5, 1.8, 8.5, false, NOW()),
+
+-- Indian Healthy Snacks
+('650e8400-e29b-41d4-a716-446655440152', 'Roasted Chana', 'Indian Healthy Snacks', 'moderate', 385, 12.5, 6.8, 18.5, 58.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440153', 'Makhana', 'Indian Healthy Snacks', 'low', 347, 14.5, 0.1, 9.7, 76.9, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440154', 'Murmura Chivda', 'Indian Healthy Snacks', 'low', 385, 2.8, 12.5, 8.5, 68.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440155', 'Til Laddu', 'Indian Healthy Snacks', 'low', 485, 11.8, 38.5, 18.5, 22.5, false, NOW()),
+
+-- Indian Soups and Broths
+('650e8400-e29b-41d4-a716-446655440156', 'Tomato Soup', 'Indian Soups', 'low', 45, 1.8, 1.2, 2.5, 8.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440157', 'Vegetable Clear Soup', 'Indian Soups', 'low', 35, 2.2, 0.8, 1.8, 6.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440158', 'Chicken Soup', 'Indian Soups', 'low', 85, 1.2, 2.8, 8.5, 6.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440159', 'Bone Broth', 'Indian Soups', 'low', 45, 0.0, 1.8, 6.8, 2.5, false, NOW()),
+('650e8400-e29b-41d4-a716-446655440160', 'Moong Dal Soup', 'Indian Soups', 'low', 65, 4.2, 0.8, 5.5, 11.5, false, NOW());

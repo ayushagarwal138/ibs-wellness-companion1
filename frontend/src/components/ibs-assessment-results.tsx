@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { SeverityIndicator } from '@/components/ui/severity-indicator';
+import { formatSmartNumber, formatConfidence, formatProbability } from '@/lib/number-formatting';
 import { 
   AlertTriangle, 
   CheckCircle, 
@@ -132,7 +132,7 @@ export default function IBSAssessmentResults({ result, onNewAssessment }: IBSAss
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Risk Score</span>
-              <span>{result.risk_assessment.overall_risk_score}/100</span>
+              <span>{formatSmartNumber(result.risk_assessment.overall_risk_score)}/100</span>
             </div>
             <Progress value={result.risk_assessment.overall_risk_score} className="h-2" />
           </div>
@@ -140,7 +140,7 @@ export default function IBSAssessmentResults({ result, onNewAssessment }: IBSAss
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Confidence Level</span>
-              <span>{result.risk_assessment.confidence_score}%</span>
+              <span>{formatConfidence(result.risk_assessment.confidence_score)}</span>
             </div>
             <Progress value={result.risk_assessment.confidence_score} className="h-2" />
           </div>
@@ -173,19 +173,19 @@ export default function IBSAssessmentResults({ result, onNewAssessment }: IBSAss
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {result.flareup_probability.next_week}%
+                {formatProbability(result.flareup_probability.next_week)}
               </div>
               <div className="text-sm text-gray-600">Next Week</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {result.flareup_probability.next_month}%
+                {formatProbability(result.flareup_probability.next_month)}
               </div>
               <div className="text-sm text-gray-600">Next Month</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">
-                {result.flareup_probability.next_3_months}%
+                {formatProbability(result.flareup_probability.next_3_months)}
               </div>
               <div className="text-sm text-gray-600">3 Months</div>
             </div>

@@ -10,10 +10,26 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
+import traceback
+from datetime import datetime
+from enum import Enum
 
 import joblib
 
 logger = logging.getLogger(__name__)
+
+
+class ModelStatus(Enum):
+    """Enum for model status tracking."""
+    LOADED = "loaded"
+    FAILED = "failed"
+    FALLBACK = "fallback"
+    NOT_FOUND = "not_found"
+
+
+class MLModelError(Exception):
+    """Custom exception for ML model errors."""
+    pass
 
 
 class MLModelService:
@@ -24,36 +40,145 @@ class MLModelService:
         self.checkpoints_path = self.models_path / "checkpoints"
         self.models = {}
         self.model_metadata = {}
+        self.model_status = {}
+        self.error_counts = {}
+        self.last_errors = {}
         self._load_latest_models()
+
+    def _log_model_error(
+        self, model_name: str, error: Exception, context: str = ""
+    ):
+        """Log model errors with detailed context."""
+        error_msg = f"Model '{model_name}' error in {context}: {str(error)}"
+        logger.error(error_msg)
+        logger.debug(f"Full traceback: {traceback.format_exc()}")
+        
+        # Track error counts
+        if model_name not in self.error_counts:
+            self.error_counts[model_name] = 0
+        self.error_counts[model_name] += 1
+        
+        # Store last error for diagnostics
+        self.last_errors[model_name] = {
+            "error": str(error),
+            "context": context,
+            "timestamp": datetime.now().isoformat(),
+            "traceback": traceback.format_exc()
+        }
+
+    def _validate_input_data(
+        self, user_data: Dict[str, Any], required_fields: List[str]
+    ) -> bool:
+        """Validate input data has required fields."""
+        try:
+            if not isinstance(user_data, dict):
+                raise MLModelError("Input data must be a dictionary")
+            
+            missing_fields = [
+                field for field in required_fields if field not in user_data
+            ]
+            if missing_fields:
+                raise MLModelError(
+                    f"Missing required fields: {missing_fields}"
+                )
+            
+            return True
+        except Exception as e:
+            logger.warning(f"Input validation failed: {e}")
+            return False
 
     def _load_latest_models(self):
         """Load the latest trained models from checkpoints directory."""
         try:
-            # Find the latest checkpoint directory
-            latest_checkpoint = self._get_latest_checkpoint()
-            if not latest_checkpoint:
-                logger.warning("No model checkpoints found")
-                return
-
-            checkpoint_path = self.checkpoints_path / latest_checkpoint
-            logger.info(f"Loading models from checkpoint: {latest_checkpoint}")
-
-            # Load metadata
-            metadata_path = checkpoint_path / "training_metadata.json"
-            if metadata_path.exists():
-                with open(metadata_path, "r") as f:
-                    self.model_metadata = json.load(f)
-                logger.info(
-                    f"Loaded model metadata: {self.model_metadata.get('training_date', 'Unknown date')}"
+            logger.info("Starting model loading process...")
+            
+            # Check for models directly in checkpoints directory (new format)
+            direct_models = [
+                "severity_classifier.pkl",
+                "flareup_predictor.pkl", 
+                "recommendation_engine.pkl",
+                "feature_scaler.pkl"
+            ]
+            
+            all_exist = all((self.checkpoints_path / model).exists() for model in direct_models)
+            
+            if all_exist:
+                logger.info("Loading models from checkpoints directory")
+                self._load_direct_models()
+                
+                # Load metadata if available
+                metadata_path = self.checkpoints_path / "model_metadata.json"
+                if metadata_path.exists():
+                    try:
+                        with open(metadata_path, "r") as f:
+                            self.model_metadata = json.load(f)
+                        logger.info("Model metadata loaded successfully")
+                    except Exception as e:
+                        self._log_model_error("metadata", e, "loading metadata")
+                        self.model_metadata = {}
+                else:
+                    logger.warning("No model metadata found")
+                    self.model_metadata = {}
+            else:
+                logger.warning(
+                    "Not all direct models found, checking for checkpoint "
+                    "subdirectories"
                 )
-
-            # Load individual models
-            self._load_severity_classifier(checkpoint_path)
-            self._load_flareup_predictor(checkpoint_path)
-            self._load_recommendation_engine(checkpoint_path)
-
+                # Fallback to checkpoint subdirectories
+                latest_checkpoint = self._get_latest_checkpoint()
+                if latest_checkpoint:
+                    checkpoint_path = self.checkpoints_path / latest_checkpoint
+                    self._load_severity_classifier(checkpoint_path)
+                    self._load_flareup_predictor(checkpoint_path)
+                    self._load_recommendation_engine(checkpoint_path)
+                else:
+                    logger.warning(
+                        "No checkpoints found, initializing fallback models"
+                    )
+                    self._initialize_fallback_models()
+                    
         except Exception as e:
-            logger.error(f"Error loading ML models: {e}")
+            self._log_model_error("system", e, "model loading initialization")
+            logger.error("Failed to load models, initializing fallback models")
+            self._initialize_fallback_models()
+
+    def _load_direct_models(self):
+        """Load models directly from checkpoints directory with error handling."""
+        model_files = {
+            "severity_classifier": "severity_classifier.pkl",
+            "flareup_predictor": "flareup_predictor.pkl",
+            "recommendation_engine": "recommendation_engine.pkl",
+            "feature_scaler": "feature_scaler.pkl"
+        }
+        
+        for model_name, filename in model_files.items():
+            try:
+                model_path = self.checkpoints_path / filename
+                if model_path.exists():
+                    self.models[model_name] = joblib.load(model_path)
+                    self.model_status[model_name] = ModelStatus.LOADED
+                    logger.info(f"Successfully loaded {model_name} from {filename}")
+                else:
+                    self.model_status[model_name] = ModelStatus.NOT_FOUND
+                    logger.warning(f"Model file not found: {filename}")
+                    
+            except Exception as e:
+                self._log_model_error(model_name, e, f"loading from {filename}")
+                self.model_status[model_name] = ModelStatus.FAILED
+                
+        # If critical models failed to load, initialize fallbacks
+        critical_models = [
+            "severity_classifier", "flareup_predictor", "recommendation_engine"
+        ]
+        failed_critical = [
+            m for m in critical_models 
+            if self.model_status.get(m) != ModelStatus.LOADED
+        ]
+        
+        if failed_critical:
+            logger.warning(
+                f"Critical models failed to load: {failed_critical}"
+            )
             self._initialize_fallback_models()
 
     def _get_latest_checkpoint(self) -> Optional[str]:
@@ -117,7 +242,7 @@ class MLModelService:
 
     def predict_severity(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict IBS severity based on user data.
+        Predict IBS severity based on user data with comprehensive error handling.
 
         Args:
             user_data: Dictionary containing user features
@@ -125,132 +250,348 @@ class MLModelService:
         Returns:
             Dictionary with severity prediction and confidence
         """
-        if "severity_classifier" not in self.models:
-            return self._fallback_severity_prediction(user_data)
-
+        model_name = "severity_classifier"
+        
         try:
+            # Validate input data
+            required_fields = ["symptoms"]
+            if not self._validate_input_data(user_data, required_fields):
+                logger.warning("Invalid input data for severity prediction, using fallback")
+                return self._fallback_severity_prediction(user_data)
+            
+            if model_name not in self.models:
+                logger.info(f"Model {model_name} not available, using fallback")
+                return self._fallback_severity_prediction(user_data)
+
             # Prepare features for the model
             features = self._prepare_severity_features(user_data)
+            
+            if not features or len(features) == 0:
+                raise MLModelError("Failed to prepare features from user data")
+            
+            # Scale features if scaler is available
+            if "feature_scaler" in self.models:
+                try:
+                    features_scaled = self.models["feature_scaler"].transform([features])
+                except Exception as e:
+                    logger.warning(f"Feature scaling failed: {e}, using unscaled features")
+                    features_scaled = [features]
+            else:
+                features_scaled = [features]
 
             # Make prediction
-            model = self.models["severity_classifier"]
-            prediction = model.predict([features])[0]
-
-            # Get prediction probabilities if available
-            confidence = 0.5
+            model = self.models[model_name]
+            
+            # Handle different model types
             if hasattr(model, "predict_proba"):
-                probabilities = model.predict_proba([features])[0]
+                # Classification model - predict severity category
+                probabilities = model.predict_proba(features_scaled)[0]
+                
+                if len(probabilities) == 0:
+                    raise MLModelError("Model returned empty probabilities")
+                
+                prediction_idx = np.argmax(probabilities)
+                
+                # Map to severity categories
+                severity_categories = ['none', 'mild', 'moderate', 'severe', 'very_severe']
+                if prediction_idx < len(severity_categories):
+                    severity_level = severity_categories[prediction_idx]
+                    severity_score = prediction_idx * 2.5  # Scale to 0-10
+                else:
+                    severity_level = 'moderate'
+                    severity_score = 5.0
+                    
                 confidence = float(np.max(probabilities))
+                
+                # Validate confidence
+                if not (0 <= confidence <= 1):
+                    logger.warning(f"Invalid confidence value: {confidence}, setting to 0.5")
+                    confidence = 0.5
+                    
+            else:
+                # Regression model - predict severity score directly
+                prediction = model.predict(features_scaled)[0]
+                
+                if np.isnan(prediction) or np.isinf(prediction):
+                    raise MLModelError(f"Model returned invalid prediction: {prediction}")
+                
+                severity_score = float(np.clip(prediction, 0, 10))
+                severity_level = self._score_to_severity_level(severity_score)
+                confidence = 0.8  # Default confidence for regression
+
+            # Log successful prediction
+            logger.debug(f"Severity prediction successful: {severity_level} (score: {severity_score:.2f})")
 
             return {
-                "severity_score": float(prediction),
-                "severity_level": self._score_to_severity_level(prediction),
+                "severity_score": severity_score,
+                "severity_level": severity_level,
                 "confidence": confidence,
                 "model_version": self.model_metadata.get("model_versions", {}).get(
-                    "severity_classifier", "unknown"
+                    model_name, "unknown"
                 ),
+                "model_status": self.model_status.get(model_name, ModelStatus.LOADED).value,
+                "prediction_timestamp": datetime.now().isoformat()
             }
 
         except Exception as e:
-            logger.error(f"Error in severity prediction: {e}")
-            return self._fallback_severity_prediction(user_data)
+            self._log_model_error(model_name, e, "severity prediction")
+            logger.error(f"Severity prediction failed: {e}")
+            
+            # Return error response with guidance for user
+            return {
+                "severity_score": None,
+                "severity_level": "unknown",
+                "confidence": 0.0,
+                "model_version": "unavailable",
+                "model_status": ModelStatus.FAILED.value,
+                "error_message": (
+                    "ML model temporarily unavailable. Please try again later or "
+                    "consult with healthcare provider."
+                ),
+                "user_guidance": (
+                    "Consider tracking symptoms manually and consulting with your "
+                    "healthcare provider for personalized assessment."
+                ),
+                "prediction_timestamp": datetime.now().isoformat(),
+                "retry_suggested": True
+            }
 
     def predict_flareup_risk(
         self, user_data: Dict[str, Any], days_ahead: int = 7
     ) -> Dict[str, Any]:
         """
-        Predict flareup risk for the next N days.
+        Predict flareup risk with comprehensive error handling.
 
         Args:
             user_data: Dictionary containing user features
-            days_ahead: Number of days to predict ahead
+            days_ahead: Number of days ahead to predict
 
         Returns:
             Dictionary with flareup risk prediction
         """
-        if "flareup_predictor" not in self.models:
-            return self._fallback_flareup_prediction(user_data)
-
+        model_name = "flareup_predictor"
+        
         try:
+            # Validate input data
+            required_fields = ["recent_symptoms", "lifestyle_factors"]
+            if not self._validate_input_data(user_data, required_fields):
+                logger.warning("Invalid input data for flareup prediction, using fallback")
+                return self._fallback_flareup_prediction(user_data)
+            
+            # Validate days_ahead parameter
+            if not isinstance(days_ahead, int) or days_ahead < 1 or days_ahead > 30:
+                logger.warning(f"Invalid days_ahead value: {days_ahead}, using default 7")
+                days_ahead = 7
+            
+            if model_name not in self.models:
+                logger.info(f"Model {model_name} not available, using fallback")
+                return self._fallback_flareup_prediction(user_data)
+
             # Prepare features for the model
             features = self._prepare_flareup_features(user_data)
+            
+            if not features or len(features) == 0:
+                raise MLModelError("Failed to prepare features from user data")
+            
+            # Scale features if scaler is available
+            if "feature_scaler" in self.models:
+                try:
+                    features_scaled = self.models["feature_scaler"].transform([features])
+                except Exception as e:
+                    logger.warning(f"Feature scaling failed: {e}, using unscaled features")
+                    features_scaled = [features]
+            else:
+                features_scaled = [features]
 
             # Make prediction
-            model = self.models["flareup_predictor"]
-
-            # Get risk probability
+            model = self.models[model_name]
+            
+            # Handle different model types
             if hasattr(model, "predict_proba"):
-                risk_prob = model.predict_proba([features])[0][
-                    1
-                ]  # Probability of positive class
+                # Classification model
+                probabilities = model.predict_proba(features_scaled)[0]
+                
+                if len(probabilities) == 0:
+                    raise MLModelError("Model returned empty probabilities")
+                
+                # Assume binary classification (no flareup, flareup)
+                risk_score = float(probabilities[-1]) * 10  # Scale to 0-10
+                confidence = float(np.max(probabilities))
             else:
-                risk_score = model.predict([features])[0]
-                risk_prob = min(max(risk_score, 0.0), 1.0)  # Clamp to [0, 1]
+                # Regression model
+                prediction = model.predict(features_scaled)[0]
+                
+                if np.isnan(prediction) or np.isinf(prediction):
+                    raise MLModelError(f"Model returned invalid prediction: {prediction}")
+                
+                risk_score = float(np.clip(prediction, 0, 10))
+                confidence = 0.8
+
+            # Validate outputs
+            if not (0 <= risk_score <= 10):
+                logger.warning(f"Invalid risk score: {risk_score}, clipping to valid range")
+                risk_score = np.clip(risk_score, 0, 10)
+                
+            if not (0 <= confidence <= 1):
+                logger.warning(f"Invalid confidence value: {confidence}, setting to 0.5")
+                confidence = 0.5
+
+            risk_level = self._score_to_risk_level(risk_score)
+            
+            # Log successful prediction
+            logger.debug(f"Flareup prediction successful: {risk_level} (score: {risk_score:.2f})")
 
             return {
-                "risk_score": float(risk_prob),
-                "risk_level": self._score_to_risk_level(risk_prob),
+                "risk_score": risk_score,
+                "risk_level": risk_level,
+                "confidence": confidence,
                 "days_ahead": days_ahead,
-                "confidence": float(risk_prob)
-                if risk_prob > 0.5
-                else float(1 - risk_prob),
                 "model_version": self.model_metadata.get("model_versions", {}).get(
-                    "flareup_predictor", "unknown"
+                    model_name, "unknown"
                 ),
+                "model_status": self.model_status.get(model_name, ModelStatus.LOADED).value,
+                "prediction_timestamp": datetime.now().isoformat()
             }
 
         except Exception as e:
-            logger.error(f"Error in flareup prediction: {e}")
-            return self._fallback_flareup_prediction(user_data)
+            self._log_model_error(model_name, e, "flareup prediction")
+            logger.error(f"Flareup prediction failed: {e}")
+            
+            # Return error response with guidance for user
+            return {
+                "risk_score": None,
+                "risk_level": "unknown",
+                "confidence": 0.0,
+                "days_ahead": days_ahead,
+                "model_version": "unavailable",
+                "model_status": ModelStatus.FAILED.value,
+                "error_message": (
+                    "Risk prediction temporarily unavailable. Please try again "
+                    "later or consult with healthcare provider."
+                ),
+                "user_guidance": (
+                    "Continue monitoring symptoms and maintain your current "
+                    "management plan. Contact healthcare provider if symptoms worsen."
+                ),
+                "prediction_timestamp": datetime.now().isoformat(),
+                "retry_suggested": True
+            }
 
     def generate_recommendations(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate personalized recommendations.
+        Generate personalized recommendations with comprehensive error handling.
 
         Args:
-            user_data: Dictionary containing user features
+            user_data: Dictionary containing user profile and current state
 
         Returns:
-            Dictionary with diet and lifestyle recommendations
+            Dictionary with personalized recommendations
         """
-        if "recommendation_engine" not in self.models:
-            return self._fallback_recommendations(user_data)
-
+        model_name = "recommendation_engine"
+        
         try:
+            # Validate input data
+            required_fields = ["user_profile", "current_symptoms"]
+            if not self._validate_input_data(user_data, required_fields):
+                logger.warning("Invalid input data for recommendations, using fallback")
+                return self._fallback_recommendations(user_data)
+            
+            if model_name not in self.models:
+                logger.info(f"Model {model_name} not available, using fallback")
+                return self._fallback_recommendations(user_data)
+
             # Prepare features for the model
             features = self._prepare_recommendation_features(user_data)
-
-            # Make predictions
-            model = self.models["recommendation_engine"]
-
-            # The recommendation engine returns diet and lifestyle scores
-            predictions = model.predict([features])[0]
-
-            # Assuming the model returns [diet_score, lifestyle_score]
-            if len(predictions) >= 2:
-                diet_score = float(predictions[0])
-                lifestyle_score = float(predictions[1])
+            
+            if not features or len(features) == 0:
+                raise MLModelError("Failed to prepare features from user data")
+            
+            # Scale features if scaler is available
+            if "feature_scaler" in self.models:
+                try:
+                    features_scaled = self.models["feature_scaler"].transform([features])
+                except Exception as e:
+                    logger.warning(f"Feature scaling failed: {e}, using unscaled features")
+                    features_scaled = [features]
             else:
-                diet_score = float(predictions[0])
-                lifestyle_score = 0.5
+                features_scaled = [features]
+
+            # Make prediction
+            model = self.models[model_name]
+            prediction = model.predict(features_scaled)[0]
+            
+            if np.isnan(prediction) or np.isinf(prediction):
+                raise MLModelError(f"Model returned invalid prediction: {prediction}")
+            
+            score = float(np.clip(prediction, 0, 10))
+
+            # Generate recommendations based on score
+            dietary_recs = self._generate_diet_recommendations(score, user_data)
+            lifestyle_recs = self._generate_lifestyle_recommendations(score, user_data)
+            
+            # Calculate personalization score based on available user data
+            personalization_factors = len([k for k in user_data.get("user_profile", {}).keys() if user_data["user_profile"][k]])
+            personalization_score = min(personalization_factors * 10, 100)
+            
+            # Log successful recommendation generation
+            logger.debug(f"Recommendations generated successfully with score: {score:.2f}")
 
             return {
-                "diet_recommendations": self._generate_diet_recommendations(
-                    diet_score, user_data
-                ),
-                "lifestyle_recommendations": self._generate_lifestyle_recommendations(
-                    lifestyle_score, user_data
-                ),
-                "diet_score": diet_score,
-                "lifestyle_score": lifestyle_score,
+                "recommendations": {
+                    "dietary": dietary_recs,
+                    "lifestyle": lifestyle_recs,
+                    "immediate": [
+                        {
+                            "action": "Continue logging symptoms and food intake daily",
+                            "priority": "high",
+                            "explanation": "Consistent tracking is essential for identifying patterns",
+                            "expected_benefit": "Better symptom management and more accurate future predictions",
+                            "timeline": "Daily"
+                        }
+                    ],
+                    "supplements": []
+                },
+                "personalization_score": personalization_score,
+                "implementation_priority": ["dietary", "lifestyle", "immediate", "supplements"],
+                "expected_timeline": {
+                    "dietary": "1-2 weeks",
+                    "lifestyle": "2-4 weeks", 
+                    "immediate": "immediate",
+                    "supplements": "4-6 weeks"
+                },
                 "model_version": self.model_metadata.get("model_versions", {}).get(
-                    "recommendation_engine", "unknown"
+                    model_name, "unknown"
                 ),
+                "model_status": self.model_status.get(model_name, ModelStatus.LOADED).value,
+                "prediction_timestamp": datetime.now().isoformat()
             }
 
         except Exception as e:
-            logger.error(f"Error in recommendation generation: {e}")
-            return self._fallback_recommendations(user_data)
+            self._log_model_error(model_name, e, "recommendation generation")
+            logger.error(f"Recommendation generation failed: {e}")
+            
+            # Return error response with guidance for user
+            return {
+                "diet_recommendations": [],
+                "lifestyle_recommendations": [],
+                "immediate_actions": [],
+                "supplements": [],
+                "personalization_score": 0.0,
+                "implementation_priority": [],
+                "expected_timeline": {},
+                "model_version": "unavailable",
+                "model_status": ModelStatus.FAILED.value,
+                "error_message": (
+                    "Personalized recommendations temporarily unavailable. "
+                    "Please try again later."
+                ),
+                "user_guidance": (
+                    "Continue with your current management plan and consult "
+                    "with healthcare provider for personalized guidance."
+                ),
+                "prediction_timestamp": datetime.now().isoformat(),
+                "retry_suggested": True
+            }
 
     def _prepare_severity_features(self, user_data: Dict[str, Any]) -> List[float]:
         """Prepare features for severity classification."""
@@ -402,79 +743,45 @@ class MLModelService:
 
         return recommendations
 
-    def _fallback_severity_prediction(
-        self, user_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Fallback severity prediction when model is not available."""
-        symptoms = user_data.get("symptoms", {})
-        avg_severity = np.mean(
-            [
-                symptoms.get("abdominal_pain", 0),
-                symptoms.get("bloating", 0),
-                symptoms.get("diarrhea", 0),
-                symptoms.get("constipation", 0),
-            ]
-        )
 
-        return {
-            "severity_score": float(avg_severity / 3.0),  # Normalize to 0-1
-            "severity_level": self._score_to_severity_level(avg_severity / 3.0),
-            "confidence": 0.5,
-            "model_version": "fallback",
-        }
-
-    def _fallback_flareup_prediction(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Fallback flareup prediction when model is not available."""
-        symptoms = user_data.get("symptoms", {})
-        stress_level = symptoms.get("stress_level", 5)
-
-        # Simple heuristic: higher stress = higher flareup risk
-        risk_score = min(stress_level / 10.0, 1.0)
-
-        return {
-            "risk_score": risk_score,
-            "risk_level": self._score_to_risk_level(risk_score),
-            "days_ahead": 7,
-            "confidence": 0.5,
-            "model_version": "fallback",
-        }
-
-    def _fallback_recommendations(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Fallback recommendations when model is not available."""
-        return {
-            "diet_recommendations": [
-                {
-                    "category": "Food Tracking",
-                    "recommendation": "Keep a food diary to identify trigger foods",
-                    "priority": "medium",
-                    "rationale": "Identifying personal trigger foods is essential for managing IBS symptoms",
-                }
-            ],
-            "lifestyle_recommendations": [
-                {
-                    "category": "Stress Management",
-                    "recommendation": "Practice stress reduction techniques",
-                    "priority": "medium",
-                    "rationale": "Stress is a common trigger for IBS symptoms and should be managed",
-                }
-            ],
-            "diet_score": 0.5,
-            "lifestyle_score": 0.5,
-            "model_version": "fallback",
-        }
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Get information about loaded models."""
+        """Get information about loaded models with health status."""
         return {
-            "loaded_models": list(self.models.keys()),
-            "metadata": self.model_metadata,
-            "models_path": str(self.models_path),
-            "checkpoint_path": str(self.checkpoints_path),
+            "models_loaded": list(self.models.keys()),
+            "model_metadata": self.model_metadata,
+            "model_status": {k: v.value for k, v in self.model_status.items()},
+            "error_counts": self.error_counts,
+            "last_errors": self.last_errors,
+            "health_check": self._perform_health_check()
         }
 
+    def _perform_health_check(self) -> Dict[str, Any]:
+        """Perform a health check on all loaded models."""
+        health_status = {}
+        
+        for model_name, model in self.models.items():
+            try:
+                # Basic health check - ensure model can be called
+                if hasattr(model, 'predict'):
+                    # Create dummy data for testing
+                    dummy_features = np.array([[0.5] * 10])  # 10 features with 0.5 values
+                    _ = model.predict(dummy_features)
+                    health_status[model_name] = "healthy"
+                else:
+                    health_status[model_name] = "no_predict_method"
+            except Exception as e:
+                health_status[model_name] = f"unhealthy: {str(e)}"
+                
+        return health_status
+
     def reload_models(self):
-        """Reload models from the latest checkpoint."""
+        """Reload all models and reset error tracking."""
+        logger.info("Reloading all models...")
         self.models.clear()
         self.model_metadata.clear()
+        self.model_status.clear()
+        self.error_counts.clear()
+        self.last_errors.clear()
         self._load_latest_models()
-        logger.info("Models reloaded successfully")
+        logger.info("Model reload completed")

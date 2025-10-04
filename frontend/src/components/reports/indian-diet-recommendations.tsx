@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,12 @@ import {
   Leaf,
   Zap,
   CheckCircle,
-  Info
+  Info,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import { mlService, PersonalizedRecommendationsResponse } from '@/services/ml-service';
+import { toast } from 'react-hot-toast';
 
 interface NutritionalInfo {
   calories: number;
@@ -326,19 +330,172 @@ const MealSection: React.FC<{
   </div>
 );
 
+// Transform ML recommendations into Indian dish format
+const transformMLToIndianDishes = (mlData: PersonalizedRecommendationsResponse): MealRecommendations => {
+  const createDishFromRecommendation = (title: string, description: string, mealType: string): IndianDishRecommendation => {
+    // Map ML recommendations to Indian dishes with realistic data
+    const dishMappings: Record<string, Partial<IndianDishRecommendation>> = {
+      'fiber': {
+        name: "Oats Upma",
+        ingredients: ["Rolled oats", "Carrots", "Green beans", "Curry leaves", "Ginger", "Turmeric"],
+        nutritionalInfo: { calories: 220, protein: 8, carbs: 35, fiber: 6, fat: 5 },
+        region: "South India"
+      },
+      'protein': {
+        name: "Moong Dal Chilla",
+        ingredients: ["Yellow moong dal", "Ginger", "Green chilies", "Coriander", "Turmeric"],
+        nutritionalInfo: { calories: 180, protein: 12, carbs: 25, fiber: 5, fat: 3 },
+        region: "North India"
+      },
+      'probiotic': {
+        name: "Curd Rice",
+        ingredients: ["Basmati rice", "Fresh curd", "Curry leaves", "Ginger", "Salt"],
+        nutritionalInfo: { calories: 200, protein: 6, carbs: 38, fiber: 1, fat: 3 },
+        region: "South India"
+      },
+      'anti-inflammatory': {
+        name: "Turmeric Khichdi",
+        ingredients: ["Rice", "Moong dal", "Turmeric", "Ginger", "Ghee"],
+        nutritionalInfo: { calories: 250, protein: 10, carbs: 45, fiber: 4, fat: 4 },
+        region: "All India"
+      }
+    };
+
+    // Find best match based on title/description keywords
+    const defaultDish = dishMappings['fiber']!; // default, guaranteed to exist
+    let selectedDish = defaultDish;
+    
+    for (const [key, dish] of Object.entries(dishMappings)) {
+      if (title.toLowerCase().includes(key) || description.toLowerCase().includes(key)) {
+        selectedDish = dish;
+        break;
+      }
+    }
+
+    return {
+      name: selectedDish.name || `${title} Preparation`,
+      description: description || "Nutritious Indian dish for digestive wellness",
+      ingredients: selectedDish.ingredients || ["Traditional spices", "Fresh vegetables", "Healthy grains"],
+      nutritionalInfo: selectedDish.nutritionalInfo || { calories: 200, protein: 8, carbs: 30, fiber: 4, fat: 5 },
+      benefits: ["IBS-friendly", "Easy digestion", "Anti-inflammatory", "Nutrient-rich"],
+      preparationTime: mealType === 'snacks' ? "10 minutes" : "20 minutes",
+      difficulty: 'easy' as const,
+      ibsFriendly: true,
+      spiceLevel: 'mild' as const,
+      region: selectedDish.region || "Modern Indian"
+    };
+  };
+
+  // Create dishes from ML recommendations
+  const dishes: IndianDishRecommendation[] = [];
+  
+  mlData.dietary_recommendations?.forEach(rec => {
+    dishes.push(createDishFromRecommendation(rec.title, rec.description, 'general'));
+  });
+
+  // If we don't have enough dishes, add some defaults
+  while (dishes.length < 8) {
+    const defaultDishes = [
+      createDishFromRecommendation("High Fiber", "Supports digestive health", "breakfast"),
+      createDishFromRecommendation("Protein Rich", "Maintains muscle health", "lunch"),
+      createDishFromRecommendation("Anti-inflammatory", "Reduces gut inflammation", "dinner"),
+      createDishFromRecommendation("Probiotic", "Supports gut bacteria", "snacks")
+    ];
+    const dishToAdd = defaultDishes[dishes.length % defaultDishes.length];
+    if (dishToAdd) {
+      dishes.push(dishToAdd);
+    }
+  }
+
+  // Distribute dishes across meal types
+  return {
+    breakfast: dishes.slice(0, 2),
+    lunch: dishes.slice(2, 4),
+    dinner: dishes.slice(4, 6),
+    snacks: dishes.slice(6, 8)
+  };
+};
+
 export const IndianDietRecommendations: React.FC<IndianDietRecommendationsProps> = ({ 
   userProfile 
 }) => {
+  const [recommendations, setRecommendations] = useState<MealRecommendations>(mockRecommendations);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRecommendations = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const mlData = await mlService.getPersonalizedRecommendations();
+      const transformedRecommendations = transformMLToIndianDishes(mlData);
+      setRecommendations(transformedRecommendations);
+
+      if (isRefresh) {
+        toast.success('Indian diet recommendations refreshed!');
+      }
+    } catch (err) {
+      console.error('Error fetching Indian diet recommendations:', err);
+      setError('Failed to load recommendations');
+      // Keep using mock data as fallback
+      setRecommendations(mockRecommendations);
+      
+      if (isRefresh) {
+        toast.error('Failed to refresh recommendations');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecommendations();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card className="mb-6">
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-orange-500" />
+            <p className="text-gray-600">Generating personalized Indian diet recommendations...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mb-6">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Utensils className="h-5 w-5 text-orange-500" />
-          Personalized Indian Diet Recommendations
-        </CardTitle>
-        <p className="text-sm text-gray-600">
-          Curated meal suggestions based on your IBS profile and dietary preferences
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Utensils className="h-5 w-5 text-orange-500" />
+              Personalized Indian Diet Recommendations
+            </CardTitle>
+            <p className="text-sm text-gray-600">
+              Curated meal suggestions based on your IBS profile and dietary preferences
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchRecommendations(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </CardHeader>
       
       <CardContent>
@@ -364,25 +521,25 @@ export const IndianDietRecommendations: React.FC<IndianDietRecommendationsProps>
         {/* Meal Sections */}
         <MealSection 
           mealType="breakfast" 
-          dishes={mockRecommendations.breakfast}
+          dishes={recommendations.breakfast}
           title="Breakfast Options"
         />
         
         <MealSection 
           mealType="lunch" 
-          dishes={mockRecommendations.lunch}
+          dishes={recommendations.lunch}
           title="Lunch Recommendations"
         />
         
         <MealSection 
           mealType="dinner" 
-          dishes={mockRecommendations.dinner}
+          dishes={recommendations.dinner}
           title="Dinner Suggestions"
         />
         
         <MealSection 
           mealType="snacks" 
-          dishes={mockRecommendations.snacks}
+          dishes={recommendations.snacks}
           title="Healthy Snacks"
         />
 

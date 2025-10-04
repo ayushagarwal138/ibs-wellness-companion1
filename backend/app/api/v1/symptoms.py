@@ -10,8 +10,7 @@ from sqlalchemy import and_, func, desc, select
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user
-from app.models.user import User
-from app.models.symptom import SymptomLog, SeverityEnum, BristolStoolTypeEnum
+from app.models import User, SymptomLog, SeverityEnum, BristolStoolTypeEnum
 from app.schemas.symptom import (
     SymptomLogCreate,
     SymptomLogUpdate,

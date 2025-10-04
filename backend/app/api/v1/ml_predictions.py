@@ -16,10 +16,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.dynamic_config import get_config
-from app.models.user import User
-from app.models.symptom import SymptomLog
-from app.models.diet import DietLog
-from app.models.medication import MedicationLog
+from app.models import User, SymptomLog, DietLog, MedicationLog
 from app.services.enhanced_recommendation_service import EnhancedRecommendationService
 from app.services.dynamic_data_service import DynamicDataService
 from app.services.user_personalization_service import UserPersonalizationService
@@ -31,6 +28,20 @@ from app.schemas.ml_predictions import (
     RecommendationRequest,
     RecommendationResponse,
     ModelInfoResponse,
+    MedicationEffectivenessRequest,
+    MedicationEffectivenessResponse,
+    DietaryTriggerRequest,
+    DietaryTriggerResponse,
+    StressSymptomCorrelationRequest,
+    StressSymptomCorrelationResponse,
+    SleepQualityImpactRequest,
+    SleepQualityImpactResponse,
+    ExerciseToleranceRequest,
+    ExerciseToleranceResponse,
+    SymptomProgressionRequest,
+    SymptomProgressionResponse,
+    TreatmentResponseRequest,
+    TreatmentResponseResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -119,7 +130,7 @@ async def predict_severity(
         # Check if ML models are available
         model_info = service.get_model_info()
 
-        if not any(model_info["models_loaded"].values()):
+        if model_info["active_models"] == 0:
             # No models loaded, use fallback prediction
             symptoms = user_data.get("symptoms", {})
             avg_severity = (
@@ -167,9 +178,8 @@ async def predict_severity(
                 "severity_level", prediction.get("risk_level", "Medium")
             ),
             confidence=prediction.get("confidence", 0.6),
-            model_version=prediction.get("model_version", "fallback_rule_based"),
-            predicted_at=datetime.utcnow(),
-            factors=_extract_severity_factors(user_data, prediction),
+            contributing_factors=_extract_severity_factors(user_data, prediction),
+            recommendations=_generate_severity_recommendations(user_data, prediction),
         )
 
     except Exception as e:
@@ -191,13 +201,25 @@ async def predict_flareup(
 ):
     """Predict flareup risk for the next N days."""
     try:
+        # Extract symptoms from recent_symptoms data for user preparation
+        latest_symptoms = {}
+        if request.recent_symptoms:
+            # Get the most recent symptom entry
+            latest_entry = request.recent_symptoms[-1]
+            # Ensure latest_entry is a dictionary before calling .get()
+            if isinstance(latest_entry, dict):
+                latest_symptoms = latest_entry.get("symptoms", {})
+            else:
+                # If latest_entry is not a dict, treat it as symptoms directly
+                latest_symptoms = latest_entry if isinstance(latest_entry, dict) else {}
+        
         # Prepare user data for prediction
-        user_data = await _prepare_user_data(current_user, db, request.symptoms)
+        user_data = await _prepare_user_data(current_user, db, latest_symptoms)
 
-        # Add recent symptom trends
-        user_data["recent_symptoms"] = await _get_recent_symptom_trends(
-            current_user.id, db
-        )
+        # Add recent symptom trends from request
+        user_data["recent_symptoms"] = request.recent_symptoms
+        user_data["lifestyle_factors"] = request.lifestyle_factors
+        user_data["prediction_horizon"] = request.prediction_horizon
 
         # Get dynamic configuration
         config = get_config()
@@ -206,7 +228,7 @@ async def predict_flareup(
         if not service.ml_models:
             # Fallback prediction based on recent symptom trends using dynamic weights
             symptoms = user_data.get("symptoms", {})
-            _recent_symptoms = user_data.get("recent_symptoms", {})
+            _recent_symptoms = user_data.get("recent_symptoms", [])
 
             # Calculate risk based on symptom severity and trends
             avg_severity = (
@@ -242,7 +264,7 @@ async def predict_flareup(
             prediction = {
                 "risk_score": risk_score,
                 "risk_level": risk_level,
-                "days_ahead": request.days_ahead or 7,
+                "days_ahead": request.prediction_horizon or 7,
                 "confidence": config.ml_model.default_confidence,
                 "model_version": config.ml_model.fallback_model_version,
             }
@@ -256,15 +278,13 @@ async def predict_flareup(
         )
 
         return FlareupPredictionResponse(
-            risk_score=prediction.get(
+            flareup_probability=prediction.get(
                 "risk_score", prediction.get("risk_probability", 0.5)
             ),
-            risk_level=prediction.get("risk_level", "Medium"),
-            days_ahead=prediction.get("days_ahead", request.days_ahead or 7),
-            confidence=prediction.get("confidence", 0.6),
-            model_version=prediction.get("model_version", "fallback_rule_based"),
-            predicted_at=datetime.utcnow(),
+            risk_level=prediction.get("risk_level", "moderate"),
+            peak_risk_days=prediction.get("peak_risk_days", [3, 5, 7]),
             risk_factors=_extract_risk_factors(user_data, prediction),
+            prevention_strategies=_generate_prevention_strategies(user_data, prediction),
         )
 
     except Exception as e:
@@ -287,7 +307,7 @@ async def get_recommendations(
     """Generate personalized diet and lifestyle recommendations."""
     try:
         # Prepare user data for recommendations
-        user_data = await _prepare_user_data(current_user, db, request.symptoms)
+        user_data = await _prepare_user_data(current_user, db, request.current_symptoms)
 
         # Add dietary patterns
         user_data["diet"] = await _get_dietary_patterns(current_user.id, db)
@@ -303,12 +323,20 @@ async def get_recommendations(
         )
 
         return RecommendationResponse(
-            diet_recommendations=recommendations["diet_recommendations"],
-            lifestyle_recommendations=recommendations["lifestyle_recommendations"],
-            diet_score=recommendations["diet_score"],
-            lifestyle_score=recommendations["lifestyle_score"],
-            model_version=recommendations["model_version"],
-            generated_at=datetime.utcnow(),
+            recommendations={
+                "dietary": recommendations.get("diet_recommendations", []),
+                "lifestyle": recommendations.get("lifestyle_recommendations", []),
+                "immediate": recommendations.get("immediate_actions", []),
+                "supplements": recommendations.get("nutrition_optimization", [])
+            },
+            personalization_score=recommendations.get("personalization_score", 0.0),
+            implementation_priority=["dietary", "lifestyle", "immediate", "supplements"],
+            expected_timeline={
+                "dietary": "1-2 weeks",
+                "lifestyle": "2-4 weeks", 
+                "immediate": "immediate",
+                "supplements": "4-6 weeks"
+            }
         )
 
     except Exception as e:
@@ -593,7 +621,7 @@ async def _get_recent_symptom_trends(
     }
 
 
-async def _get_dietary_patterns(user_id: str, db: AsyncSession) -> Dict[str, Any]:
+async def _get_dietary_patterns(user_id: int, db: AsyncSession) -> Dict[str, Any]:
     """Get dietary patterns for the user."""
     # Get diet logs from the last 30 days
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
@@ -680,18 +708,510 @@ def _extract_severity_factors(
     return factors
 
 
+def _generate_severity_recommendations(
+    user_data: Dict[str, Any], prediction: Dict[str, Any]
+) -> List[str]:
+    """Generate recommendations based on severity prediction."""
+    recommendations = []
+    symptoms = user_data.get("symptoms", {})
+    severity_level = prediction.get("severity_level", "Medium")
+
+    # High stress recommendations
+    if symptoms.get("stress_level", 0) > 6:
+        recommendations.append("Practice stress management techniques")
+        recommendations.append("Consider meditation or deep breathing exercises")
+
+    # Poor sleep recommendations
+    if symptoms.get("sleep_quality", 10) < 5:
+        recommendations.append("Improve sleep hygiene")
+        recommendations.append("Maintain consistent sleep schedule")
+
+    # High severity recommendations
+    if severity_level in ["High", "Severe"] or symptoms.get("abdominal_pain", 0) > 7:
+        recommendations.append("Consult healthcare provider")
+        recommendations.append("Consider dietary modifications")
+
+    # Bloating recommendations
+    if symptoms.get("bloating", 0) > 5:
+        recommendations.append("Reduce gas-producing foods")
+        recommendations.append("Try gentle abdominal massage")
+
+    # General recommendations if none specific
+    if not recommendations:
+        recommendations.extend([
+            "Monitor symptoms regularly",
+            "Maintain food diary",
+            "Stay hydrated"
+        ])
+
+    return recommendations
+
+
+def _generate_prevention_strategies(
+    user_data: Dict[str, Any], prediction: Dict[str, Any]
+) -> List[str]:
+    """Generate prevention strategies based on user data and prediction."""
+    strategies = []
+    
+    # Risk level based strategies
+    risk_level = prediction.get("risk_level", "moderate")
+    if risk_level == "high":
+        strategies.extend([
+            "Strictly follow your prescribed diet plan",
+            "Increase stress management activities",
+            "Consider consulting your healthcare provider"
+        ])
+    elif risk_level == "moderate":
+        strategies.extend([
+            "Monitor your symptoms closely",
+            "Maintain regular meal times",
+            "Practice relaxation techniques"
+        ])
+    else:
+        strategies.extend([
+            "Continue current management routine",
+            "Keep a food and symptom diary"
+        ])
+    
+    # Lifestyle factor based strategies
+    lifestyle_factors = user_data.get("lifestyle_factors", {})
+    if lifestyle_factors.get("stress_level", 0) > 6:
+        strategies.append("Focus on stress reduction techniques")
+    if lifestyle_factors.get("sleep_quality", 0) < 5:
+        strategies.append("Improve sleep hygiene")
+    if lifestyle_factors.get("exercise_frequency", 0) < 3:
+        strategies.append("Gradually increase physical activity")
+    
+    # Recent symptoms based strategies
+    recent_symptoms = user_data.get("recent_symptoms", [])
+    if recent_symptoms:
+        # Get the latest symptom entry
+        latest_symptoms = recent_symptoms[-1] if recent_symptoms else {}
+        if isinstance(latest_symptoms, dict):
+            symptoms_data = latest_symptoms.get("symptoms", {})
+            if symptoms_data.get("abdominal_pain", 0) > 5:
+                strategies.append("Apply heat therapy for pain relief")
+            if symptoms_data.get("diarrhea", 0) > 3:
+                strategies.append("Stay hydrated and avoid trigger foods")
+            if symptoms_data.get("constipation", 0) > 3:
+                strategies.append("Increase fiber intake gradually")
+    
+    # General prevention strategies
+    strategies.extend([
+        "Take medications as prescribed",
+        "Stay consistent with meal timing",
+        "Avoid known trigger foods"
+    ])
+    
+    return list(set(strategies))  # Remove duplicates
+
+
+# New ML Prediction Endpoints
+
+@router.post("/predict/medication-effectiveness", 
+             response_model=MedicationEffectivenessResponse)
+async def predict_medication_effectiveness(
+    request: MedicationEffectivenessRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """
+    Predict medication effectiveness based on user history and current symptoms.
+    """
+    try:
+        # Prepare medication history data
+        medication_features = await _prepare_medication_effectiveness_features(
+            current_user.id, request, db
+        )
+        
+        # Use enhanced recommendation service for prediction
+        prediction = await service.predict_medication_effectiveness(
+            medication_features
+        )
+        
+        # Map service response to schema requirements
+        response_data = {
+            "effectiveness_score": prediction.get("effectiveness_score", 0.0),
+            "confidence": prediction.get("confidence", 0.0),
+            "predicted_improvement": {
+                "abdominal_pain": prediction.get("predicted_improvement", 0.3),
+                "diarrhea": prediction.get("predicted_improvement", 0.3) * 0.8,
+                "bloating": prediction.get("predicted_improvement", 0.3) * 0.9,
+                "constipation": prediction.get("predicted_improvement", 0.3) * 0.7,
+                "nausea": prediction.get("predicted_improvement", 0.3) * 0.6
+            }
+        }
+        
+        # Store prediction
+        await _store_prediction(
+            db,
+            current_user.id,
+            "medication_effectiveness",
+            prediction,
+            request.model_dump(),
+        )
+        
+        return MedicationEffectivenessResponse(**response_data)
+        
+    except Exception as e:
+        logger.error(f"Error predicting medication effectiveness: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to predict medication effectiveness"
+        )
+
+
+@router.post("/predict/dietary-triggers", response_model=DietaryTriggerResponse)
+async def predict_dietary_triggers(
+    request: DietaryTriggerRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """
+    Identify dietary triggers based on food diary and symptom correlation.
+    """
+    try:
+        # Prepare dietary analysis data
+        dietary_features = await _prepare_dietary_trigger_features(
+            current_user.id, request, db
+        )
+        
+        # Use enhanced recommendation service for analysis
+        prediction = await service.analyze_dietary_triggers(dietary_features)
+        
+        # Store prediction
+        await _store_prediction(
+            db,
+            current_user.id,
+            "dietary_triggers",
+            prediction,
+            request.model_dump(),
+        )
+        
+        return DietaryTriggerResponse(**prediction)
+        
+    except Exception as e:
+        logger.error(f"Error analyzing dietary triggers: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to analyze dietary triggers"
+        )
+
+
+@router.post("/predict/stress-symptom-correlation", 
+             response_model=StressSymptomCorrelationResponse)
+async def predict_stress_symptom_correlation(
+    request: StressSymptomCorrelationRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """
+    Analyze stress-symptom correlations and provide targeted interventions.
+    """
+    try:
+        # Prepare stress-symptom correlation data
+        correlation_features = await _prepare_stress_correlation_features(
+            current_user.id, request, db
+        )
+        
+        # Use enhanced recommendation service for analysis
+        prediction = await service.analyze_stress_symptom_correlation(
+            correlation_features
+        )
+        
+        # Store prediction
+        await _store_prediction(
+            db,
+            current_user.id,
+            "stress_symptom_correlation",
+            prediction,
+            request.model_dump(),
+        )
+        
+        return StressSymptomCorrelationResponse(**prediction)
+        
+    except Exception as e:
+        logger.error(f"Error analyzing stress-symptom correlation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to analyze stress-symptom correlation"
+        )
+
+
+@router.post("/predict/sleep-quality-impact", 
+             response_model=SleepQualityImpactResponse)
+async def predict_sleep_quality_impact(
+    request: SleepQualityImpactRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """
+    Analyze sleep quality impact on IBS symptoms and provide recommendations.
+    """
+    try:
+        # Prepare sleep analysis data
+        sleep_features = await _prepare_sleep_quality_features(
+            current_user.id, request, db
+        )
+        
+        # Use enhanced recommendation service for analysis
+        prediction = await service.analyze_sleep_quality_impact(sleep_features)
+        
+        # Store prediction
+        await _store_prediction(
+            db,
+            current_user.id,
+            "sleep_quality_impact",
+            prediction,
+            request.model_dump(),
+        )
+        
+        return SleepQualityImpactResponse(**prediction)
+        
+    except Exception as e:
+        logger.error(f"Error analyzing sleep quality impact: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to analyze sleep quality impact"
+        )
+
+
+@router.post("/predict/exercise-tolerance", 
+             response_model=ExerciseToleranceResponse)
+async def predict_exercise_tolerance(
+    request: ExerciseToleranceRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """
+    Predict exercise tolerance and provide personalized exercise recommendations.
+    """
+    try:
+        # Prepare exercise tolerance data
+        exercise_features = await _prepare_exercise_tolerance_features(
+            current_user.id, request, db
+        )
+        
+        # Use enhanced recommendation service for prediction
+        prediction = await service.predict_exercise_tolerance(exercise_features)
+        
+        # Store prediction
+        await _store_prediction(
+            db,
+            current_user.id,
+            "exercise_tolerance",
+            prediction,
+            request.model_dump(),
+        )
+        
+        return ExerciseToleranceResponse(**prediction)
+        
+    except Exception as e:
+        logger.error(f"Error predicting exercise tolerance: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to predict exercise tolerance"
+        )
+
+
+# Helper functions for new prediction types
+
+
+async def _prepare_sleep_quality_features(
+    user_id: int, request: SleepQualityImpactRequest, db: AsyncSession
+) -> dict:
+    """Prepare features for sleep quality impact analysis."""
+    # Get recent symptom logs
+    recent_symptoms = await db.execute(
+        select(SymptomLog)
+        .where(SymptomLog.user_id == user_id)
+        .order_by(SymptomLog.logged_at.desc())
+        .limit(30)
+    )
+    symptoms = recent_symptoms.scalars().all()
+    
+    return {
+        "sleep_duration": request.sleep_duration,
+        "sleep_quality": request.sleep_quality,
+        "bedtime": request.bedtime,
+        "wake_time": request.wake_time,
+        "sleep_interruptions": request.sleep_interruptions,
+        "recent_symptoms": [
+            {
+                "severity": s.severity.value,
+                "logged_at": s.logged_at.isoformat(),
+                "symptoms": s.symptoms,
+            }
+            for s in symptoms
+        ],
+        "user_id": user_id,
+    }
+
+
+async def _prepare_exercise_tolerance_features(
+    user_id: int, request: ExerciseToleranceRequest, db: AsyncSession
+) -> dict:
+    """Prepare features for exercise tolerance prediction."""
+    # Get recent symptom logs
+    recent_symptoms = await db.execute(
+        select(SymptomLog)
+        .where(SymptomLog.user_id == user_id)
+        .order_by(SymptomLog.logged_at.desc())
+        .limit(30)
+    )
+    symptoms = recent_symptoms.scalars().all()
+    
+    return {
+        "current_fitness_level": request.current_fitness_level,
+        "exercise_history": request.exercise_history,
+        "preferred_activities": request.preferred_activities,
+        "time_availability": request.time_availability,
+        "symptom_triggers": request.symptom_triggers,
+        "recent_symptoms": [
+            {
+                "severity": s.severity.value,
+                "logged_at": s.logged_at.isoformat(),
+                "symptoms": s.symptoms,
+            }
+            for s in symptoms
+        ],
+        "user_id": user_id,
+    }
+
+
+async def _prepare_medication_effectiveness_features(
+    user_id: str, request: MedicationEffectivenessRequest, db: AsyncSession
+) -> Dict[str, Any]:
+    """Prepare features for medication effectiveness prediction."""
+    # Get recent medication logs
+    result = await db.execute(
+        select(MedicationLog)
+        .where(MedicationLog.user_id == user_id)
+        .order_by(MedicationLog.taken_at.desc())
+        .limit(50)
+    )
+    medication_logs = result.scalars().all()
+    
+    return {
+        "medication_history": request.medication_history,
+        "current_symptoms": request.current_symptoms,
+        "user_profile": request.user_profile,
+        "prediction_period": request.prediction_period,
+        "recent_medication_logs": [
+            {
+                "medication": log.medication.name if log.medication else "unknown",
+                "dosage": log.dosage,
+                "taken_at": log.taken_at.isoformat(),
+                "adherence": log.adherence.value if log.adherence else "unknown"
+            }
+            for log in medication_logs
+        ]
+    }
+
+
+async def _prepare_dietary_trigger_features(
+    user_id: str, request: DietaryTriggerRequest, db: AsyncSession
+) -> Dict[str, Any]:
+    """Prepare features for dietary trigger analysis."""
+    # Get recent diet logs
+    result = await db.execute(
+        select(DietLog)
+        .where(DietLog.user_id == user_id)
+        .order_by(DietLog.logged_at.desc())
+        .limit(100)
+    )
+    diet_logs = result.scalars().all()
+    
+    return {
+        "food_diary": request.food_diary,
+        "symptom_history": request.symptom_history,
+        "user_profile": request.user_profile,
+        "analysis_period": request.analysis_period,
+        "recent_diet_logs": [
+            {
+                "food_item": log.food_item.name if log.food_item else "unknown",
+                "quantity": log.quantity,
+                "meal_type": log.meal_type.value if log.meal_type else "unknown",
+                "logged_at": log.logged_at.isoformat()
+            }
+            for log in diet_logs
+        ]
+    }
+
+
+async def _prepare_stress_correlation_features(
+    user_id: str, request: StressSymptomCorrelationRequest, db: AsyncSession
+) -> Dict[str, Any]:
+    """Prepare features for stress-symptom correlation analysis."""
+    # Get recent symptom logs
+    result = await db.execute(
+        select(SymptomLog)
+        .where(SymptomLog.user_id == user_id)
+        .order_by(SymptomLog.logged_at.desc())
+        .limit(100)
+    )
+    symptom_logs = result.scalars().all()
+    
+    return {
+        "stress_data": request.stress_data,
+        "symptom_data": request.symptom_data,
+        "lifestyle_factors": request.lifestyle_factors,
+        "analysis_period": request.analysis_period,
+        "recent_symptom_logs": [
+            {
+                "symptom": log.symptom.name if log.symptom else "unknown",
+                "severity": log.severity.value if log.severity else "unknown",
+                "logged_at": log.logged_at.isoformat(),
+                "notes": log.notes
+            }
+            for log in symptom_logs
+        ]
+    }
+
+
 def _extract_risk_factors(
     user_data: Dict[str, Any], prediction: Dict[str, Any]
 ) -> List[str]:
     """Extract factors contributing to flareup risk."""
     factors = []
     symptoms = user_data.get("symptoms", {})
-    recent_symptoms = user_data.get("recent_symptoms", {})
+    recent_symptoms = user_data.get("recent_symptoms", [])
 
-    if recent_symptoms.get("avg_severity_7d", 0) > 1.5:
-        factors.append("Increasing symptom severity trend")
+    # Calculate average severity from recent symptoms if available
+    if recent_symptoms:
+        total_severity = 0
+        count = 0
+        for symptom_entry in recent_symptoms:
+            if isinstance(symptom_entry, dict) and "symptoms" in symptom_entry:
+                entry_symptoms = symptom_entry["symptoms"]
+                if isinstance(entry_symptoms, dict):
+                    severity_sum = sum(entry_symptoms.values())
+                    total_severity += severity_sum
+                    count += len(entry_symptoms)
+        
+        if count > 0:
+            avg_severity = total_severity / count
+            if avg_severity > 5:
+                factors.append("Increasing symptom severity trend")
 
-    if recent_symptoms.get("stress_trend", 0) > 6:
+    # Check lifestyle factors for stress
+    lifestyle_factors = user_data.get("lifestyle_factors", {})
+    if lifestyle_factors.get("stress_level", 0) > 6:
         factors.append("Elevated stress levels")
 
     if symptoms.get("urgency", 0) > 2:
@@ -702,3 +1222,177 @@ def _extract_risk_factors(
         factors.append("Frequent trigger food consumption")
 
     return factors
+
+
+@router.post("/predict/symptom-progression", response_model=SymptomProgressionResponse)
+async def predict_symptom_progression(
+    request: SymptomProgressionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """Predict symptom progression over time."""
+    try:
+        # Prepare features for symptom progression forecasting
+        features = await _prepare_symptom_progression_features(
+            current_user.id, request, db
+        )
+        
+        # Get prediction from enhanced recommendation service
+        prediction = await service.forecast_symptom_progression(features)
+        
+        # Store prediction
+        await _store_prediction(
+            db, current_user.id, "symptom_progression", prediction, features
+        )
+        
+        return SymptomProgressionResponse(**prediction)
+        
+    except Exception as e:
+        logger.error(f"Error in symptom progression prediction: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate symptom progression forecast"
+        )
+
+
+@router.post("/predict/treatment-response", response_model=TreatmentResponseResponse)
+async def predict_treatment_response(
+    request: TreatmentResponseRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """Predict treatment response probability."""
+    try:
+        # Prepare features for treatment response prediction
+        features = await _prepare_treatment_response_features(
+            current_user.id, request, db
+        )
+        
+        # Get prediction from enhanced recommendation service
+        prediction = await service.predict_treatment_response(features)
+        
+        # Store prediction
+        await _store_prediction(
+            db, current_user.id, "treatment_response", prediction, features
+        )
+        
+        return TreatmentResponseResponse(**prediction)
+        
+    except Exception as e:
+        logger.error(f"Error in treatment response prediction: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate treatment response prediction"
+        )
+
+
+async def _prepare_symptom_progression_features(
+    user_id: str, request: SymptomProgressionRequest, db: AsyncSession
+) -> Dict[str, Any]:
+    """Prepare features for symptom progression forecasting."""
+    # Get recent symptom logs
+    result = await db.execute(
+        select(SymptomLog)
+        .where(SymptomLog.user_id == user_id)
+        .order_by(SymptomLog.logged_at.desc())
+        .limit(200)
+    )
+    symptom_logs = result.scalars().all()
+    
+    return {
+        "historical_symptoms": request.historical_symptoms,
+        "current_treatments": request.current_treatments,
+        "lifestyle_factors": request.lifestyle_factors,
+        "prediction_horizon": request.prediction_horizon,
+        "recent_symptom_logs": [
+            {
+                "symptom": log.symptom.name if log.symptom else "unknown",
+                "severity": log.severity.value if log.severity else "unknown",
+                "logged_at": log.logged_at.isoformat(),
+                "notes": log.notes
+            }
+            for log in symptom_logs
+        ]
+    }
+
+
+@router.post("/predict/multimodal")
+async def predict_multimodal(
+    timeframe_days: int = 30,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    service: EnhancedRecommendationService = Depends(
+        get_enhanced_recommendation_service
+    ),
+):
+    """
+    Generate comprehensive multi-modal predictions using integrated data analysis.
+    
+    This endpoint combines data from multiple sources (symptoms, diet, lifestyle, 
+    biometrics) to provide enhanced predictions and insights.
+    
+    Args:
+        timeframe_days: Number of days to analyze (default: 30)
+        
+    Returns:
+        Comprehensive multi-modal predictions and recommendations
+    """
+    try:
+        logger.info(f"Generating multi-modal predictions for user {current_user.id}")
+        
+        # Generate multi-modal predictions
+        predictions = await service.generate_multimodal_predictions(
+            user_id=current_user.id,
+            timeframe_days=timeframe_days,
+            db=db
+        )
+        
+        return {
+            "status": "success",
+            "data": predictions,
+            "message": "Multi-modal predictions generated successfully",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating multi-modal predictions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate multi-modal predictions: {str(e)}"
+        )
+
+
+async def _prepare_treatment_response_features(
+    user_id: str, request: TreatmentResponseRequest, db: AsyncSession
+) -> Dict[str, Any]:
+    """Prepare features for treatment response prediction."""
+    # Get recent medication logs
+    result = await db.execute(
+        select(MedicationLog)
+        .where(MedicationLog.user_id == user_id)
+        .order_by(MedicationLog.logged_at.desc())
+        .limit(100)
+    )
+    medication_logs = result.scalars().all()
+    
+    return {
+        "treatment_type": request.treatment_type,
+        "treatment_details": request.treatment_details,
+        "patient_profile": request.patient_profile,
+        "historical_responses": request.historical_responses,
+        "recent_medication_logs": [
+            {
+                "medication": log.medication.name if log.medication else "unknown",
+                "dosage": log.dosage,
+                "logged_at": log.logged_at.isoformat(),
+                "notes": log.notes
+            }
+            for log in medication_logs
+        ]
+    }

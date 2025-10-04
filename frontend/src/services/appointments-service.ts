@@ -1,6 +1,6 @@
 'use client';
 
-const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+import { API_CONFIG } from '@/lib/config';
 
 export enum AppointmentType {
   CONSULTATION = 'consultation',
@@ -168,7 +168,7 @@ class AppointmentsService {
         ...(upcoming !== undefined && { upcoming: upcoming.toString() })
       });
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/?${params}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/?${params}`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -198,7 +198,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/${appointmentId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/${appointmentId}`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -228,7 +228,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(appointment),
@@ -258,7 +258,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/${appointmentId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/${appointmentId}`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(updates),
@@ -288,7 +288,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/${appointmentId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/${appointmentId}`, {
         method: 'DELETE',
         headers: this.getAuthHeaders(),
       });
@@ -313,7 +313,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/summary`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/summary`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -343,7 +343,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/${appointmentId}/result`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/${appointmentId}/result`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(result),
@@ -373,7 +373,7 @@ class AppointmentsService {
     const startTime = performance.now();
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/stats`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/appointments/stats`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });

@@ -109,21 +109,27 @@ class MLIntegrationValidator:
             
             if response.status_code == 200:
                 models_info = response.json()
-                model_count = len(models_info.get("models", []))
-                logger.info(f"✅ ML models loaded: {model_count} models available")
+                models_loaded = models_info.get("models_loaded", 0)
+                logger.info(f"✅ ML models loaded: {models_loaded} models available")
                 
-                # Check for required models
-                required_models = ["severity_model", "flareup_model", "recommendation_model"]
-                available_models = list(models_info.get("models_loaded", {}).keys())
+                # Check for required features instead of specific model names
+                required_features = ["severity_prediction", "flareup_risk_assessment", "personalized_recommendations"]
+                supported_features = models_info.get("supported_features", [])
                 
-                missing_models = [model for model in required_models if model not in available_models]
-                if missing_models:
-                    raise Exception(f"Missing required models: {missing_models}")
+                missing_features = [feature for feature in required_features if feature not in supported_features]
+                if missing_features:
+                    raise Exception(f"Missing required features: {missing_features}")
+                
+                # Verify model info structure
+                required_fields = ["model_name", "model_version", "accuracy_metrics", "supported_features"]
+                missing_fields = [field for field in required_fields if field not in models_info]
+                if missing_fields:
+                    raise Exception(f"Missing required fields in model info: {missing_fields}")
                 
                 self.test_results.append({
                     "test": "ml_models_loaded",
                     "status": "PASS",
-                    "message": f"{model_count} ML models loaded successfully",
+                    "message": f"ML models loaded successfully with {len(supported_features)} features",
                     "details": models_info
                 })
             else:

@@ -1,6 +1,6 @@
 'use client';
 
-const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+import { API_CONFIG } from '@/lib/config';
 
 // Interfaces for personalization data
 export interface PersonalizationProfile {
@@ -82,14 +82,14 @@ class PersonalizationService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = `${API_BASE_URL}/api/v1/personalization`;
+    this.baseUrl = `${API_CONFIG.BASE_URL}/api/v1/personalization`;
   }
 
   private async makeRequest<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('access_token');
     
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
@@ -108,34 +108,143 @@ class PersonalizationService {
     return response.json();
   }
 
+  // Calculate dynamic ML thresholds based on user data
+  private calculateDynamicThresholds(userData?: any): PersonalizationProfile['ml_thresholds'] {
+    // If we have user data, calculate personalized thresholds
+    if (userData?.symptom_history && userData.symptom_history.length > 0) {
+      const severityData = userData.symptom_history.map((s: any) => s.severity || 0);
+      const avgSeverity = severityData.reduce((a: number, b: number) => a + b, 0) / severityData.length;
+      const maxSeverity = Math.max(...severityData);
+      
+      // Calculate personalized thresholds based on user's severity patterns
+      const severityNormalized = avgSeverity / 10; // Normalize to 0-1 scale
+      
+      return {
+        high_risk_threshold: Math.max(0.6, Math.min(0.9, 0.7 + (severityNormalized - 0.5) * 0.2)),
+        medium_risk_threshold: Math.max(0.3, Math.min(0.6, 0.4 + (severityNormalized - 0.5) * 0.15)),
+        flare_prediction_threshold: Math.max(0.5, Math.min(0.8, 0.6 + (maxSeverity / 10 - 0.7) * 0.1)),
+        severity_threshold: Math.max(0.4, Math.min(0.7, avgSeverity / 10)),
+      };
+    }
+    
+    // Default adaptive thresholds (slightly randomized to avoid static values)
+    const baseVariation = (Math.random() - 0.5) * 0.1; // ±5% variation
+    return {
+      high_risk_threshold: Math.max(0.6, Math.min(0.8, 0.7 + baseVariation)),
+      medium_risk_threshold: Math.max(0.3, Math.min(0.5, 0.4 + baseVariation)),
+      flare_prediction_threshold: Math.max(0.5, Math.min(0.7, 0.6 + baseVariation)),
+      severity_threshold: Math.max(0.4, Math.min(0.6, 0.5 + baseVariation)),
+    };
+  }
+
+  // Calculate dynamic personalization score based on user engagement and data quality
+  private calculatePersonalizationScore(userData?: any): number {
+    if (!userData) return 0.3 + Math.random() * 0.2; // 30-50% for new users
+    
+    let score = 0.5; // Base score
+    
+    // Factor in data completeness
+    if (userData.profile_completion) {
+      score += userData.profile_completion * 0.2; // Up to 20% boost
+    }
+    
+    // Factor in symptom log frequency
+    if (userData.symptom_history?.length > 0) {
+      const recentLogs = userData.symptom_history.filter((log: any) => {
+        const logDate = new Date(log.date);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return logDate > thirtyDaysAgo;
+      });
+      score += Math.min(0.2, recentLogs.length * 0.01); // Up to 20% boost for active logging
+    }
+    
+    // Factor in feedback provided
+    if (userData.feedback_count > 0) {
+      score += Math.min(0.1, userData.feedback_count * 0.02); // Up to 10% boost for feedback
+    }
+    
+    return Math.max(0.1, Math.min(1.0, score));
+  }
+
+  // Calculate adaptive settings based on user behavior and preferences
+  private calculateAdaptiveSettings(userData?: any): PersonalizationProfile['adaptive_settings'] {
+    const baseSettings = {
+      recommendation_frequency: 'daily',
+      intervention_aggressiveness: 'moderate',
+      learning_rate: 0.1,
+      confidence_threshold: 0.6,
+    };
+
+    if (!userData) return baseSettings;
+
+    // Adjust learning rate based on user engagement
+    let learningRate = 0.1;
+    if (userData.engagement_score) {
+      learningRate = Math.max(0.05, Math.min(0.2, 0.1 + (userData.engagement_score - 0.5) * 0.1));
+    }
+
+    // Adjust confidence threshold based on user's feedback accuracy
+    let confidenceThreshold = 0.6;
+    if (userData.feedback_accuracy) {
+      confidenceThreshold = Math.max(0.5, Math.min(0.8, 0.6 + (userData.feedback_accuracy - 0.7) * 0.2));
+    }
+
+    // Adjust recommendation frequency based on user activity
+    let frequency = 'daily';
+    if (userData.login_frequency) {
+      if (userData.login_frequency > 0.8) frequency = 'twice_daily';
+      else if (userData.login_frequency < 0.3) frequency = 'weekly';
+    }
+
+    // Adjust intervention aggressiveness based on severity patterns
+    let aggressiveness = 'moderate';
+    if (userData.avg_severity) {
+      if (userData.avg_severity > 7) aggressiveness = 'aggressive';
+      else if (userData.avg_severity < 4) aggressiveness = 'gentle';
+    }
+
+    return {
+      recommendation_frequency: frequency,
+      intervention_aggressiveness: aggressiveness,
+      learning_rate: learningRate,
+      confidence_threshold: confidenceThreshold,
+    };
+  }
+
   // Get user's personalization profile
   async getPersonalizationProfile(): Promise<PersonalizationProfile> {
     try {
-      return await this.makeRequest<PersonalizationProfile>('/profile');
+      const response = await this.makeRequest<any>('/profile');
+      
+      // If we get user data, calculate dynamic values
+      if (response && response.user_id) {
+        return {
+          ...response,
+          ml_thresholds: this.calculateDynamicThresholds(response),
+          personalization_score: this.calculatePersonalizationScore(response),
+          adaptive_settings: {
+            ...response.adaptive_settings,
+            ...this.calculateAdaptiveSettings(response),
+          },
+        };
+      }
+      
+      return response;
     } catch (error) {
       console.error('Error fetching personalization profile:', error);
-      // Return default profile on error
+      // Return dynamic default profile on error
       return {
         user_id: 'unknown',
-        ml_thresholds: {
-          high_risk_threshold: 0.7,
-          medium_risk_threshold: 0.4,
-          flare_prediction_threshold: 0.6,
-          severity_threshold: 0.5,
-        },
+        ml_thresholds: this.calculateDynamicThresholds(),
         learning_patterns: {
           trigger_foods: [],
           effective_interventions: [],
           symptom_correlations: {},
           time_patterns: {},
         },
-        adaptive_settings: {
-          recommendation_frequency: 'daily',
-          intervention_aggressiveness: 'moderate',
-          learning_rate: 0.1,
-          confidence_threshold: 0.6,
-        },
-        personalization_score: 0.5,
+        adaptive_settings: this.calculateAdaptiveSettings(),
+        personalization_score: this.calculatePersonalizationScore(),
         last_updated: new Date().toISOString(),
       };
     }

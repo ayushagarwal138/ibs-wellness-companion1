@@ -269,12 +269,15 @@ async def get_symptoms(
         logger.info(f"Retrieving available symptoms for user {current_user.id}")
 
         # Query symptoms
-        result = await db.execute(select(Symptom).where(Symptom.is_active is True))
+        logger.info("Executing symptom query...")
+        result = await db.execute(select(Symptom).where(Symptom.is_active == True))
         symptoms = result.scalars().all()
+        logger.info(f"Query executed, found {len(symptoms)} symptoms")
 
         # Create response
         response_data = []
         for symptom in symptoms:
+            logger.info(f"Processing symptom: {symptom.id} - {symptom.name}")
             response_data.append(
                 SymptomResponse(
                     id=symptom.id,
@@ -403,9 +406,11 @@ async def get_symptom_stats_summary(
                 data=SymptomStats(
                     total_logs=0,
                     average_severity=0.0,
-                    most_common_symptom="None",
-                    symptoms_by_type={},
-                    symptoms_by_severity={"mild": 0, "moderate": 0, "severe": 0},
+                    most_common_symptoms=[],
+                    severity_distribution={"mild": 0, "moderate": 0, "severe": 0},
+                    bristol_distribution={},
+                    pain_locations={},
+                    weekly_trends={},
                 ),
             )
 
@@ -415,8 +420,12 @@ async def get_symptom_stats_summary(
         severity_values = {"mild": 1, "moderate": 2, "severe": 3}
         total_severity = 0
         symptom_counts = {}
-        symptom_type_counts = {}
-
+        bristol_counts = {}
+        pain_location_counts = {}
+        
+        # Weekly trends calculation
+        weekly_data = {}
+        
         for log, symptom in logs:
             severity = log.severity.value
             severity_counts[severity] += 1
@@ -424,27 +433,40 @@ async def get_symptom_stats_summary(
 
             symptom_name = symptom.name
             symptom_counts[symptom_name] = symptom_counts.get(symptom_name, 0) + 1
-
-            # Group by symptom category/type
-            symptom_category = symptom.category
-            symptom_type_counts[symptom_category] = (
-                symptom_type_counts.get(symptom_category, 0) + 1
-            )
+            
+            # Bristol stool type distribution
+            if log.bristol_stool_type:
+                bristol_type = log.bristol_stool_type.value
+                bristol_counts[bristol_type] = bristol_counts.get(bristol_type, 0) + 1
+            
+            # Pain location distribution
+            if log.pain_location:
+                location = log.pain_location
+                pain_location_counts[location] = pain_location_counts.get(location, 0) + 1
+            
+            # Weekly trends (group by week)
+            week_key = log.logged_at.strftime("%Y-W%U")
+            if week_key not in weekly_data:
+                weekly_data[week_key] = 0
+            weekly_data[week_key] += 1
 
         # Calculate average severity
         average_severity = total_severity / total_logs if total_logs > 0 else 0.0
 
-        # Find most common symptom
-        most_common_symptom = (
-            max(symptom_counts, key=symptom_counts.get) if symptom_counts else "None"
-        )
+        # Find most common symptoms (top 3)
+        sorted_symptoms = sorted(
+            symptom_counts.items(), key=lambda x: x[1], reverse=True
+        )[:3]
+        most_common_symptoms = [symptom[0] for symptom in sorted_symptoms]
 
         stats = SymptomStats(
             total_logs=total_logs,
             average_severity=round(average_severity, 2),
-            most_common_symptom=most_common_symptom,
-            symptoms_by_type=symptom_type_counts,
-            symptoms_by_severity=severity_counts,
+            most_common_symptoms=most_common_symptoms,
+            severity_distribution=severity_counts,
+            bristol_distribution=bristol_counts,
+            pain_locations=pain_location_counts,
+            weekly_trends=weekly_data,
         )
 
         return StandardResponse(

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiService, type SymptomStats as ApiSymptomStats } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 import { toast } from 'react-hot-toast';
 import {
   Chart as ChartJS,
@@ -15,6 +16,7 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  Filler,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 
@@ -27,30 +29,50 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  Filler
 );
 
 export default function SymptomStats() {
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<ApiSymptomStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30'); // days
 
   const fetchStats = React.useCallback(async () => {
+    // Only fetch if user is authenticated
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await apiService.getSymptomStats(parseInt(dateRange));
       setStats(response);
     } catch (error) {
       console.error('Error fetching symptom stats:', error);
-      toast.error('Failed to load symptom statistics');
+      
+      // Check if it's an authentication error
+      if (error instanceof Error && error.message.includes('403')) {
+        toast.error('Please log in to view symptom statistics');
+      } else {
+        toast.error('Failed to load symptom statistics');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange]);
+  }, [dateRange, user]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    // Only fetch when auth is complete and user is authenticated
+    if (!authLoading && user) {
+      fetchStats();
+    } else if (!authLoading && !user) {
+      // User is not authenticated, stop loading
+      setIsLoading(false);
+    }
+  }, [fetchStats, authLoading, user]);
 
   if (isLoading) {
     return (
@@ -66,6 +88,17 @@ export default function SymptomStats() {
           </Card>
         ))}
       </div>
+    );
+  }
+
+  // Show authentication message if user is not logged in
+  if (!authLoading && !user) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-center text-gray-500">Please log in to view symptom statistics</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -161,6 +194,9 @@ export default function SymptomStats() {
       legend: {
         position: 'top' as const,
       },
+      filler: {
+        propagate: true,
+      },
     },
     scales: {
       y: {
@@ -174,6 +210,28 @@ export default function SymptomStats() {
     plugins: {
       legend: {
         position: 'bottom' as const,
+      },
+    },
+  };
+
+  const lineChartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      filler: {
+        propagate: true,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+    elements: {
+      line: {
+        tension: 0.4,
       },
     },
   };
@@ -279,7 +337,7 @@ export default function SymptomStats() {
             <CardTitle>Weekly Trends</CardTitle>
           </CardHeader>
           <CardContent>
-            <Line data={weeklyTrendsData} options={chartOptions} />
+            <Line data={weeklyTrendsData} options={lineChartOptions} />
           </CardContent>
         </Card>
       </div>

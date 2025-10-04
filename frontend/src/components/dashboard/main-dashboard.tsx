@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 import SymptomStats from './symptom-stats';
 import DietStats from './diet-stats';
 import { dashboardAnalyticsService, DashboardAnalytics } from '@/services/dashboard-analytics-service';
@@ -16,6 +17,7 @@ export default function MainDashboard() {
   const [activeView, setActiveView] = useState<DashboardView>('overview');
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     // Only load analytics when auth is complete and user is authenticated
@@ -24,9 +26,40 @@ export default function MainDashboard() {
     }
   }, [authLoading, user]);
 
-  const loadDashboardAnalytics = async () => {
+  // Add event listeners for window focus and visibility change to refresh data
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!authLoading && user) {
+        console.log('Window focused, refreshing dashboard data...');
+        loadDashboardAnalytics();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !authLoading && user) {
+        console.log('Page became visible, refreshing dashboard data...');
+        loadDashboardAnalytics();
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [authLoading, user]);
+
+  const loadDashboardAnalytics = async (isManualRefresh = false) => {
     try {
-      setIsLoading(true);
+      if (isManualRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       console.log('Loading dashboard analytics for user:', user?.email);
       const dashboardData = await dashboardAnalyticsService.getDashboardAnalytics();
       setAnalytics(dashboardData);
@@ -46,7 +79,12 @@ export default function MainDashboard() {
       });
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleManualRefresh = () => {
+    loadDashboardAnalytics(true);
   };
 
   // Show loading state while auth is loading or data is loading
@@ -262,38 +300,52 @@ export default function MainDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Navigation Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-        <button
-          onClick={() => setActiveView('overview')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeView === 'overview'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+      {/* Navigation Tabs with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg flex-1 mr-4">
+          <button
+            onClick={() => setActiveView('overview')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeView === 'overview'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveView('symptoms')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeView === 'symptoms'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Symptoms
+          </button>
+          <button
+            onClick={() => setActiveView('diet')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeView === 'diet'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Diet
+          </button>
+        </div>
+        
+        {/* Refresh Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-2"
         >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveView('symptoms')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeView === 'symptoms'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Symptoms
-        </button>
-        <button
-          onClick={() => setActiveView('diet')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeView === 'diet'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Diet
-        </button>
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
       </div>
 
       {/* Content */}

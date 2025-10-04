@@ -5,8 +5,8 @@ database-driven dynamic content.
 """
 
 from typing import Dict, List, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, select
 from datetime import datetime, timedelta
 import logging
 
@@ -21,21 +21,22 @@ logger = logging.getLogger(__name__)
 class DynamicDataService:
     """Service for managing dynamic data instead of hardcoded values."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.config = get_config()
 
-    def get_fodmap_foods(
+    async def get_fodmap_foods(
         self, fodmap_level: FODMAPLevelEnum = None
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Get FODMAP foods from database instead of hardcoded lists."""
         try:
-            query = self.db.query(Food)
+            query = select(Food)
 
             if fodmap_level:
                 query = query.filter(Food.fodmap_level == fodmap_level)
 
-            foods = query.all()
+            result = await self.db.execute(query)
+            foods = result.scalars().all()
 
             # Group foods by FODMAP level and category
             fodmap_data = {
@@ -65,7 +66,7 @@ class DynamicDataService:
                     fodmap_data["low_fodmap"].append(food_data)
 
             # Get alternatives mapping
-            fodmap_data["alternatives"] = self._get_food_alternatives()
+            fodmap_data["alternatives"] = await self._get_food_alternatives()
 
             return fodmap_data
 
@@ -73,31 +74,26 @@ class DynamicDataService:
             logger.error(f"Error fetching FODMAP foods: {e}")
             return self._get_fallback_fodmap_data()
 
-    def _get_food_alternatives(self) -> Dict[str, List[str]]:
+    async def _get_food_alternatives(self) -> Dict[str, List[str]]:
         """Get food alternatives mapping from database."""
         try:
             # Query for low FODMAP alternatives to high FODMAP foods
-            high_fodmap_foods = (
-                self.db.query(Food)
-                .filter(Food.fodmap_level == FODMAPLevelEnum.HIGH)
-                .all()
-            )
+            high_query = select(Food).filter(Food.fodmap_level == FODMAPLevelEnum.HIGH)
+            high_result = await self.db.execute(high_query)
+            high_fodmap_foods = high_result.scalars().all()
 
             alternatives = {}
 
             for high_food in high_fodmap_foods:
                 # Find low FODMAP foods in the same category
-                low_alternatives = (
-                    self.db.query(Food)
-                    .filter(
-                        and_(
-                            Food.category == high_food.category,
-                            Food.fodmap_level == FODMAPLevelEnum.LOW,
-                        )
+                low_query = select(Food).filter(
+                    and_(
+                        Food.category == high_food.category,
+                        Food.fodmap_level == FODMAPLevelEnum.LOW,
                     )
-                    .limit(3)
-                    .all()
-                )
+                ).limit(3)
+                low_result = await self.db.execute(low_query)
+                low_alternatives = low_result.scalars().all()
 
                 if low_alternatives:
                     alternatives[high_food.name] = [
@@ -110,16 +106,18 @@ class DynamicDataService:
             logger.error(f"Error fetching food alternatives: {e}")
             return {}
 
-    def get_personalized_nutrition_guidelines(self, user_id: int) -> Dict[str, Any]:
+    async def get_personalized_nutrition_guidelines(self, user_id: int) -> Dict[str, Any]:
         """Get personalized nutrition guidelines based on user data and history."""
         try:
-            user = self.db.query(User).filter(User.id == user_id).first()
+            user_query = select(User).filter(User.id == user_id)
+            user_result = await self.db.execute(user_query)
+            user = user_result.scalar_one_or_none()
             if not user:
                 return self._get_default_nutrition_guidelines()
 
             # Get user's symptom and diet history for personalization
-            recent_symptoms = self._get_recent_symptoms(user_id, days=30)
-            diet_patterns = self._get_diet_patterns(user_id, days=30)
+            recent_symptoms = await self._get_recent_symptoms(user_id, days=30)
+            diet_patterns = await self._get_diet_patterns(user_id, days=30)
 
             # Base nutrition targets from config
             base_targets = self.config.get_nutrition_targets(user.weight)
@@ -145,25 +143,23 @@ class DynamicDataService:
             logger.error(f"Error getting personalized nutrition guidelines: {e}")
             return self._get_default_nutrition_guidelines()
 
-    def _get_recent_symptoms(self, user_id: int, days: int = 30) -> List[SymptomLog]:
+    async def _get_recent_symptoms(self, user_id: int, days: int = 30) -> List[SymptomLog]:
         """Get recent symptom logs for a user."""
         cutoff_date = datetime.utcnow() - timedelta(days=days)
-        return (
-            self.db.query(SymptomLog)
-            .filter(
-                and_(SymptomLog.user_id == user_id, SymptomLog.logged_at >= cutoff_date)
-            )
-            .all()
+        query = select(SymptomLog).filter(
+            and_(SymptomLog.user_id == user_id, SymptomLog.logged_at >= cutoff_date)
         )
+        result = await self.db.execute(query)
+        return result.scalars().all()
 
-    def _get_diet_patterns(self, user_id: int, days: int = 30) -> List[DietLog]:
+    async def _get_diet_patterns(self, user_id: int, days: int = 30) -> List[DietLog]:
         """Get recent diet patterns for a user."""
         cutoff_date = datetime.utcnow() - timedelta(days=days)
-        return (
-            self.db.query(DietLog)
-            .filter(and_(DietLog.user_id == user_id, DietLog.logged_at >= cutoff_date))
-            .all()
+        query = select(DietLog).filter(
+            and_(DietLog.user_id == user_id, DietLog.consumed_at >= cutoff_date)
         )
+        result = await self.db.execute(query)
+        return result.scalars().all()
 
     def _personalize_nutrition_targets(
         self,
@@ -295,10 +291,12 @@ class DynamicDataService:
 
         return supplements
 
-    def _calculate_personalization_score(self, user_id: int) -> float:
+    async def _calculate_personalization_score(self, user_id: int) -> float:
         """Calculate how personalized the recommendations can be based on available data."""
         try:
-            user = self.db.query(User).filter(User.id == user_id).first()
+            user_query = select(User).filter(User.id == user_id)
+            user_result = await self.db.execute(user_query)
+            user = user_result.scalar_one_or_none()
             if not user:
                 return 0.0
 
@@ -320,35 +318,33 @@ class DynamicDataService:
             score += profile_score
 
             # Symptom tracking history (25 points)
-            symptom_count = (
-                self.db.query(SymptomLog).filter(SymptomLog.user_id == user_id).count()
-            )
+            symptom_query = select(func.count()).select_from(SymptomLog).filter(SymptomLog.user_id == user_id)
+            symptom_result = await self.db.execute(symptom_query)
+            symptom_count = symptom_result.scalar()
             symptom_score = min(25, symptom_count * 2.5)
             score += symptom_score
 
             # Diet tracking history (20 points)
-            diet_count = (
-                self.db.query(DietLog).filter(DietLog.user_id == user_id).count()
-            )
+            diet_query = select(func.count()).select_from(DietLog).filter(DietLog.user_id == user_id)
+            diet_result = await self.db.execute(diet_query)
+            diet_count = diet_result.scalar()
             diet_score = min(20, diet_count * 2)
             score += diet_score
 
             # Recent activity (15 points)
-            recent_logs = (
-                self.db.query(SymptomLog)
-                .filter(
-                    and_(
-                        SymptomLog.user_id == user_id,
-                        SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=7),
-                    )
+            recent_query = select(func.count()).select_from(SymptomLog).filter(
+                and_(
+                    SymptomLog.user_id == user_id,
+                    SymptomLog.logged_at >= datetime.utcnow() - timedelta(days=7),
                 )
-                .count()
             )
+            recent_result = await self.db.execute(recent_query)
+            recent_logs = recent_result.scalar()
             recent_score = min(15, recent_logs * 3)
             score += recent_score
 
             # Data consistency (10 points)
-            consistency_score = self._calculate_data_consistency(user_id)
+            consistency_score = await self._calculate_data_consistency(user_id)
             score += consistency_score
 
             return min(score, max_score)
@@ -357,24 +353,21 @@ class DynamicDataService:
             logger.error(f"Error calculating personalization score: {e}")
             return 0.0
 
-    def _calculate_data_consistency(self, user_id: int) -> float:
+    async def _calculate_data_consistency(self, user_id: int) -> float:
         """Calculate data consistency score."""
         try:
             # Check if user has been logging consistently
             recent_days = 14
             cutoff_date = datetime.utcnow() - timedelta(days=recent_days)
 
-            days_with_logs = (
-                self.db.query(func.date(SymptomLog.logged_at))
-                .filter(
-                    and_(
-                        SymptomLog.user_id == user_id,
-                        SymptomLog.logged_at >= cutoff_date,
-                    )
+            days_query = select(func.date(SymptomLog.logged_at)).filter(
+                and_(
+                    SymptomLog.user_id == user_id,
+                    SymptomLog.logged_at >= cutoff_date,
                 )
-                .distinct()
-                .count()
-            )
+            ).distinct()
+            days_result = await self.db.execute(days_query)
+            days_with_logs = len(days_result.fetchall())
 
             consistency_ratio = days_with_logs / recent_days
             return consistency_ratio * 10  # Max 10 points
@@ -424,17 +417,19 @@ class DynamicDataService:
             },
         }
 
-    def get_dynamic_recommendations(
+    async def get_dynamic_recommendations(
         self, user_id: int, risk_level: RiskLevel
     ) -> List[Dict[str, Any]]:
         """Generate dynamic recommendations based on user data and risk level."""
         try:
-            user = self.db.query(User).filter(User.id == user_id).first()
+            user_query = select(User).filter(User.id == user_id)
+            user_result = await self.db.execute(user_query)
+            user = user_result.scalar_one_or_none()
             if not user:
                 return self._get_fallback_recommendations(risk_level)
 
-            recent_symptoms = self._get_recent_symptoms(user_id, days=7)
-            diet_patterns = self._get_diet_patterns(user_id, days=14)
+            recent_symptoms = await self._get_recent_symptoms(user_id, days=7)
+            diet_patterns = await self._get_diet_patterns(user_id, days=14)
 
             recommendations = []
 
@@ -453,7 +448,7 @@ class DynamicDataService:
                 )
 
             # Add diet-specific recommendations
-            recommendations.extend(self._get_diet_recommendations(user, diet_patterns))
+            recommendations.extend(await self._get_diet_recommendations(user, diet_patterns))
 
             # Limit recommendations based on config
             max_recommendations = (
@@ -546,7 +541,7 @@ class DynamicDataService:
             }
         ]
 
-    def _get_diet_recommendations(
+    async def _get_diet_recommendations(
         self, user: User, diet_patterns: List[DietLog]
     ) -> List[Dict[str, Any]]:
         """Get diet-specific recommendations based on patterns."""
@@ -566,7 +561,9 @@ class DynamicDataService:
                 )[:5]
                 food_ids = [food_id for food_id, _ in frequent_foods]
 
-                foods = self.db.query(Food).filter(Food.id.in_(food_ids)).all()
+                foods_query = select(Food).filter(Food.id.in_(food_ids))
+                foods_result = await self.db.execute(foods_query)
+                foods = foods_result.scalars().all()
                 high_fodmap_foods = [
                     f for f in foods if f.fodmap_level == FODMAPLevelEnum.HIGH
                 ]

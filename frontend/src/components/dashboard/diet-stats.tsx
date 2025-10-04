@@ -1,42 +1,32 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { apiService } from '@/lib/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Doughnut, Bar } from 'react-chartjs-2';
 import { toast } from 'react-hot-toast';
+import { UI_CONFIG } from '@/lib/config';
+import { dietService, DietStats } from '@/services/diet-service';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
-  LineElement,
-  PointElement,
   Title,
   Tooltip,
   Legend,
   ArcElement,
 } from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
-  LineElement,
-  PointElement,
   Title,
   Tooltip,
   Legend,
   ArcElement
 );
-
-interface DietStats {
-  total_meals_logged: number;
-  meals_by_type: { [key: string]: number };
-  average_daily_calories?: number;
-  mood_correlation: { [key: string]: number };
-  most_consumed_foods: string[];
-}
 
 export default function DietStats() {
   const [stats, setStats] = useState<DietStats | null>(null);
@@ -50,29 +40,31 @@ export default function DietStats() {
   const fetchStats = async () => {
     setIsLoading(true);
     try {
-      // Mock data for now since the API endpoint might not be fully implemented
-      const mockStats: DietStats = {
-        total_meals_logged: 45,
-        meals_by_type: {
-          breakfast: 15,
-          lunch: 12,
-          dinner: 13,
-          snack: 5
-        },
-        average_daily_calories: 1850,
-        mood_correlation: {
-          'Before Eating': 6.2,
-          'After Eating': 7.1
-        },
-        most_consumed_foods: ['Rice', 'Chicken', 'Vegetables', 'Bread', 'Fruits']
+      const days = parseInt(dateRange);
+      const dietStats = await dietService.getDietStats(days);
+      
+      // Transform the data to match the expected format
+      const transformedStats: DietStats = {
+        total_meals_logged: dietStats.total_meals_logged,
+        meals_by_type: dietStats.meals_by_type,
+        average_daily_calories: dietStats.average_daily_calories,
+        mood_correlation: dietStats.mood_correlation,
+        most_consumed_foods: dietStats.most_consumed_foods
       };
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setStats(mockStats);
+      setStats(transformedStats);
     } catch (error) {
       console.error('Error fetching diet stats:', error);
       toast.error('Failed to load diet statistics');
+      
+      // Fallback to empty data structure instead of mock data
+      setStats({
+        total_meals_logged: 0,
+        meals_by_type: {},
+        average_daily_calories: 0,
+        mood_correlation: {},
+        most_consumed_foods: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -106,40 +98,56 @@ export default function DietStats() {
   }
 
   // Meals by Type Chart
+  const mealTypes = Object.keys(stats.meals_by_type || {});
+  const hasMealData = mealTypes.length > 0;
+  
   const mealsChartData = {
-    labels: Object.keys(stats.meals_by_type).map(key => 
-      key.charAt(0).toUpperCase() + key.slice(1)
-    ),
+    labels: hasMealData 
+      ? mealTypes.map(key => key.charAt(0).toUpperCase() + key.slice(1))
+      : ['No Data'],
     datasets: [
       {
         label: 'Number of Meals',
-        data: Object.values(stats.meals_by_type),
-        backgroundColor: [
+        data: hasMealData 
+          ? Object.values(stats.meals_by_type)
+          : [0],
+        backgroundColor: hasMealData ? [
           'rgba(255, 206, 84, 0.8)',   // Yellow for breakfast
           'rgba(54, 162, 235, 0.8)',   // Blue for lunch
           'rgba(255, 99, 132, 0.8)',   // Red for dinner
           'rgba(75, 192, 192, 0.8)',   // Teal for snack
-        ],
-        borderColor: [
+        ] : ['rgba(200, 200, 200, 0.8)'],
+        borderColor: hasMealData ? [
           'rgba(255, 206, 84, 1)',
           'rgba(54, 162, 235, 1)',
           'rgba(255, 99, 132, 1)',
           'rgba(75, 192, 192, 1)',
-        ],
+        ] : ['rgba(200, 200, 200, 1)'],
         borderWidth: 1,
       },
     ],
   };
 
   // Mood Correlation Chart
+  const moodKeys = Object.keys(stats.mood_correlation || {});
+  const hasMoodData = moodKeys.length > 0;
+  
   const moodChartData = {
-    labels: Object.keys(stats.mood_correlation),
+    labels: hasMoodData 
+      ? moodKeys
+      : ['No Data'],
     datasets: [
       {
         label: 'Average Mood Rating',
-        data: Object.values(stats.mood_correlation),
-        backgroundColor: 'rgba(153, 102, 255, 0.8)',
-        borderColor: 'rgba(153, 102, 255, 1)',
+        data: hasMoodData 
+          ? Object.values(stats.mood_correlation)
+          : [0],
+        backgroundColor: hasMoodData 
+          ? 'rgba(153, 102, 255, 0.8)'
+          : 'rgba(200, 200, 200, 0.8)',
+        borderColor: hasMoodData 
+          ? 'rgba(153, 102, 255, 1)'
+          : 'rgba(200, 200, 200, 1)',
         borderWidth: 1,
       },
     ],
@@ -203,7 +211,9 @@ export default function DietStats() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.average_daily_calories ? Math.round(stats.average_daily_calories) : 'N/A'}
+              {stats.average_daily_calories !== null && stats.average_daily_calories !== undefined 
+                ? Math.round(stats.average_daily_calories) 
+                : 'N/A'}
             </div>
             <p className="text-xs text-gray-500">calories per day</p>
           </CardContent>
@@ -215,11 +225,15 @@ export default function DietStats() {
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
-              {stats.most_consumed_foods.slice(0, 3).map((food, index) => (
-                <div key={index} className="text-sm">
-                  {index + 1}. {food}
-                </div>
-              ))}
+              {stats.most_consumed_foods && stats.most_consumed_foods.length > 0 ? (
+                stats.most_consumed_foods.slice(0, 3).map((food, index) => (
+                  <div key={index} className="text-sm">
+                    {index + 1}. {food}
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-gray-500">No food data available</div>
+              )}
             </div>
           </CardContent>
         </Card>

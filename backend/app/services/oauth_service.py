@@ -7,7 +7,8 @@ from app.core.config import settings
 from app.services.auth_service import AuthService
 from app.models.user import User
 from app.core.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 
 class OAuthService:
@@ -58,7 +59,7 @@ class OAuthService:
             return None
 
     async def handle_oauth_login(
-        self, provider: str, token: str, db: Session
+        self, provider: str, token: str, db: AsyncSession
     ) -> Dict[str, Any]:
         """Handle OAuth login/registration."""
         user_info = None
@@ -68,17 +69,19 @@ class OAuthService:
         elif provider == "github":
             user_info = await self.verify_github_token(token)
         else:
-            raise ValueError("Unsupported OAuth provider")
+            raise ValueError(f"Unsupported OAuth provider: {provider}")
 
         if not user_info:
-            raise ValueError("Invalid OAuth token")
+            raise ValueError("Failed to verify OAuth token")
 
         email = user_info.get("email")
         if not email:
             raise ValueError("Email not provided by OAuth provider")
 
         # Check if user exists
-        existing_user = db.query(User).filter(User.email == email).first()
+        user_query = select(User).filter(User.email == email)
+        user_result = await db.execute(user_query)
+        existing_user = user_result.scalar_one_or_none()
 
         if existing_user:
             # User exists, generate tokens

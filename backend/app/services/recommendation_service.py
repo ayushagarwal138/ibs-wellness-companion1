@@ -7,8 +7,8 @@ and treatment based on IBS severity assessment and user data patterns.
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, select
 
 from app.models.user import User
 from app.models.diet import FoodReaction, ReactionSeverityEnum
@@ -23,7 +23,7 @@ from app.schemas.chat import (
 class RecommendationService:
     """Service for generating personalized IBS recommendations."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
         # Evidence-based recommendation database
@@ -185,7 +185,7 @@ class RecommendationService:
             ],
         }
 
-    def generate_recommendations(
+    async def generate_recommendations(
         self,
         user: User,
         ibs_assessment: IBSAssessment,
@@ -221,7 +221,7 @@ class RecommendationService:
             recommendations.append(recommendation)
 
         # Add personalized recommendations based on user data
-        personalized_recs = self._generate_personalized_recommendations(
+        personalized_recs = await self._generate_personalized_recommendations(
             user, ibs_assessment
         )
         recommendations.extend(personalized_recs)
@@ -236,14 +236,14 @@ class RecommendationService:
         recommendations.sort(key=lambda x: x.priority)
         return recommendations[:8]  # Return top 8 recommendations
 
-    def _generate_personalized_recommendations(
+    async def _generate_personalized_recommendations(
         self, user: User, ibs_assessment: IBSAssessment
     ) -> List[Recommendation]:
         """Generate recommendations based on user's specific patterns."""
         recommendations = []
 
         # Analyze food reaction patterns
-        food_triggers = self._analyze_food_triggers(user.id)
+        food_triggers = await self._analyze_food_triggers(user.id)
         if food_triggers:
             trigger_foods = ", ".join(food_triggers[:3])
             recommendations.append(
@@ -328,15 +328,14 @@ class RecommendationService:
 
         return recommendations
 
-    def _analyze_food_triggers(self, user_id: str, days: int = 60) -> List[str]:
+    async def _analyze_food_triggers(self, user_id: str, days: int = 60) -> List[str]:
         """Analyze user's food reaction data to identify trigger foods."""
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
 
         # Get food reactions with moderate to severe severity
-        reactions = (
-            self.db.query(FoodReaction)
-            .filter(
+        result = await self.db.execute(
+            select(FoodReaction).filter(
                 and_(
                     FoodReaction.user_id == user_id,
                     FoodReaction.reaction_occurred_at >= start_date,
@@ -344,13 +343,12 @@ class RecommendationService:
                         [
                             ReactionSeverityEnum.MODERATE,
                             ReactionSeverityEnum.SEVERE,
-                            ReactionSeverityEnum.VERY_SEVERE,
                         ]
                     ),
                 )
             )
-            .all()
         )
+        reactions = result.scalars().all()
 
         # Count reactions per food
         food_counts = {}

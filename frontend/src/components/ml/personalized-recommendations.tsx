@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatConfidence } from '@/lib/number-formatting';
 import { 
   Lightbulb, 
   Star, 
@@ -205,7 +206,7 @@ export function PersonalizedRecommendations({
                     </Badge>
                     <div className="flex items-center gap-1 text-yellow-500">
                       <Star className="w-4 h-4 fill-current" />
-                      <span className="text-sm font-medium">{recommendation.confidence}%</span>
+                      <span className="text-sm font-medium">{formatConfidence(recommendation.confidence)}</span>
                     </div>
                   </div>
                 </div>
