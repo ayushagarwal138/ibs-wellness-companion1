@@ -63,6 +63,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Ensure component is mounted before accessing localStorage
   useEffect(() => {
     setMounted(true)
+    // Clean up any stuck auth_redirecting flags
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('auth_redirecting')
+    }
   }, [])
 
   // Check if user is authenticated on mount
@@ -162,6 +166,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Use setTimeout to ensure state updates are processed before navigation
       setTimeout(() => {
+        // Check for stored redirect path
+        const redirectPath = sessionStorage.getItem('redirect_after_login')
+        if (redirectPath && onboardingCompleted) {
+          // Clear the stored redirect path
+          sessionStorage.removeItem('redirect_after_login')
+          // Validate the redirect path is safe
+          if (redirectPath.startsWith('/') && !redirectPath.includes('//')) {
+            router.push(redirectPath)
+            return
+          }
+        }
+        
+        // Default navigation logic
         if (onboardingCompleted) {
           router.push('/dashboard')
         } else {
@@ -183,9 +200,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true)
       
       // Split fullName into first and last name
-      const nameParts = fullName.trim().split(' ')
+      const trimmedName = fullName.trim()
+      if (!trimmedName) {
+        throw new Error('Please enter your name')
+      }
+      
+      const nameParts = trimmedName.split(' ').filter(part => part.length > 0)
       const firstName = nameParts[0] || ''
-      const lastName = nameParts.slice(1).join(' ') || ''
+      const lastName = nameParts.slice(1).join(' ') || 'User' // Use 'User' as default last name if only one name provided
       
       const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
@@ -203,7 +225,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.message || 'Registration failed')
+        
+        // Handle validation errors with more specific messages
+        if (response.status === 422 && error.detail) {
+          const validationErrors = Array.isArray(error.detail) ? error.detail : [error.detail]
+          const passwordError = validationErrors.find((err: any) => err.loc && err.loc.includes('password'))
+          
+          if (passwordError && passwordError.msg) {
+            throw new Error(passwordError.msg.replace('Value error, ', ''))
+          }
+          
+          // Handle other validation errors
+          const errorMessages = validationErrors.map((err: any) => err.msg || err.message || 'Validation error').join(', ')
+          throw new Error(errorMessages)
+        }
+        
+        throw new Error(error.message || error.detail || 'Registration failed')
       }
 
       const data = await response.json()

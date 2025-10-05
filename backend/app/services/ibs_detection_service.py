@@ -16,6 +16,9 @@ from app.models.diet import FoodReaction, ReactionSeverityEnum
 from app.models.medication import MedicationLog, AdherenceEnum
 from app.schemas.chat import IBSAssessment, IBSSeverity
 from app.core.logging import StructuredLogger
+from app.services.personalized_threshold_service import (
+    PersonalizedThresholdService
+)
 
 
 class IBSDetectionService:
@@ -23,6 +26,7 @@ class IBSDetectionService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.threshold_service = PersonalizedThresholdService(db)
 
     async def assess_ibs_severity(self, user: User, days: int = 30) -> IBSAssessment:
         """
@@ -54,7 +58,7 @@ class IBSDetectionService:
 
         # Determine overall severity
         severity, confidence = self._determine_severity(
-            symptoms_score, frequency_score, impact_score
+            symptoms_score, frequency_score, impact_score, user
         )
 
         # Identify key factors
@@ -308,27 +312,52 @@ class IBSDetectionService:
         return min(impact_score, 10.0)
 
     def _determine_severity(
-        self, symptoms_score: float, frequency_score: float, impact_score: float
+        self, symptoms_score: float, frequency_score: float, impact_score: float,
+        user: User
     ) -> Tuple[IBSSeverity, float]:
-        """Determine overall IBS severity and confidence level."""
+        """Determine overall IBS severity using personalized thresholds."""
         # Weighted average of scores
         overall_score = (
             (symptoms_score * 0.4) + (frequency_score * 0.3) + (impact_score * 0.3)
         )
 
-        # Determine severity thresholds
-        if overall_score >= 7.5:
-            severity = IBSSeverity.SEVERE
-            confidence = min(0.9, 0.6 + (overall_score - 7.5) * 0.1)
-        elif overall_score >= 4.5:
-            severity = IBSSeverity.MODERATE
-            confidence = min(0.85, 0.6 + (overall_score - 4.5) * 0.08)
-        elif overall_score >= 2.0:
-            severity = IBSSeverity.MILD
-            confidence = min(0.8, 0.5 + (overall_score - 2.0) * 0.1)
-        else:
-            severity = IBSSeverity.UNKNOWN
-            confidence = 0.5
+        # Normalize score to 0-1 range for threshold comparison
+        normalized_score = min(1.0, overall_score / 10.0)
+        
+        # Use personalized thresholds
+        try:
+            severity_level = self.threshold_service.classify_severity_with_personalized_thresholds(
+                user, normalized_score
+            )
+            
+            # Convert string to IBSSeverity enum and calculate confidence
+            if severity_level == "severe":
+                severity = IBSSeverity.SEVERE
+                confidence = min(0.9, 0.7 + normalized_score * 0.2)
+            elif severity_level == "moderate":
+                severity = IBSSeverity.MODERATE
+                confidence = min(0.85, 0.6 + normalized_score * 0.25)
+            elif severity_level == "mild":
+                severity = IBSSeverity.MILD
+                confidence = min(0.8, 0.5 + normalized_score * 0.3)
+            else:
+                severity = IBSSeverity.UNKNOWN
+                confidence = 0.5
+                
+        except Exception as e:
+            # Fallback to default thresholds if personalized fails
+            if overall_score >= 7.5:
+                severity = IBSSeverity.SEVERE
+                confidence = min(0.9, 0.6 + (overall_score - 7.5) * 0.1)
+            elif overall_score >= 4.5:
+                severity = IBSSeverity.MODERATE
+                confidence = min(0.85, 0.6 + (overall_score - 4.5) * 0.08)
+            elif overall_score >= 2.0:
+                severity = IBSSeverity.MILD
+                confidence = min(0.8, 0.5 + (overall_score - 2.0) * 0.1)
+            else:
+                severity = IBSSeverity.UNKNOWN
+                confidence = 0.5
 
         return severity, confidence
 
@@ -421,7 +450,7 @@ class IBSDetectionService:
                 )
 
                 severity, confidence = self._determine_severity(
-                    symptoms_score, frequency_score, impact_score
+                    symptoms_score, frequency_score, impact_score, user
                 )
 
                 trends.append(

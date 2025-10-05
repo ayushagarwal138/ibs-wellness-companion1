@@ -13,7 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { apiService } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { MealType } from '@ibs-wellness/shared-types';
-import { Clock, Plus, X, Utensils, AlertTriangle, Search, Calculator } from 'lucide-react';
+import { Clock, Plus, X, Utensils, AlertTriangle, Search, Calculator, Brain } from 'lucide-react';
+import { personalizedDefaultsService, PersonalizedDietDefaults } from '@/services/personalized-defaults-service';
 
 interface DietLogFormData {
   meal_type: MealType | '';
@@ -89,6 +90,8 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [isCalculatingNutrition, setIsCalculatingNutrition] = useState(false);
+  const [personalizedDefaults, setPersonalizedDefaults] = useState<PersonalizedDietDefaults | null>(null);
+  const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const handleInputChange = (field: keyof DietLogFormData, value: any) => {
@@ -97,6 +100,35 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
       [field]: value
     }));
   };
+
+  // Fetch personalized defaults on component mount
+  useEffect(() => {
+    const fetchPersonalizedDefaults = async () => {
+      try {
+        setIsLoadingDefaults(true);
+        const defaults = await personalizedDefaultsService.getDietDefaults();
+        setPersonalizedDefaults(defaults);
+        
+        // Apply personalized defaults to form
+         setFormData(prev => ({
+           ...prev,
+           mood_before: defaults.moodBefore,
+           mood_after: defaults.moodAfter,
+           hydration_level: defaults.hydrationLevel,
+           eating_speed: defaults.eatingSpeed,
+           preparation_method: defaults.preferredPreparationMethod,
+           food_categories: defaults.commonFoodCategories,
+           consumed_at: defaults.preferredMealTime || prev.consumed_at
+         }));
+      } catch (error) {
+        console.error('Error fetching personalized diet defaults:', error);
+      } finally {
+        setIsLoadingDefaults(false);
+      }
+    };
+
+    fetchPersonalizedDefaults();
+  }, []);
 
   // Fetch food suggestions
   useEffect(() => {
@@ -232,7 +264,10 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
       case 'Enter':
         e.preventDefault();
         if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
-          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+          const suggestion = suggestions[selectedSuggestionIndex];
+          if (suggestion) {
+            handleSuggestionClick(suggestion);
+          }
         } else {
           addFoodItem();
         }
@@ -338,7 +373,18 @@ export default function DietLogForm({ onSuccess }: DietLogFormProps) {
         <CardTitle className="flex items-center gap-2">
           <Utensils className="h-5 w-5" />
           Log Your Meal
+          {personalizedDefaults && !isLoadingDefaults && (
+            <div className="flex items-center gap-1 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+              <Brain className="h-3 w-3" />
+              AI-Enhanced
+            </div>
+          )}
         </CardTitle>
+        {personalizedDefaults && !isLoadingDefaults && (
+          <p className="text-xs text-blue-600 mt-1">
+            Form values are personalized based on your patterns and ML predictions
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">

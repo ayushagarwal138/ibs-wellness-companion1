@@ -446,7 +446,9 @@ class MLProfileCompletionService {
   // Helper methods
   private applyMultiplierToSection(section: Record<string, number>, multiplier: number): void {
     Object.keys(section).forEach(field => {
-      section[field] *= multiplier;
+      if (section[field] !== undefined) {
+        section[field] *= multiplier;
+      }
     });
   }
 

@@ -219,8 +219,8 @@ export default function TestMLPage() {
     setLoading(prev => ({ ...prev, stress: true }));
     try {
       const result = await mlService.predictStressSymptomCorrelation({
-        stress_levels: [8, 7, 9, 6, 8],
-        symptom_severity: [7, 6, 8, 5, 7],
+        stress_levels: { day1: 8, day2: 7, day3: 9, day4: 6, day5: 8 },
+        symptoms: { day1: 7, day2: 6, day3: 8, day4: 5, day5: 7 },
         timeframe_days: 7
       });
       setStressCorrelation(result);
@@ -520,11 +520,11 @@ export default function TestMLPage() {
               <CardContent>
                 {modelInfo ? (
                   <div className="space-y-2">
-                    <p><strong>Model:</strong> {modelInfo.model_name}</p>
-                    <p><strong>Version:</strong> {modelInfo.model_version}</p>
-                    <p><strong>Last Trained:</strong> {modelInfo.last_trained}</p>
-                    <p><strong>Accuracy:</strong> {formatConfidence(modelInfo.accuracy_metrics?.overall_accuracy)}</p>
-                    <p><strong>F1 Score:</strong> {formatConfidence(modelInfo.accuracy_metrics?.f1_score)}</p>
+                    <p><strong>Total Models:</strong> {modelInfo.total_models}</p>
+                    <p><strong>Active Models:</strong> {modelInfo.active_models}</p>
+                    <p><strong>Last Updated:</strong> {new Date(modelInfo.last_updated).toLocaleString()}</p>
+                    <p><strong>Average Performance:</strong> {formatConfidence(modelInfo.average_performance)}</p>
+                    <p><strong>Models:</strong> {modelInfo.models.map(m => m.name).join(', ')}</p>
                   </div>
                 ) : (
                   <p className="text-gray-500">Click "Model Info" to load data</p>
@@ -634,9 +634,9 @@ export default function TestMLPage() {
               <CardContent>
                 {stressCorrelation ? (
                   <div className="space-y-2">
-                    <p><strong>Correlation Strength:</strong> {formatConfidence(stressCorrelation.correlation_strength)}</p>
-                    <p><strong>Stress Impact Score:</strong> {formatConfidence(stressCorrelation.stress_impact_score)}</p>
-                    <p><strong>Confidence:</strong> {formatConfidence(stressCorrelation.confidence)}</p>
+                    <p><strong>Correlation Score:</strong> {formatConfidence(stressCorrelation.correlation_score)}</p>
+                    <p><strong>Stress Triggers:</strong> {stressCorrelation.stress_triggers.join(', ')}</p>
+                    <p><strong>Management Strategies:</strong> {stressCorrelation.management_strategies.join(', ')}</p>
                   </div>
                 ) : (
                   <p className="text-gray-500">Click "Stress" to load data</p>

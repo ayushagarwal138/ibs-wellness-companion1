@@ -37,35 +37,52 @@ class UserLogin(BaseModel):
     """User login request schema."""
 
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=100)
+    password: str = Field(..., min_length=6, max_length=100)
 
 
 class UserRegister(BaseModel):
     """User registration request schema."""
 
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=100)
-    confirm_password: str = Field(..., min_length=8, max_length=100)
+    password: str = Field(..., min_length=6, max_length=100)
+    confirm_password: str = Field(..., min_length=6, max_length=100)
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
 
     @validator("password")
     def validate_password(cls, v):
-        """Validate password strength."""
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
+        """Validate password strength with flexible requirements."""
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters long")
 
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Password must contain at least one uppercase letter")
+        # Count how many criteria are met
+        criteria_met = 0
+        criteria_messages = []
 
-        if not re.search(r"[a-z]", v):
-            raise ValueError("Password must contain at least one lowercase letter")
+        if re.search(r"[A-Z]", v):
+            criteria_met += 1
+        else:
+            criteria_messages.append("uppercase letter")
 
-        if not re.search(r"\d", v):
-            raise ValueError("Password must contain at least one digit")
+        if re.search(r"[a-z]", v):
+            criteria_met += 1
+        else:
+            criteria_messages.append("lowercase letter")
 
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
-            raise ValueError("Password must contain at least one special character")
+        if re.search(r"\d", v):
+            criteria_met += 1
+        else:
+            criteria_messages.append("number")
+
+        if re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            criteria_met += 1
+        else:
+            criteria_messages.append("special character")
+
+        # Require at least 2 out of 4 criteria
+        if criteria_met < 2:
+            missing = ', '.join(criteria_messages[:3])
+            raise ValueError(f"Password must include at least 2 of: {missing}")
 
         return v
 

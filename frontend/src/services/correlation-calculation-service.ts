@@ -320,7 +320,7 @@ class CorrelationCalculationService {
         groups[log.food_name] = [];
       }
       if (groups[log.food_name]) {
-        groups[log.food_name].push({
+        groups[log.food_name]!.push({
           consumption_time: log.consumption_time || '',
           portion_size: log.portion_size || 0
         });
@@ -338,7 +338,7 @@ class CorrelationCalculationService {
     // This would align food consumption with subsequent symptoms
     return consumptions.map((consumption, index) => ({
       foodExposure: consumption.portion_size,
-      symptomSeverity: (symptomLogs && symptomLogs[index]) ? symptomLogs[index].severity : 0
+      symptomSeverity: (symptomLogs && symptomLogs[index]) ? symptomLogs[index]!.severity : 0
     }));
   }
 

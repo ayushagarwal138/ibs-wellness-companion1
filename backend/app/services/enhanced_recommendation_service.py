@@ -15,6 +15,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.sql import case
 
 # Add ML models path to system path
 ml_models_path = Path(__file__).parent.parent.parent.parent / "ml-models"
@@ -1128,20 +1129,20 @@ class EnhancedRecommendationService(RecommendationService):
                     # Symptom counts
                     func.count(SymptomLog.id).label("total_symptoms"),
                     func.sum(
-                        func.case(
+                        case(
                             (SymptomLog.severity == SeverityEnum.SEVERE, 1),
                             else_=0
                         )
                     ).label("severe_symptoms"),
                     func.sum(
-                        func.case(
+                        case(
                             (SymptomLog.severity == SeverityEnum.MODERATE, 1),
                             else_=0
                         )
                     ).label("moderate_symptoms"),
                     func.avg(SymptomLog.pain_level).label("avg_pain_level"),
                     func.sum(
-                        func.case(
+                        case(
                             (SymptomLog.bristol_stool_type.isnot(None), 1),
                             else_=0
                         )
@@ -1149,7 +1150,7 @@ class EnhancedRecommendationService(RecommendationService):
                     # Food reaction counts
                     func.count(FoodReaction.id).label("food_reactions"),
                     func.sum(
-                        func.case(
+                        case(
                             (FoodReaction.severity == ReactionSeverityEnum.SEVERE, 1),
                             else_=0
                         )
@@ -1370,9 +1371,16 @@ class EnhancedRecommendationService(RecommendationService):
     ) -> Dict[str, Any]:
         """Analyze stress-symptom correlations and provide interventions."""
         try:
-            stress_data = features.get("stress_data", [])
-            symptom_data = features.get("symptom_data", [])
-            lifestyle_factors = features.get("lifestyle_factors", {})
+            # Use correct field names from StressSymptomCorrelationRequest schema
+            stress_levels = features.get("stress_levels", {})
+            symptoms = features.get("symptoms", {})
+            timeframe_days = features.get("timeframe_days", 30)
+            
+            # Convert to expected format for internal methods
+            # stress_levels and symptoms are Dict[str, float] according to schema
+            stress_data = [{"stress_level": level, "day": day} for day, level in stress_levels.items()]
+            symptom_data = [{"severity": severity, "day": day} for day, severity in symptoms.items()]
+            lifestyle_factors = {"timeframe_days": timeframe_days}
             
             # Calculate correlation metrics
             correlation_metrics = self._calculate_stress_symptom_correlation(
@@ -1389,34 +1397,28 @@ class EnhancedRecommendationService(RecommendationService):
                 correlation_metrics, stress_patterns
             )
             
+            # Return data matching StressSymptomCorrelationResponse schema
             return {
-                "correlation_strength": correlation_metrics.get("strength", 0.0),
-                "stress_patterns": stress_patterns,
-                "peak_stress_times": self._identify_peak_stress_times(stress_data),
-                "symptom_triggers": correlation_metrics.get("triggers", []),
-                "interventions": interventions,
-                "confidence": min(0.85, 0.4 + len(stress_data) * 0.03),
-                "recommended_techniques": self._recommend_stress_techniques(
-                    stress_patterns
-                ),
-                "lifestyle_modifications": self._suggest_lifestyle_changes(
-                    correlation_metrics, lifestyle_factors
-                )
+                "correlation_score": correlation_metrics.get("strength", 0.0),
+                "stress_triggers": correlation_metrics.get("triggers", []),
+                "management_strategies": [
+                    strategy.get("technique", strategy.get("description", ""))
+                    for strategy in interventions
+                    if isinstance(strategy, dict)
+                ] + self._recommend_stress_techniques(stress_patterns)
             }
             
         except Exception as e:
             logger.error(f"Error analyzing stress-symptom correlation: {e}")
+            # Return default values matching the schema on error
             return {
-                "error": True,
-                "error_message": (
-                    "Unable to analyze stress-symptom correlation at this "
-                    "time. Please try again later."
-                ),
-                "user_guidance": (
-                    "Consider tracking stress levels manually and noting "
-                    "patterns with symptoms."
-                ),
-                "status": "FAILED"
+                "correlation_score": 0.0,
+                "stress_triggers": ["Unable to identify triggers at this time"],
+                "management_strategies": [
+                    "Consider tracking stress levels manually",
+                    "Note patterns between stress and symptoms",
+                    "Try basic stress reduction techniques"
+                ]
             }
 
     async def analyze_sleep_quality_impact(self, features: dict) -> dict:

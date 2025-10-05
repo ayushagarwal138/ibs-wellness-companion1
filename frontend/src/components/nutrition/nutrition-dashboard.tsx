@@ -86,7 +86,7 @@ const NutritionDashboard: React.FC = () => {
     try {
       const response = await fetch(`/api/diet/nutrition/daily/${date}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       })
       if (response.ok) {
@@ -105,7 +105,7 @@ const NutritionDashboard: React.FC = () => {
     try {
       const response = await fetch('/api/diet/nutrition/trends?days=30', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       })
       if (response.ok) {

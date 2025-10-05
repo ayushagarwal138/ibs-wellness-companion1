@@ -185,6 +185,7 @@ async def create_symptom_log(
 @router.get("", response_model=StandardResponse[List[SymptomLogResponse]])
 async def get_symptom_logs(
     days: int = Query(30, description="Number of days to retrieve logs for"),
+    limit: Optional[int] = Query(None, description="Maximum number of logs to return"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -201,7 +202,7 @@ async def get_symptom_logs(
         start_date = end_date - timedelta(days=days)
 
         # Query logs
-        result = await db.execute(
+        query = (
             select(SymptomLog, Symptom)
             .join(Symptom)
             .where(
@@ -211,6 +212,12 @@ async def get_symptom_logs(
             )
             .order_by(desc(SymptomLog.logged_at))
         )
+        
+        # Apply limit if specified
+        if limit is not None:
+            query = query.limit(limit)
+            
+        result = await db.execute(query)
         logs = result.all()
 
         # Create response
@@ -407,7 +414,7 @@ async def get_symptom_stats_summary(
                     total_logs=0,
                     average_severity=0.0,
                     most_common_symptoms=[],
-                    severity_distribution={"mild": 0, "moderate": 0, "severe": 0},
+                    severity_distribution={"none": 0, "mild": 0, "moderate": 0, "severe": 0, "very_severe": 0},
                     bristol_distribution={},
                     pain_locations={},
                     weekly_trends={},
@@ -416,8 +423,8 @@ async def get_symptom_stats_summary(
 
         # Calculate statistics
         total_logs = len(logs)
-        severity_counts = {"mild": 0, "moderate": 0, "severe": 0}
-        severity_values = {"mild": 1, "moderate": 2, "severe": 3}
+        severity_counts = {"none": 0, "mild": 0, "moderate": 0, "severe": 0, "very_severe": 0}
+        severity_values = {"none": 0, "mild": 1, "moderate": 2, "severe": 3, "very_severe": 4}
         total_severity = 0
         symptom_counts = {}
         bristol_counts = {}
@@ -444,11 +451,20 @@ async def get_symptom_stats_summary(
                 location = log.pain_location
                 pain_location_counts[location] = pain_location_counts.get(location, 0) + 1
             
-            # Weekly trends (group by week)
+            # Weekly trends (group by week with severity tracking)
             week_key = log.logged_at.strftime("%Y-W%U")
             if week_key not in weekly_data:
-                weekly_data[week_key] = 0
-            weekly_data[week_key] += 1
+                weekly_data[week_key] = {"total_severity": 0, "count": 0}
+            weekly_data[week_key]["total_severity"] += severity_values[severity]
+            weekly_data[week_key]["count"] += 1
+        
+        # Calculate average severity per week
+        weekly_trends = {}
+        for week_key, week_data_item in weekly_data.items():
+            weekly_trends[week_key] = {
+                "average_severity": round(week_data_item["total_severity"] / week_data_item["count"], 2) if week_data_item["count"] > 0 else 0,
+                "count": week_data_item["count"]
+            }
 
         # Calculate average severity
         average_severity = total_severity / total_logs if total_logs > 0 else 0.0
@@ -466,7 +482,7 @@ async def get_symptom_stats_summary(
             severity_distribution=severity_counts,
             bristol_distribution=bristol_counts,
             pain_locations=pain_location_counts,
-            weekly_trends=weekly_data,
+            weekly_trends=weekly_trends,
         )
 
         return StandardResponse(

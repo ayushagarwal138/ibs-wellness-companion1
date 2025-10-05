@@ -9,8 +9,8 @@ import json
 
 # API configuration
 BASE_URL = "http://localhost:8000/api/v1"
-TEST_EMAIL = "test_api@example.com"
-TEST_PASSWORD = "testpassword123"
+TEST_EMAIL = "analytics_test@example.com"
+TEST_PASSWORD = "TestPassword123!"
 
 
 def authenticate():
@@ -76,6 +76,7 @@ def main():
         print("\n🎉 All tests passed!")
     else:
         print("\n💥 Tests failed!")
+
 
 if __name__ == "__main__":
     main()

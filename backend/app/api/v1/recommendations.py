@@ -78,37 +78,84 @@ async def get_personalized_recommendations(
             },
         }
 
-        # Generate enhanced recommendations
-        recommendations = await service.generate_enhanced_recommendations(
-            current_user.id, ml_predictions
-        )
+        # Generate enhanced recommendations with fallback
+        try:
+            recommendations = await service.generate_enhanced_recommendations(
+                current_user.id, ml_predictions
+            )
+        except Exception as service_error:
+            logger.warning(f"Service error, using fallback: {service_error}")
+            recommendations = {
+                "dietary_suggestions": [],
+                "lifestyle_changes": [],
+                "key_factors": [],
+                "immediate_actions": []
+            }
+
+        # Ensure recommendations is a dict and has required keys
+        if not isinstance(recommendations, dict):
+            recommendations = {}
+        
+        # Safely get arrays with fallbacks
+        dietary_suggestions = recommendations.get("dietary_suggestions", [])
+        lifestyle_changes = recommendations.get("lifestyle_changes", [])
+        key_factors = recommendations.get("key_factors", [])
+        immediate_actions = recommendations.get("immediate_actions", [])
+        
+        # Ensure all are lists
+        if not isinstance(dietary_suggestions, list):
+            dietary_suggestions = []
+        if not isinstance(lifestyle_changes, list):
+            lifestyle_changes = []
+        if not isinstance(key_factors, list):
+            key_factors = []
+        if not isinstance(immediate_actions, list):
+            immediate_actions = []
+            
+        # Add default recommendations if arrays are empty
+        if not dietary_suggestions:
+            dietary_suggestions = [
+                {"category": "General", "action": "Stay hydrated", "explanation": "Proper hydration supports digestive health", "priority": 5}
+            ]
+        if not lifestyle_changes:
+            lifestyle_changes = [
+                {"category": "Stress", "suggestion": "Practice relaxation techniques", "impact": "Stress reduction may help manage symptoms", "priority": 4}
+            ]
 
         # Transform to match frontend expected format
         response = {
             "dietary_recommendations": [
                 {
-                    "type": rec.get("type", "general"),
-                    "title": rec.get(
-                        "title", rec.get("action", "Dietary Recommendation")
-                    ),
-                    "description": rec.get("description", rec.get("explanation", "")),
-                    "priority": rec.get("priority", "medium"),
+                    "category": rec.get("category", "General") if isinstance(rec, dict) else "General",
+                    "recommendation": (rec.get("title", rec.get("action", "Dietary Recommendation")) 
+                             if isinstance(rec, dict) else "Dietary Recommendation"),
+                    "reasoning": (rec.get("description", rec.get("explanation", "Based on your symptom patterns")) 
+                                   if isinstance(rec, dict) else "Based on your symptom patterns"),
+                    "priority": rec.get("priority", 5) if isinstance(rec, dict) else 5,
                 }
-                for rec in recommendations.get("dietary_suggestions", [])
+                for rec in dietary_suggestions
             ],
-            "lifestyle_insights": [
+            "lifestyle_recommendations": [
                 {
-                    "category": rec.get("category", "General"),
-                    "insight": rec.get("suggestion", ""),
-                    "recommendation": rec.get("impact", ""),
-                    "priority": rec.get("priority", "medium"),
+                    "category": rec.get("category", "General") if isinstance(rec, dict) else "General",
+                    "recommendation": rec.get("suggestion", "Lifestyle improvement") if isinstance(rec, dict) else "Lifestyle improvement",
+                    "reasoning": rec.get("impact", "May help improve your symptoms") if isinstance(rec, dict) else "May help improve your symptoms",
+                    "priority": rec.get("priority", 5) if isinstance(rec, dict) else 5,
                 }
-                for rec in recommendations.get("lifestyle_changes", [])
+                for rec in lifestyle_changes
+            ],
+            "medical_recommendations": [
+                {
+                    "category": "Medical",
+                    "recommendation": "Consult with your healthcare provider",
+                    "reasoning": "Regular check-ups help monitor your condition",
+                    "priority": 3,
+                }
             ],
             "trigger_analysis": {
                 "primary_category": "Dietary",
                 "insights": [
-                    factor for factor in recommendations.get("key_factors", [])[:3]
+                    factor for factor in key_factors[:3] if isinstance(factor, str)
                 ],
             },
             "management_strategy": {
@@ -119,8 +166,9 @@ async def get_personalized_recommendations(
                 "timeline": "2-4 weeks for initial results",
             },
             "personalized_tips": [
-                action.get("action", "")
-                for action in recommendations.get("immediate_actions", [])[:5]
+                action.get("action", "") if isinstance(action, dict) else str(action)
+                for action in immediate_actions[:5]
+                if action
             ],
         }
 

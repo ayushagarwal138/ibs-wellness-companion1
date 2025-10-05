@@ -207,7 +207,7 @@ const mockRecommendations: LifestyleRecommendation[] = [
     tips: [
       "Look for IBS communities on Reddit or Facebook",
       "Be open about your needs with friends",
-      "Don't let IBS prevent you from social activities"
+      "Don&apos;t let IBS prevent you from social activities"
     ]
   }
 ];
@@ -665,7 +665,7 @@ export const LifestyleRecommendations: React.FC<LifestyleRecommendationsProps> =
                 </ul>
               </div>
               <div>
-                <h5 className="font-medium text-blue-800 mb-2">This Week's Goals:</h5>
+                <h5 className="font-medium text-blue-800 mb-2">This Week&apos;s Goals:</h5>
                 <ul className="space-y-1 text-blue-700">
                   {prioritizedRecommendations
                     .slice(0, 3)

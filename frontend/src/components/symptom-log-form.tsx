@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2 } from "lucide-react"
+import { Loader2, Brain } from "lucide-react"
 import { apiService } from "@/lib/api"
 import { SeverityLevel } from "@ibs-wellness/shared-types"
+import { personalizedDefaultsService, PersonalizedSymptomDefaults } from "@/services/personalized-defaults-service"
 
 // Custom interface that matches the backend's actual SymptomLogCreate expectations
 interface SymptomLogCreateData {
@@ -47,22 +48,46 @@ export function SymptomLogForm({ onSubmit }: SymptomLogFormProps) {
   const [availableSymptoms, setAvailableSymptoms] = useState<Symptom[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [personalizedDefaults, setPersonalizedDefaults] = useState<PersonalizedSymptomDefaults | null>(null)
+  const [isLoadingDefaults, setIsLoadingDefaults] = useState(true)
 
-  // Fetch available symptoms from API
+  // Fetch available symptoms and personalized defaults from API
   useEffect(() => {
-    const fetchSymptoms = async () => {
+    const fetchData = async () => {
       setIsLoading(true)
+      setIsLoadingDefaults(true)
+      
       try {
-        const data = await apiService.getAvailableSymptoms()
-        setAvailableSymptoms(data)
+        // Fetch symptoms and personalized defaults in parallel
+        const [symptomsData, defaultsData] = await Promise.all([
+          apiService.getAvailableSymptoms(),
+          personalizedDefaultsService.getSymptomDefaults()
+        ])
+        
+        setAvailableSymptoms(symptomsData)
+        setPersonalizedDefaults(defaultsData)
+        
+        // Apply personalized defaults
+        setSeverity(defaultsData.severity)
+        setStressLevel(defaultsData.stressLevel)
+        setSleepQuality(defaultsData.sleepQuality)
+        setDuration(defaultsData.duration)
+        
+        // Set most likely symptom if available
+        if (defaultsData.mostLikelySymptom) {
+          setSelectedSymptomId(defaultsData.mostLikelySymptom)
+        }
+        
       } catch (error) {
-        console.error('Error fetching symptoms:', error)
+        console.error('Error fetching data:', error)
+        // Keep default values if personalized defaults fail
       } finally {
         setIsLoading(false)
+        setIsLoadingDefaults(false)
       }
     }
 
-    fetchSymptoms()
+    fetchData()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,9 +153,22 @@ export function SymptomLogForm({ onSubmit }: SymptomLogFormProps) {
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Log Your Symptoms</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Log Your Symptoms
+          {personalizedDefaults && !isLoadingDefaults && (
+            <div className="flex items-center gap-1 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+              <Brain className="h-3 w-3" />
+              AI-Enhanced
+            </div>
+          )}
+        </CardTitle>
         <CardDescription>
           Track your IBS symptoms to help identify patterns and triggers
+          {personalizedDefaults && !isLoadingDefaults && (
+            <span className="block text-xs text-blue-600 mt-1">
+              Form values are personalized based on your patterns and ML predictions
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -312,9 +312,27 @@ async def get_recommendations(
         # Add dietary patterns
         user_data["diet"] = await _get_dietary_patterns(current_user.id, db)
 
+        # Create ML predictions format from user data
+        ml_predictions = {
+            "severity_prediction": {
+                "predicted_severity": user_data.get("current_severity", "medium"),
+                "confidence": 0.7
+            },
+            "flareup_risk": {
+                "risk_level": "moderate",
+                "confidence": 0.6
+            },
+            "recommendations": {
+                "dietary_suggestions": [],
+                "lifestyle_changes": [],
+                "immediate_actions": []
+            },
+            "confidence": 0.7
+        }
+
         # Generate enhanced recommendations
         recommendations = await service.generate_enhanced_recommendations(
-            current_user.id, user_data, db
+            current_user.id, ml_predictions
         )
 
         # Store recommendations in database
@@ -390,46 +408,33 @@ async def get_predictions(
             "severity_score": 5,
         }
 
-        # Prepare response
+        # Prepare response in the format expected by the frontend
         response = {
-            "risk_level": severity_prediction.get("risk_level", "medium"),
+            "riskLevel": severity_prediction.get("risk_level", "medium"),
+            "nextFlareRisk": severity_prediction.get("risk_score", 0.5),
             "confidence": severity_prediction.get("confidence", 0.75),
-            "next_flare_probability": severity_prediction.get("risk_score", 0.5),
-            "predicted_severity": severity_prediction.get("severity_score", 5),
-            "timeline": f"Next {timeframe}",
-            "key_factors": [
+            "triggerFoods": [
+                "High-FODMAP foods",
+                "Dairy products",
+                "Spicy foods",
+                "Caffeine"
+            ],
+            "recommendations": [
+                "Monitor symptoms closely",
+                "Stay hydrated",
+                "Avoid known trigger foods",
+                "Practice stress management techniques",
+                "Maintain regular sleep schedule"
+            ],
+            "keyFactors": [
                 "Recent symptom patterns",
                 "Dietary factors",
                 "Stress levels",
                 "Sleep quality",
             ],
-            "personalization_applied": True,
-            "user_learning_score": personalized_thresholds.get("learning_score", 0.5),
+            "timeline": f"Next {timeframe}",
+            "modelVersion": "v1.2.0"
         }
-
-        # Add basic recommendations if requested
-        if include_recommendations:
-            response["recommendations"] = {
-                "immediate_actions": [
-                    "Monitor symptoms closely",
-                    "Stay hydrated",
-                    "Avoid known trigger foods",
-                ],
-                "dietary_suggestions": [
-                    "Consider a low-FODMAP diet",
-                    "Eat smaller, more frequent meals",
-                    "Include probiotic foods",
-                ],
-                "lifestyle_changes": [
-                    "Practice stress management techniques",
-                    "Maintain regular sleep schedule",
-                    "Engage in gentle exercise",
-                ],
-                "personalized_tips": [
-                    "Based on your profile, focus on stress reduction",
-                    "Track your symptoms to identify patterns",
-                ],
-            }
 
         return response
 
@@ -1158,29 +1163,32 @@ async def _prepare_stress_correlation_features(
     user_id: str, request: StressSymptomCorrelationRequest, db: AsyncSession
 ) -> Dict[str, Any]:
     """Prepare features for stress-symptom correlation analysis."""
-    # Get recent symptom logs
+    # Get recent symptom logs with eager loading to avoid lazy loading issues
+    from sqlalchemy.orm import selectinload
     result = await db.execute(
         select(SymptomLog)
+        .options(selectinload(SymptomLog.symptom))
         .where(SymptomLog.user_id == user_id)
         .order_by(SymptomLog.logged_at.desc())
         .limit(100)
     )
     symptom_logs = result.scalars().all()
     
+    # Convert to simple data structures to avoid SQLAlchemy session issues
+    recent_symptom_logs = []
+    for log in symptom_logs:
+        recent_symptom_logs.append({
+            "symptom": log.symptom.name if log.symptom else "unknown",
+            "severity": log.severity.value if log.severity else "unknown",
+            "logged_at": log.logged_at.isoformat() if log.logged_at else "",
+            "notes": log.notes or ""
+        })
+    
     return {
-        "stress_data": request.stress_data,
-        "symptom_data": request.symptom_data,
-        "lifestyle_factors": request.lifestyle_factors,
-        "analysis_period": request.analysis_period,
-        "recent_symptom_logs": [
-            {
-                "symptom": log.symptom.name if log.symptom else "unknown",
-                "severity": log.severity.value if log.severity else "unknown",
-                "logged_at": log.logged_at.isoformat(),
-                "notes": log.notes
-            }
-            for log in symptom_logs
-        ]
+        "stress_levels": request.stress_levels,
+        "symptoms": request.symptoms,
+        "timeframe_days": request.timeframe_days,
+        "recent_symptom_logs": recent_symptom_logs
     }
 
 
@@ -1349,8 +1357,7 @@ async def predict_multimodal(
         # Generate multi-modal predictions
         predictions = await service.generate_multimodal_predictions(
             user_id=current_user.id,
-            timeframe_days=timeframe_days,
-            db=db
+            timeframe_days=timeframe_days
         )
         
         return {

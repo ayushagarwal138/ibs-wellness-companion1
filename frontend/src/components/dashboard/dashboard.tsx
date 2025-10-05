@@ -32,11 +32,13 @@ import {
   Loader2
 } from 'lucide-react';
 import { dynamicDashboardService, DynamicDashboardData } from '@/services/dynamic-dashboard-service';
+import { useAuth } from '@/contexts/auth-context';
 
 // Use the dynamic interface from the service
 type DashboardData = DynamicDashboardData;
 
 export default function Dashboard() {
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,11 +65,20 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    // Only load dashboard data when auth is complete and user is authenticated
+    if (!authLoading && user) {
+      loadDashboardData();
+    } else if (!authLoading && !user) {
+      // User is not authenticated, stop loading
+      setIsLoading(false);
+    }
+  }, [authLoading, user]);
 
   const handleRefresh = () => {
-    loadDashboardData(true);
+    // Only refresh if user is authenticated
+    if (user) {
+      loadDashboardData(true);
+    }
   };
 
   const getRiskColor = (risk: string) => {
@@ -94,13 +105,33 @@ export default function Dashboard() {
     }
   };
 
-  if (isLoading) {
+  // Show loading state while auth is loading or data is loading
+  if (authLoading || (isLoading && user)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Your Dashboard</h2>
           <p className="text-gray-600">Fetching your personalized health insights...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication required message if user is not logged in
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-6">Please log in to access your dashboard and view your health insights.</p>
+          <Button 
+            onClick={() => window.location.href = '/login'} 
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Go to Login
+          </Button>
         </div>
       </div>
     );

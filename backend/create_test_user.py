@@ -15,6 +15,7 @@ def create_or_login_test_user():
     user_data = {
         "email": "mood_test@example.com",
         "password": "TestPassword123!",
+        "confirm_password": "TestPassword123!",
         "first_name": "Mood",
         "last_name": "Tester"
     }

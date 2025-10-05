@@ -9,32 +9,15 @@ export interface MLPredictionRequest {
 }
 
 export interface MLPredictionResponse {
-  risk_level: 'low' | 'medium' | 'moderate' | 'high';
+  riskLevel: 'low' | 'medium' | 'moderate' | 'high';
   confidence: number;
-  next_flare_probability: number;
-  predicted_severity: number;
+  nextFlareRisk: number;
+  predicted_severity?: number; // Optional since backend doesn't always return this
   timeline: string;
-  key_factors: string[];
-  recommendations?: {
-    immediate_actions: Array<{
-      action: string;
-      priority: 'high' | 'medium' | 'low';
-      explanation: string;
-      expected_benefit: string;
-    }>;
-    dietary_suggestions: Array<{
-      type: 'avoid' | 'include' | 'moderate';
-      foods: string[];
-      reason: string;
-      timeline: string;
-    }>;
-    lifestyle_changes: Array<{
-      category: string;
-      suggestion: string;
-      difficulty: 'easy' | 'moderate' | 'challenging';
-      impact: string;
-    }>;
-  };
+  keyFactors: string[];
+  triggerFoods: string[];
+  recommendations: string[];
+  modelVersion?: string;
 }
 
 export interface RealtimePredictionResponse {
@@ -224,16 +207,15 @@ export interface DietaryTriggerResponse {
 }
 
 export interface StressSymptomCorrelationRequest {
-  stress_levels: number[];
-  symptom_severity: number[];
+  stress_levels: Record<string, number>;
+  symptoms: Record<string, number>;
   timeframe_days: number;
 }
 
 export interface StressSymptomCorrelationResponse {
-  correlation_strength: number;
-  stress_impact_score: number;
-  recommendations: string[];
-  confidence: number;
+  correlation_score: number;
+  stress_triggers: string[];
+  management_strategies: string[];
 }
 
 export interface SleepQualityImpactRequest {
@@ -363,12 +345,13 @@ class MLService {
   private validateMLPredictionResponse(data: any): data is MLPredictionResponse {
     return (
       data &&
-      typeof data.risk_level === 'string' &&
+      typeof data.riskLevel === 'string' &&
       typeof data.confidence === 'number' &&
-      typeof data.next_flare_probability === 'number' &&
-      typeof data.predicted_severity === 'number' &&
+      typeof data.nextFlareRisk === 'number' &&
       typeof data.timeline === 'string' &&
-      Array.isArray(data.key_factors)
+      Array.isArray(data.keyFactors) &&
+      Array.isArray(data.triggerFoods) &&
+      Array.isArray(data.recommendations)
     );
   }
 
@@ -730,7 +713,9 @@ class MLService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`HTTP ${response.status} error:`, errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       return await response.json();
@@ -738,16 +723,19 @@ class MLService {
       console.error('Stress Correlation API error:', error);
       
       // Calculate basic correlation from the provided data
-      const { stress_levels, symptom_severity } = request;
+      const { stress_levels, symptoms } = request;
       
-      if (stress_levels.length === 0 || symptom_severity.length === 0) {
+      const stressValues = Object.values(stress_levels);
+      const symptomValues = Object.values(symptoms);
+      
+      if (stressValues.length === 0 || symptomValues.length === 0) {
         throw new Error('Insufficient data for stress-symptom correlation analysis');
       }
       
       // Calculate Pearson correlation coefficient
-      const n = Math.min(stress_levels.length, symptom_severity.length);
-      const stressData = stress_levels.slice(0, n);
-      const symptomData = symptom_severity.slice(0, n);
+      const n = Math.min(stressValues.length, symptomValues.length);
+      const stressData = stressValues.slice(0, n);
+      const symptomData = symptomValues.slice(0, n);
       
       const stressMean = stressData.reduce((sum, val) => sum + val, 0) / n;
       const symptomMean = symptomData.reduce((sum, val) => sum + val, 0) / n;
@@ -790,10 +778,9 @@ class MLService {
       }
       
       return {
-        correlation_strength: correlationStrength,
-        stress_impact_score: correlationStrength * 0.9, // Impact slightly lower than correlation
-        recommendations,
-        confidence: Math.max(0.3, Math.min(0.9, n / 30)) // Confidence based on data points
+        correlation_score: correlationStrength,
+        stress_triggers: correlationStrength > 0.5 ? ['High stress periods', 'Work pressure', 'Sleep disruption'] : [],
+        management_strategies: recommendations
       };
     }
   }
@@ -900,18 +887,85 @@ class MLService {
       return await response.json();
     } catch (error) {
       console.error('Multimodal Prediction API error:', error);
-      // Return mock data as fallback
-      return {
-        overall_risk_score: 0.58,
-        risk_category: 'medium',
-        predictions: {
-          severity: 5.8,
-          flareup_risk: 0.42,
-          treatment_response: 0.71
-        },
-        recommendations: ['Maintain current treatment', 'Monitor stress levels', 'Continue dietary modifications'],
-        confidence: 0.75
-      };
+      
+      // Generate intelligent fallback based on available data
+      try {
+        const [realtimePredictions, mlPredictions, modelInfo] = await Promise.allSettled([
+          this.getRealtimePredictions(),
+          this.getPredictions(),
+          this.getModelInfo()
+        ]);
+
+        const realtimeData = realtimePredictions.status === 'fulfilled' ? realtimePredictions.value : null;
+        const mlData = mlPredictions.status === 'fulfilled' ? mlPredictions.value : null;
+        const modelData = modelInfo.status === 'fulfilled' ? modelInfo.value : null;
+
+        // Calculate intelligent risk score based on available data
+        const baseRisk = realtimeData?.current_risk || 0.5;
+        const mlRisk = mlData?.nextFlareRisk || 0.5;
+        const overall_risk_score = (baseRisk + mlRisk) / 2;
+
+        // Determine risk category based on calculated score
+        let risk_category: 'low' | 'medium' | 'high';
+        if (overall_risk_score < 0.3) risk_category = 'low';
+        else if (overall_risk_score < 0.7) risk_category = 'medium';
+        else risk_category = 'high';
+
+        // Calculate predictions based on available data
+        const severity = mlData?.predicted_severity || (baseRisk * 10);
+        const flareup_risk = mlRisk || (baseRisk * 0.8);
+        const treatment_response = modelData?.average_performance || (1 - overall_risk_score);
+
+        // Generate contextual recommendations
+        const recommendations = [
+          ...(realtimeData?.immediate_recommendations || []),
+          ...(mlData?.recommendations || [])
+        ].slice(0, 3);
+
+        if (recommendations.length === 0) {
+          if (risk_category === 'high') {
+            recommendations.push('Consider consulting your healthcare provider', 'Monitor symptoms closely', 'Review current treatment plan');
+          } else if (risk_category === 'medium') {
+            recommendations.push('Maintain current management strategies', 'Monitor stress and diet', 'Continue regular check-ins');
+          } else {
+            recommendations.push('Continue current wellness routine', 'Maintain healthy lifestyle', 'Regular monitoring recommended');
+          }
+        }
+
+        // Calculate confidence based on available data quality
+        const confidence = Math.min(
+          (realtimeData?.confidence_score || 0.5) * 0.4 +
+          (mlData?.confidence || 0.5) * 0.4 +
+          (modelData?.average_performance || 0.5) * 0.2,
+          0.95
+        );
+
+        return {
+          overall_risk_score,
+          risk_category,
+          predictions: {
+            severity,
+            flareup_risk,
+            treatment_response
+          },
+          recommendations,
+          confidence
+        };
+      } catch (fallbackError) {
+        console.error('Fallback data generation failed:', fallbackError);
+        // Last resort fallback with minimal assumptions
+        return {
+          overall_risk_score: 0.5,
+          risk_category: 'medium',
+          predictions: {
+            severity: 5.0,
+            flareup_risk: 0.5,
+            treatment_response: 0.6
+          },
+          recommendations: ['Monitor symptoms regularly', 'Maintain healthy lifestyle', 'Consult healthcare provider if symptoms worsen'],
+          confidence: 0.4
+        };
+      }
     }
   }
 
@@ -995,26 +1049,73 @@ class MLService {
       const dynamicConfidence = this.calculateDynamicConfidence(request);
       const dynamicAlternatives = this.generateDynamicAlternatives(request);
       
+      // Calculate dynamic optimal dosage based on request data
+      const currentMedication = request.medication_history[0];
+      const avgSymptomSeverity = (
+        request.current_symptoms.abdominal_pain +
+        request.current_symptoms.diarrhea +
+        request.current_symptoms.bloating +
+        (request.current_symptoms.constipation || 0) +
+        (request.current_symptoms.nausea || 0)
+      ) / 5;
+
+      // Determine optimal dosage based on current effectiveness and symptoms
+      const dosageMultiplier = avgSymptomSeverity > 7 ? 1.2 : avgSymptomSeverity < 4 ? 0.8 : 1.0;
+      const baseAmount = currentMedication ? parseFloat(currentMedication.dosage.replace(/[^\d.]/g, '')) || 2 : 2;
+      const optimalAmount = Math.round(baseAmount * dosageMultiplier * 10) / 10;
+
+      // Determine frequency based on symptom severity and current adherence
+      const avgAdherence = request.medication_history.reduce((sum, med) => sum + med.adherence_rate, 0) / request.medication_history.length;
+      const frequency = avgSymptomSeverity > 6 && avgAdherence > 0.8 ? 'three_times_daily' : 
+                      avgSymptomSeverity > 4 ? 'twice_daily' : 'once_daily';
+
+      // Dynamic timing based on frequency
+      const timing = frequency === 'three_times_daily' ? ['morning', 'afternoon', 'evening'] :
+                    frequency === 'twice_daily' ? ['morning', 'evening'] : ['morning'];
+
+      // Calculate side effect probabilities based on dosage and user profile
+      const sideEffectMultiplier = optimalAmount > baseAmount ? 1.3 : 0.8;
+      const ageFactor = request.user_profile.age > 65 ? 1.2 : request.user_profile.age < 30 ? 0.9 : 1.0;
+
       return {
         effectiveness_score: dynamicEffectiveness,
         confidence: dynamicConfidence,
         optimal_dosage: {
-          amount: '2mg',
-          frequency: 'twice_daily',
-          timing: ['morning', 'evening'],
-          with_food: true,
-          adjustments: ['Consider adjusting dosage timing based on symptom patterns']
+          amount: `${optimalAmount}mg`,
+          frequency,
+          timing,
+          with_food: avgSymptomSeverity > 5, // Recommend with food for higher symptom severity
+          adjustments: [
+            avgSymptomSeverity > 7 ? 'Consider gradual dose increase under medical supervision' :
+            avgSymptomSeverity < 3 ? 'Consider dose reduction if symptoms remain controlled' :
+            'Monitor current dosage effectiveness',
+            avgAdherence < 0.7 ? 'Focus on improving medication adherence' : 'Maintain current adherence schedule'
+          ].filter(Boolean)
         },
         expected_side_effects: [
-          { effect: 'mild_drowsiness', probability: 0.2 + Math.random() * 0.15, severity: 'mild' },
-          { effect: 'dry_mouth', probability: 0.1 + Math.random() * 0.15, severity: 'mild' }
+          { 
+            effect: 'mild_drowsiness', 
+            probability: Math.min(0.15 * sideEffectMultiplier * ageFactor, 0.8), 
+            severity: optimalAmount > baseAmount * 1.5 ? 'moderate' : 'mild' 
+          },
+          { 
+            effect: 'dry_mouth', 
+            probability: Math.min(0.08 * sideEffectMultiplier * ageFactor, 0.6), 
+            severity: 'mild' 
+          },
+          ...(optimalAmount > baseAmount * 1.2 ? [{ 
+            effect: 'gastrointestinal_upset', 
+            probability: Math.min(0.12 * sideEffectMultiplier, 0.5), 
+            severity: 'mild' 
+          }] : [])
         ],
         alternative_medications: dynamicAlternatives,
         monitoring_recommendations: [
           'Monitor symptom severity daily',
           'Track medication adherence',
-          'Combine with dietary modifications',
-          'Regular follow-up assessments'
+          avgSymptomSeverity > 6 ? 'Consider combining with dietary modifications' : 'Maintain current dietary approach',
+          frequency === 'three_times_daily' ? 'Regular follow-up every 2 weeks' : 'Regular follow-up assessments',
+          ...(request.user_profile.comorbidities?.length ? ['Monitor for drug interactions with comorbid conditions'] : [])
         ]
       };
     }

@@ -31,6 +31,7 @@ export default function DietHistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [mealTypeFilter, setMealTypeFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
+
   const [sortBy, setSortBy] = useState<'date' | 'meal_type' | 'calories'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -159,11 +160,15 @@ export default function DietHistoryPage() {
   };
 
   const getStats = () => {
-    const totalLogs = dietLogs.length;
-    const totalCalories = dietLogs.reduce((sum, log) => sum + (log.calories || 0), 0);
+    // Use the filtered logs that are actually displayed to the user
+    // This ensures statistics match what the user can see
+    const statsLogs = filteredLogs;
+    
+    const totalLogs = statsLogs.length;
+    const totalCalories = statsLogs.reduce((sum, log) => sum + (log.calories || 0), 0);
     const avgCaloriesPerMeal = totalLogs > 0 ? Math.round(totalCalories / totalLogs) : 0;
     
-    const mealTypeCounts = dietLogs.reduce((acc, log) => {
+    const mealTypeCounts = statsLogs.reduce((acc, log) => {
       acc[log.meal_type] = (acc[log.meal_type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -213,6 +218,12 @@ export default function DietHistoryPage() {
                   Log New Meal
                 </Button>
               </Link>
+            </div>
+
+            {/* Statistics Overview */}
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Statistics Overview</h2>
+              <p className="text-sm text-gray-600 mt-1">Statistics reflect your currently filtered data</p>
             </div>
 
             {/* Stats Cards */}

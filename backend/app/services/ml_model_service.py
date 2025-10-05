@@ -665,16 +665,30 @@ class MLModelService:
 
         return features
 
-    def _score_to_severity_level(self, score: float) -> str:
-        """Convert severity score to level."""
-        if score < 0.25:
-            return "none"
-        elif score < 0.5:
-            return "mild"
-        elif score < 0.75:
-            return "moderate"
+    def _score_to_severity_level(
+        self, score: float, user_thresholds: Optional[Dict[str, float]] = None
+    ) -> str:
+        """Convert severity score to level using personalized or default thresholds."""
+        if user_thresholds:
+            # Use personalized thresholds
+            if score >= user_thresholds.get("severe", 0.75):
+                return "severe"
+            elif score >= user_thresholds.get("moderate", 0.5):
+                return "moderate"
+            elif score >= user_thresholds.get("mild", 0.25):
+                return "mild"
+            else:
+                return "none"
         else:
-            return "severe"
+            # Use default thresholds
+            if score < 0.25:
+                return "none"
+            elif score < 0.5:
+                return "mild"
+            elif score < 0.75:
+                return "moderate"
+            else:
+                return "severe"
 
     def _score_to_risk_level(self, score: float) -> str:
         """Convert risk score to level."""

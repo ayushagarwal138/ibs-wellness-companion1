@@ -61,7 +61,7 @@ export const PaymentMethods: React.FC = () => {
     try {
       const response = await fetch('/api/v1/financial/payment-methods', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
       
@@ -92,7 +92,7 @@ export const PaymentMethods: React.FC = () => {
         method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         },
         body: JSON.stringify(formData)
       });
@@ -119,7 +119,7 @@ export const PaymentMethods: React.FC = () => {
       const response = await fetch(`/api/v1/financial/payment-methods/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 
@@ -140,7 +140,7 @@ export const PaymentMethods: React.FC = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         },
         body: JSON.stringify({ is_default: true })
       });

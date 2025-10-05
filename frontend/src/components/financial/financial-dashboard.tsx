@@ -70,7 +70,7 @@ export const FinancialDashboard: React.FC = () => {
       // Fetch financial summary
       const summaryResponse = await fetch('/api/v1/financial/summary', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 
@@ -82,7 +82,7 @@ export const FinancialDashboard: React.FC = () => {
       // Fetch recent transactions
       const transactionsResponse = await fetch('/api/v1/financial/transactions?limit=5', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 
@@ -97,7 +97,7 @@ export const FinancialDashboard: React.FC = () => {
       // Fetch recent invoices
       const invoicesResponse = await fetch('/api/v1/financial/invoices?limit=5', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 
@@ -112,7 +112,7 @@ export const FinancialDashboard: React.FC = () => {
       // Fetch recent subscriptions
       const subscriptionsResponse = await fetch('/api/v1/financial/subscriptions?limit=5', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 

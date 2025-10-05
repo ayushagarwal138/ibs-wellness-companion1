@@ -273,7 +273,7 @@ async def get_diet_logs(
     from app.models.diet import Food
 
     query = (
-        select(DietLog, Food.name.label("food_name"))
+        select(DietLog, Food.name.label("food_name"), Food.calories_per_100g)
         .join(Food, DietLog.food_id == Food.id)
         .filter(DietLog.user_id == current_user.id)
     )
@@ -295,7 +295,7 @@ async def get_diet_logs(
 
     # Group logs by meal (same consumed_at, meal_type, and user)
     meal_groups = {}
-    for diet_log, food_name in rows:
+    for diet_log, food_name, calories_per_100g in rows:
         # Create a key for grouping meals (within 5 minutes of each other)
         meal_key = (
             diet_log.meal_type,
@@ -305,9 +305,18 @@ async def get_diet_logs(
         )
 
         if meal_key not in meal_groups:
-            meal_groups[meal_key] = {"diet_log": diet_log, "foods": []}
+            meal_groups[meal_key] = {
+                "diet_log": diet_log, 
+                "foods": [], 
+                "total_calories": 0
+            }
 
         meal_groups[meal_key]["foods"].append(food_name)
+        
+        # Calculate calories for this food item
+        if calories_per_100g and diet_log.portion_size_g:
+            food_calories = (float(diet_log.portion_size_g) / 100.0) * float(calories_per_100g)
+            meal_groups[meal_key]["total_calories"] += food_calories
 
     # Convert grouped meals to list and sort by consumed_at
     grouped_meals = list(meal_groups.values())
@@ -318,13 +327,14 @@ async def get_diet_logs(
     offset = (page - 1) * size
     paginated_meals = grouped_meals[offset : offset + size]
 
-    # Transform the results to include food names
+    # Transform the results to include food names and calculated calories
     items = []
     for meal_group in paginated_meals:
         diet_log = meal_group["diet_log"]
         foods = meal_group["foods"]
+        total_calories = meal_group["total_calories"]
 
-        # Create a dict with all diet log attributes plus foods array
+        # Create a dict with all diet log attributes plus foods array and calories
         item_dict = {
             "id": diet_log.id,
             "user_id": str(diet_log.user_id),
@@ -345,6 +355,7 @@ async def get_diet_logs(
             "created_at": diet_log.created_at,
             "updated_at": diet_log.updated_at,
             "foods": foods,  # Include all foods from this meal
+            "calories": round(total_calories, 1),  # Add calculated calories for the meal
         }
         items.append(item_dict)
 
@@ -610,17 +621,34 @@ async def get_diet_stats(
     """Get diet statistics for the current user."""
     start_date = datetime.utcnow() - timedelta(days=days)
 
-    # Total meals count
-    total_meals_result = await db.execute(
-        select(func.count(DietLog.id))
+    # Total meals count - use the same grouping logic as get_diet_logs
+    # Get all diet logs and group them by meal (same consumed_at, meal_type)
+    diet_logs_result = await db.execute(
+        select(DietLog)
         .where(
             and_(
                 DietLog.user_id == current_user.id,
                 DietLog.consumed_at >= start_date
             )
         )
+        .order_by(desc(DietLog.consumed_at))
     )
-    total_meals = total_meals_result.scalar() or 0
+    diet_logs = diet_logs_result.scalars().all()
+    
+    # Group logs by meal (same consumed_at, meal_type, and user)
+    meal_groups = {}
+    for diet_log in diet_logs:
+        # Create a key for grouping meals
+        meal_key = (
+            diet_log.meal_type,
+            diet_log.consumed_at.replace(second=0, microsecond=0),
+            diet_log.portion_description or "",
+            diet_log.notes or "",
+        )
+        if meal_key not in meal_groups:
+            meal_groups[meal_key] = True
+    
+    total_meals = len(meal_groups)
 
     # Calculate average daily calories
     calories_result = await db.execute(
@@ -823,11 +851,61 @@ async def get_trigger_food_analysis(
         "Consult with a healthcare provider or dietitian for personalized advice"
     )
 
+    # Format data according to TriggerFoodAnalysis schema
+    identified_triggers = [
+        {
+            "food_name": food["food_name"],
+            "risk_score": food["risk_score"],
+            "reaction_count": food["reaction_count"],
+            "average_severity": food["average_severity"],
+            "confidence": min(100, food["reaction_count"] * 25)  # Higher confidence with more reactions
+        }
+        for food in trigger_foods[:10]
+    ]
+    
+    safe_alternatives = [
+        {
+            "food_name": food,
+            "category": "safe",
+            "confidence": 85,
+            "notes": "No recorded reactions in analysis period"
+        }
+        for food in safe_foods
+    ]
+    
+    elimination_suggestions = []
+    if trigger_foods:
+        elimination_suggestions.extend([
+            f"Eliminate {food['food_name']} for 2-4 weeks to confirm trigger status"
+            for food in trigger_foods[:3]
+        ])
+        elimination_suggestions.append("Keep a detailed symptom diary during elimination")
+        elimination_suggestions.append("Reintroduce foods one at a time after elimination period")
+    
+    reintroduction_plan = []
+    if trigger_foods:
+        for i, food in enumerate(trigger_foods[:3]):
+            reintroduction_plan.append({
+                "week": i + 1,
+                "food_name": food["food_name"],
+                "instructions": f"Reintroduce {food['food_name']} in small amounts",
+                "monitoring_period": "3-5 days",
+                "notes": "Monitor for symptom recurrence"
+            })
+    
+    confidence_scores = {
+        "overall_analysis": min(100, len(reactions) * 10) if reactions else 50,
+        "trigger_identification": 90 if len(trigger_foods) > 0 else 30,
+        "safe_food_identification": 75,
+        "recommendation_accuracy": 85
+    }
+
     return TriggerFoodAnalysis(
-        analysis_period_days=days,
-        trigger_foods=trigger_foods[:10],  # Top 10 trigger foods
-        safe_foods=safe_foods,
-        recommendations=recommendations,
+        identified_triggers=identified_triggers,
+        safe_alternatives=safe_alternatives,
+        elimination_suggestions=elimination_suggestions,
+        reintroduction_plan=reintroduction_plan,
+        confidence_scores=confidence_scores,
     )
 
 

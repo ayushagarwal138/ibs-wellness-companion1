@@ -37,29 +37,43 @@ export function RegisterForm() {
       return
     }
 
-    if (formData.password.length < 8) {
-      toast.error("Password must be at least 8 characters long")
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters long")
       return
     }
 
-    // Check password strength requirements
-    if (!/[A-Z]/.test(formData.password)) {
-      toast.error("Password must contain at least one uppercase letter")
-      return
+    // Check basic password strength (more lenient requirements)
+    let strengthScore = 0
+    const requirements = []
+    
+    if (formData.password.length >= 8) strengthScore++
+    if (/[A-Z]/.test(formData.password)) {
+      strengthScore++
+    } else {
+      requirements.push("uppercase letter")
+    }
+    
+    if (/[a-z]/.test(formData.password)) {
+      strengthScore++
+    } else {
+      requirements.push("lowercase letter")
+    }
+    
+    if (/\d/.test(formData.password)) {
+      strengthScore++
+    } else {
+      requirements.push("number")
+    }
+    
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      strengthScore++
+    } else {
+      requirements.push("special character")
     }
 
-    if (!/[a-z]/.test(formData.password)) {
-      toast.error("Password must contain at least one lowercase letter")
-      return
-    }
-
-    if (!/\d/.test(formData.password)) {
-      toast.error("Password must contain at least one digit")
-      return
-    }
-
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
-      toast.error("Password must contain at least one special character")
+    // Require at least 2 out of 4 criteria for a more flexible approach
+    if (strengthScore < 2) {
+      toast.error(`Password is too weak. Please include at least 2 of: ${requirements.slice(0, 3).join(", ")}`)
       return
     }
 
@@ -95,7 +109,7 @@ export function RegisterForm() {
               id="fullName"
               name="fullName"
               type="text"
-              placeholder="Enter your full name"
+              placeholder="Enter your first and last name (e.g., John Doe)"
               value={formData.fullName}
               onChange={handleChange}
               required
@@ -123,12 +137,12 @@ export function RegisterForm() {
               id="password"
               name="password"
               type="password"
-              placeholder="Create a password (min. 8 chars, 1 upper, 1 lower, 1 digit, 1 special)"
+              placeholder="Create a password (min. 6 chars, include 2 of: uppercase, lowercase, number, special char)"
               value={formData.password}
               onChange={handleChange}
               required
               disabled={isLoading}
-              minLength={8}
+              minLength={6}
             />
           </div>
 

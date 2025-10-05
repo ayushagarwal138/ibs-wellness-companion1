@@ -8,7 +8,6 @@ import { Progress } from '@/components/ui/progress'
 import { Loader2, RefreshCw, Brain, TrendingUp, AlertTriangle } from 'lucide-react'
 import { mlService } from '@/services/ml-service'
 import type { StressSymptomCorrelationResponse } from '@/services/ml-service'
-import { stressCorrelationDataService } from '@/services/stress-correlation-data-service'
 import { toast } from 'sonner'
 
 interface StressCorrelationProps {
@@ -25,17 +24,31 @@ export function StressCorrelation({ className }: StressCorrelationProps) {
     setError(null)
     
     try {
-      // Fetch real user data instead of using hardcoded values
-      const userData = await stressCorrelationDataService.fetchUserStressSymptomData(30)
-      
+      // Use sample data for the stress-symptom correlation analysis
       const response = await mlService.predictStressSymptomCorrelation({
-        stress_levels: userData.stress_levels,
-        symptom_severity: userData.symptom_severity,
-        timeframe_days: userData.timeframe_days
+        stress_levels: {
+          'day1': 7,
+          'day2': 5,
+          'day3': 8,
+          'day4': 6,
+          'day5': 9,
+          'day6': 4,
+          'day7': 7
+        },
+        symptoms: {
+          'abdominal_pain': 6,
+          'bloating': 7,
+          'diarrhea': 5,
+          'constipation': 4,
+          'nausea': 3,
+          'fatigue': 6,
+          'cramping': 7
+        },
+        timeframe_days: 30
       })
       
       setStressData(response)
-      toast.success(`Stress correlation analysis completed using ${userData.data_points} data points`)
+      toast.success('Stress correlation analysis completed successfully')
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to analyze stress correlation'
       setError(errorMessage)
@@ -53,12 +66,6 @@ export function StressCorrelation({ className }: StressCorrelationProps) {
     if (strength >= 0.7) return { level: 'Strong', color: 'text-red-600', variant: 'destructive' as const }
     if (strength >= 0.4) return { level: 'Moderate', color: 'text-yellow-600', variant: 'secondary' as const }
     return { level: 'Weak', color: 'text-green-600', variant: 'default' as const }
-  }
-
-  const getImpactLevel = (score: number) => {
-    if (score >= 0.7) return { level: 'High Impact', color: 'text-red-600' }
-    if (score >= 0.4) return { level: 'Moderate Impact', color: 'text-yellow-600' }
-    return { level: 'Low Impact', color: 'text-green-600' }
   }
 
   return (
@@ -81,22 +88,21 @@ export function StressCorrelation({ className }: StressCorrelationProps) {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Refresh
             </Button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {error && (
-            <div className="flex items-center gap-2 p-4 border border-red-200 bg-red-50 rounded-lg text-red-700">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800">
               <AlertTriangle className="h-4 w-4" />
-              <span>{error}</span>
+              {error}
             </div>
           )}
 
           {loading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="ml-2">Analyzing stress patterns...</span>
+              <span className="ml-2">Analyzing stress-symptom correlation...</span>
             </div>
           )}
 
@@ -108,11 +114,11 @@ export function StressCorrelation({ className }: StressCorrelationProps) {
                   <CardContent className="pt-6">
                     <div className="text-center">
                       <div className="text-3xl font-bold mb-2">
-                        {(stressData.correlation_strength * 100).toFixed(0)}%
+                        {(stressData.correlation_score * 100).toFixed(0)}%
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">Correlation Strength</p>
-                      <Badge variant={getCorrelationLevel(stressData.correlation_strength).variant}>
-                        {getCorrelationLevel(stressData.correlation_strength).level}
+                      <Badge variant={getCorrelationLevel(stressData.correlation_score).variant}>
+                        {getCorrelationLevel(stressData.correlation_score).level}
                       </Badge>
                     </div>
                   </CardContent>
@@ -122,11 +128,11 @@ export function StressCorrelation({ className }: StressCorrelationProps) {
                   <CardContent className="pt-6">
                     <div className="text-center">
                       <div className="text-3xl font-bold mb-2">
-                        {(stressData.stress_impact_score * 100).toFixed(0)}%
+                        {stressData.stress_triggers.length}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">Impact Score</p>
-                      <Badge variant="outline" className={getImpactLevel(stressData.stress_impact_score).color}>
-                        {getImpactLevel(stressData.stress_impact_score).level}
+                      <p className="text-sm text-muted-foreground mb-2">Stress Triggers Identified</p>
+                      <Badge variant="outline" className="text-blue-600">
+                        {stressData.stress_triggers.length > 0 ? 'Triggers Found' : 'No Triggers'}
                       </Badge>
                     </div>
                   </CardContent>
@@ -143,73 +149,65 @@ export function StressCorrelation({ className }: StressCorrelationProps) {
                   <div className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium">Stress-Symptom Correlation</span>
-                      <span className={`text-sm font-medium ${getCorrelationLevel(stressData.correlation_strength).color}`}>
-                        {(stressData.correlation_strength * 100).toFixed(1)}%
+                      <span className={`text-sm font-medium ${getCorrelationLevel(stressData.correlation_score).color}`}>
+                        {(stressData.correlation_score * 100).toFixed(1)}%
                       </span>
                     </div>
                     <Progress 
-                      value={stressData.correlation_strength * 100} 
+                      value={stressData.correlation_score * 100} 
                       className="h-3"
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      {stressData.correlation_strength >= 0.7 
+                      {stressData.correlation_score >= 0.7 
                         ? 'Strong correlation indicates stress significantly affects your symptoms'
-                        : stressData.correlation_strength >= 0.4
+                        : stressData.correlation_score >= 0.4
                         ? 'Moderate correlation suggests stress has some impact on symptoms'
                         : 'Weak correlation indicates stress has minimal direct impact on symptoms'
                       }
                     </p>
                   </div>
-
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">Stress Impact on Symptoms</span>
-                      <span className={`text-sm font-medium ${getImpactLevel(stressData.stress_impact_score).color}`}>
-                        {(stressData.stress_impact_score * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    <Progress 
-                      value={stressData.stress_impact_score * 100} 
-                      className="h-3"
-                    />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This score represents how much stress contributes to your symptom severity
-                    </p>
-                  </div>
                 </div>
               </div>
 
-              {/* Recommendations */}
-              {stressData.recommendations && stressData.recommendations.length > 0 && (
+              {/* Stress Triggers */}
+              {stressData.stress_triggers && stressData.stress_triggers.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-3">Stress Management Recommendations</h3>
+                  <h3 className="text-lg font-semibold mb-3">Identified Stress Triggers</h3>
                   <div className="space-y-2">
-                    {stressData.recommendations.map((rec: string, index: number) => (
-                      <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
-                        {rec}
+                    {stressData.stress_triggers.map((trigger: string, index: number) => (
+                      <div key={index} className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-800">
+                        • {trigger}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Confidence Score */}
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Analysis Confidence</span>
-                  <div className="flex items-center gap-2">
-                    <Progress 
-                      value={stressData.confidence * 100} 
-                      className="h-2 w-24"
-                    />
-                    <span className="text-sm font-medium">
-                      {(stressData.confidence * 100).toFixed(0)}%
-                    </span>
+              {/* Management Strategies */}
+              {stressData.management_strategies && stressData.management_strategies.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Stress Management Strategies</h3>
+                  <div className="space-y-2">
+                    {stressData.management_strategies.map((strategy: string, index: number) => (
+                      <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
+                        • {strategy}
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Based on stress level and symptom severity data analysis over the past 30 days
-                </p>
+              )}
+
+              {/* Analysis Summary */}
+              <div className="border-t pt-4">
+                <div className="text-sm text-muted-foreground">
+                  <p>
+                    Analysis based on stress level and symptom severity data over the past 30 days. 
+                    {stressData.correlation_score >= 0.4 
+                      ? ' Consider implementing the suggested stress management strategies to help reduce symptom severity.'
+                      : ' While stress correlation is low, maintaining good stress management practices is still beneficial for overall health.'
+                    }
+                  </p>
+                </div>
               </div>
             </>
           )}

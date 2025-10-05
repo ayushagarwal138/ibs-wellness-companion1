@@ -61,7 +61,7 @@ export const Subscriptions: React.FC = () => {
     plan_name: '',
     amount: 0,
     billing_cycle: 'monthly',
-    start_date: new Date().toISOString().split('T')[0]
+    start_date: new Date().toISOString().substring(0, 10)
   });
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export const Subscriptions: React.FC = () => {
     try {
       const response = await fetch('/api/v1/financial/subscriptions', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
       
@@ -94,7 +94,7 @@ export const Subscriptions: React.FC = () => {
     try {
       const response = await fetch('/api/v1/financial/payment-methods', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
       
@@ -121,7 +121,7 @@ export const Subscriptions: React.FC = () => {
         method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         },
         body: JSON.stringify(formData)
       });
@@ -148,7 +148,7 @@ export const Subscriptions: React.FC = () => {
       const response = await fetch(`/api/v1/financial/subscriptions/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 
@@ -181,7 +181,7 @@ export const Subscriptions: React.FC = () => {
       plan_name: '',
       amount: 0,
       billing_cycle: 'monthly',
-      start_date: new Date().toISOString().split('T')[0]
+      start_date: new Date().toISOString().substring(0, 10)
     });
     setEditingId(null);
     setShowAddForm(false);

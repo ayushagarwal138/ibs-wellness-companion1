@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { toast } from 'react-hot-toast';
 import { UI_CONFIG } from '@/lib/config';
-import { dietService, DietStats } from '@/services/diet-service';
+import { dietService, type DietStats } from '@/services/diet-service';
 import {
   Chart as ChartJS,
   CategoryScale,

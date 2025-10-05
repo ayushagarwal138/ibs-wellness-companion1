@@ -1,6 +1,31 @@
 'use client';
 
 import { API_CONFIG } from '@/lib/config';
+import { apiService } from './api-service';
+import { dynamicRiskFactorService, DynamicRiskAssessment } from './dynamic-risk-factor-service';
+import { ApiError } from '@/lib/api';
+
+// Enhanced error handling for dashboard operations
+interface DashboardError extends Error {
+  type: 'network' | 'auth' | 'server' | 'validation' | 'timeout' | 'data' | 'unknown';
+  component?: string;
+  retryable: boolean;
+  userMessage: string;
+}
+
+// Retry configuration for dashboard operations
+const DASHBOARD_RETRY_CONFIG = {
+  maxRetries: 2,
+  retryDelay: 2000,
+  components: {
+    predictions: { maxRetries: 3, critical: true },
+    symptoms: { maxRetries: 2, critical: false },
+    stats: { maxRetries: 2, critical: false },
+    insights: { maxRetries: 1, critical: false },
+    reminders: { maxRetries: 1, critical: false },
+    recommendations: { maxRetries: 2, critical: false }
+  }
+};
 
 export interface DynamicDashboardData {
   aiPredictions: {
@@ -63,41 +88,134 @@ export interface DynamicDashboardData {
 }
 
 class DynamicDashboardService {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-    };
-  }
+  
+  // Helper method to create dashboard-specific errors
+  private createDashboardError(error: any, component: string): DashboardError {
+    let type: DashboardError['type'] = 'unknown';
+    let retryable = false;
+    let userMessage = 'An unexpected error occurred';
 
-  private async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...this.getAuthHeaders(),
-        ...options.headers,
-      },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    if (error && typeof error === 'object' && 'type' in error) {
+      // Handle ApiError from our enhanced API client
+      const apiError = error as ApiError;
+      type = apiError.type;
+      retryable = apiError.retryable;
+      
+      switch (apiError.type) {
+        case 'network':
+          userMessage = `Unable to connect to ${this.getComponentDisplayName(component)} service. Please check your internet connection and try again.`;
+          break;
+        case 'auth':
+          userMessage = `Please log in to access ${this.getComponentDisplayName(component)}.`;
+          break;
+        case 'server':
+          userMessage = `${this.getComponentDisplayName(component)} service is temporarily unavailable. Please try again in a moment.`;
+          break;
+        case 'timeout':
+          userMessage = `${this.getComponentDisplayName(component)} is taking longer than usual to load. Please try again.`;
+          break;
+        case 'validation':
+          userMessage = 'Invalid data provided. Please check your input and try again.';
+          break;
+        default:
+          userMessage = `Failed to load ${this.getComponentDisplayName(component)}. Please try again.`;
+      }
+    } else {
+      // Handle other types of errors
+      type = 'data';
+      retryable = true;
+      userMessage = this.getContextualErrorMessage(error, component);
     }
 
-    return response;
+    const dashboardError = new Error(error?.message || userMessage) as DashboardError;
+    dashboardError.type = type;
+    dashboardError.component = component;
+    dashboardError.retryable = retryable;
+    dashboardError.userMessage = userMessage;
+    
+    return dashboardError;
+  }
+
+  private getComponentDisplayName(component: string): string {
+    const displayNames: Record<string, string> = {
+      'predictions': 'AI Predictions',
+      'symptoms': 'Recent Symptoms',
+      'stats': 'Weekly Statistics',
+      'insights': 'Personalized Insights',
+      'reminders': 'Upcoming Reminders',
+      'recommendations': 'Personalized Recommendations',
+      'dashboard': 'Dashboard',
+    };
+    
+    return displayNames[component] || component;
+  }
+
+  private getContextualErrorMessage(error: any, component: string): string {
+    const componentName = this.getComponentDisplayName(component);
+    
+    // Check if error has a user-friendly message from the API client
+    if (error?.userMessage) {
+      return error.userMessage;
+    }
+    
+    // Check for specific error patterns
+    if (error?.response?.data?.detail) {
+      const detail = error.response.data.detail;
+      if (typeof detail === 'string') {
+        return `${componentName}: ${detail}`;
+      }
+    }
+    
+    // Default contextual message
+    return `Unable to load ${componentName}. Please try again.`;
+  }
+
+  // Helper method to execute operations with component-specific retry logic
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    component: keyof typeof DASHBOARD_RETRY_CONFIG.components,
+    fallbackData?: T
+  ): Promise<T> {
+    const config = DASHBOARD_RETRY_CONFIG.components[component];
+    let lastError: any;
+
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        const dashboardError = this.createDashboardError(error, component);
+        
+        // If it's not retryable or we've exhausted retries, throw the error
+        if (!dashboardError.retryable || attempt === config.maxRetries) {
+          // For non-critical components, return fallback data if available
+          if (!config.critical && fallbackData !== undefined) {
+            console.warn(`Failed to load ${component}, using fallback data:`, dashboardError);
+            return fallbackData;
+          }
+          throw dashboardError;
+        }
+
+        // Wait before retrying (exponential backoff)
+        if (attempt < config.maxRetries) {
+          const delay = DASHBOARD_RETRY_CONFIG.retryDelay * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw this.createDashboardError(lastError, component);
   }
 
   async getMLPredictions(): Promise<DynamicDashboardData['aiPredictions']> {
     try {
-      // Get enhanced predictions and trigger analysis in parallel
-      const [predictionsResponse, triggerAnalysisResponse] = await Promise.all([
-        this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/ml/predictions`),
-        this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/diet/analysis/triggers?days=90`)
+      // Get enhanced predictions, trigger analysis, and dynamic risk assessment in parallel
+      const [predictionsData, triggerAnalysisData, dynamicRiskAssessment] = await Promise.all([
+        apiService.get(`${API_CONFIG.BASE_URL}/api/v1/ml/predictions`),
+        apiService.get(`${API_CONFIG.BASE_URL}/api/v1/diet/analysis/triggers?days=90`),
+        dynamicRiskFactorService.calculateDynamicRiskFactors()
       ]);
-
-      const predictionsData = await predictionsResponse.json();
-      const triggerData = await triggerAnalysisResponse.json();
 
       // Validate required fields from ML model response
       if (!predictionsData || typeof predictionsData !== 'object') {
@@ -105,33 +223,121 @@ class DynamicDashboardService {
       }
 
       // Extract trigger foods from enhanced analysis
-      const enhancedTriggerFoods = triggerData.trigger_foods?.map((trigger: any) => 
+      const enhancedTriggerFoods = (triggerAnalysisData as any)?.trigger_foods?.map((trigger: any) => 
         `${trigger.food_name} (${trigger.risk_score}% risk)`
       ) || [];
 
       // Fallback to basic trigger foods if enhanced analysis fails
       const triggerFoods = enhancedTriggerFoods.length > 0 
         ? enhancedTriggerFoods 
-        : this.validateStringArray(predictionsData.trigger_foods);
+        : this.validateStringArray((predictionsData as any).triggerFoods);
+
+      // Integrate dynamic risk factors with ML predictions
+      const enhancedKeyFactors = this.combineRiskFactors(
+        this.validateStringArray((predictionsData as any).keyFactors),
+        dynamicRiskAssessment
+      );
+
+      // Enhance recommendations with dynamic insights
+      const enhancedRecommendations = this.combineRecommendations(
+        this.validateStringArray((predictionsData as any).recommendations),
+        dynamicRiskAssessment
+      );
+
+      // Use dynamic risk level if confidence is higher
+      const finalRiskLevel = this.selectBestRiskLevel(
+        this.validateRiskLevel((predictionsData as any).riskLevel),
+        dynamicRiskAssessment
+      );
+
+      // Combine confidence scores
+      const combinedConfidence = this.calculateCombinedConfidence(
+        this.validateConfidence((predictionsData as any).confidence),
+        dynamicRiskAssessment.confidence
+      );
 
       // Ensure all required fields are present and valid
       const predictions = {
-        riskLevel: this.validateRiskLevel(predictionsData.risk_level),
-        nextFlareRisk: this.validatePercentage(predictionsData.next_flare_probability),
-        confidence: this.validateConfidence(predictionsData.confidence),
+        riskLevel: finalRiskLevel,
+        nextFlareRisk: this.validatePercentage((predictionsData as any).nextFlareRisk),
+        confidence: combinedConfidence,
         triggerFoods: triggerFoods,
-        recommendations: this.validateStringArray(predictionsData.recommendations),
-        keyFactors: this.validateStringArray(predictionsData.key_factors),
-        timeline: this.validateTimeline(predictionsData.timeline),
-        modelVersion: this.validateModelVersion(predictionsData.model_version),
+        recommendations: enhancedRecommendations,
+        keyFactors: enhancedKeyFactors,
+        timeline: this.validateTimeline((predictionsData as any).timeline),
+        modelVersion: this.validateModelVersion((predictionsData as any).modelVersion),
       };
 
-      console.log('Enhanced ML predictions with trigger analysis retrieved successfully:', predictions);
+      console.log('Enhanced ML predictions with dynamic risk analysis retrieved successfully:', predictions);
       return predictions;
     } catch (error) {
       console.error('Failed to fetch ML predictions:', error);
       throw new Error(`ML prediction service unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Combine ML-generated key factors with dynamic risk factors
+   */
+  private combineRiskFactors(mlFactors: string[], riskAssessment: DynamicRiskAssessment): string[] {
+    const dynamicFactors = riskAssessment.riskFactors
+      .filter(factor => factor.impact === 'high' || factor.impact === 'critical')
+      .map(factor => factor.factor);
+
+    // Combine and deduplicate factors, prioritizing high-impact dynamic factors
+    const combinedFactors = [...dynamicFactors, ...mlFactors];
+    const uniqueFactors = Array.from(new Set(combinedFactors));
+    
+    // Limit to top 6 factors for display
+    return uniqueFactors.slice(0, 6);
+  }
+
+  /**
+   * Combine ML recommendations with dynamic risk-based recommendations
+   */
+  private combineRecommendations(mlRecommendations: string[], riskAssessment: DynamicRiskAssessment): string[] {
+    // Get top priority recommendations from dynamic assessment
+    const dynamicRecommendations = riskAssessment.recommendations.slice(0, 3);
+    
+    // Combine recommendations, prioritizing dynamic ones
+    const combinedRecommendations = [...dynamicRecommendations, ...mlRecommendations];
+    const uniqueRecommendations = Array.from(new Set(combinedRecommendations));
+    
+    // Limit to top 8 recommendations for display
+    return uniqueRecommendations.slice(0, 8);
+  }
+
+  /**
+   * Select the best risk level based on confidence scores
+   */
+  private selectBestRiskLevel(mlRiskLevel: 'low' | 'medium' | 'high', riskAssessment: DynamicRiskAssessment): 'low' | 'medium' | 'high' {
+    // Convert dynamic risk level to match ML format
+    const dynamicRiskLevel = riskAssessment.riskLevel === 'moderate' ? 'medium' : 
+                             riskAssessment.riskLevel === 'critical' ? 'high' : 
+                             riskAssessment.riskLevel;
+
+    // Use dynamic risk level if it has higher confidence or if it indicates higher risk
+    if (riskAssessment.confidence > 0.7) {
+      return dynamicRiskLevel as 'low' | 'medium' | 'high';
+    }
+
+    // Otherwise, use the higher of the two risk levels
+    const riskLevels = { low: 1, medium: 2, high: 3 };
+    const mlLevel = riskLevels[mlRiskLevel];
+    const dynamicLevel = riskLevels[dynamicRiskLevel as 'low' | 'medium' | 'high'];
+    
+    const maxLevel = Math.max(mlLevel, dynamicLevel);
+    return Object.keys(riskLevels).find(key => riskLevels[key as keyof typeof riskLevels] === maxLevel) as 'low' | 'medium' | 'high';
+  }
+
+  /**
+   * Calculate combined confidence score
+   */
+  private calculateCombinedConfidence(mlConfidence: number, dynamicConfidence: number): number {
+    // Weighted average with slight preference for dynamic confidence if it's high
+    const weight = dynamicConfidence > 0.8 ? 0.6 : 0.4;
+    const combinedConfidence = (dynamicConfidence * weight) + (mlConfidence * (1 - weight));
+    return Math.round(combinedConfidence * 100) / 100;
   }
 
   private validateRiskLevel(value: any): 'low' | 'medium' | 'high' {
@@ -291,8 +497,7 @@ class DynamicDashboardService {
 
   async getRecentSymptoms(): Promise<DynamicDashboardData['recentSymptoms']> {
     try {
-      const response = await this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/symptom-logs?limit=10`);
-      const data = await response.json();
+      const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/symptom-logs?limit=10`) as any;
 
       return (data.items || []).map((log: any) => ({
         date: new Date(log.logged_at).toLocaleDateString(),
@@ -308,15 +513,12 @@ class DynamicDashboardService {
 
   async getWeeklyStats(): Promise<DynamicDashboardData['weeklyStats']> {
     try {
-      const [symptomsResponse, analyticsResponse] = await Promise.all([
-        this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/symptom-logs?days=7`),
-        this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/analytics/weekly-summary`),
+      const [symptomsData, analyticsData] = await Promise.all([
+        apiService.get(`${API_CONFIG.BASE_URL}/api/v1/symptom-logs?days=7`),
+        apiService.get(`${API_CONFIG.BASE_URL}/api/v1/analytics/weekly-summary`),
       ]);
 
-      const symptomsData = await symptomsResponse.json();
-      const analyticsData = await analyticsResponse.json();
-
-      const symptoms = symptomsData.items || [];
+      const symptoms = (symptomsData as any).items || [];
       const totalDays = 7;
       const symptomFreeDays = totalDays - new Set(symptoms.map((s: any) => 
         new Date(s.logged_at).toDateString()
@@ -335,8 +537,8 @@ class DynamicDashboardService {
         avgSeverity: Math.round(avgSeverity * 10) / 10,
         symptomFreeDays,
         totalLogs: symptoms.length,
-        adherenceRate: this.validateAdherenceRate(analyticsData.adherence_rate),
-        improvementTrend: this.validateImprovementTrend(analyticsData.improvement_trend),
+        adherenceRate: this.validateAdherenceRate((analyticsData as any).adherence_rate),
+        improvementTrend: this.validateImprovementTrend((analyticsData as any).improvement_trend),
       };
 
       console.log('Weekly stats retrieved successfully:', stats);
@@ -349,8 +551,7 @@ class DynamicDashboardService {
 
   async getPersonalizedInsights(): Promise<DynamicDashboardData['insights']> {
     try {
-      const response = await this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/analytics/insights`);
-      const data = await response.json();
+      const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/analytics/insights`) as any;
 
       if (!data || !Array.isArray(data.insights)) {
         throw new Error('Invalid insights response format');
@@ -380,8 +581,7 @@ class DynamicDashboardService {
 
   async getUpcomingReminders(): Promise<DynamicDashboardData['upcomingReminders']> {
     try {
-      const response = await this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/reminders/upcoming`);
-      const data = await response.json();
+      const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/reminders/upcoming`) as any;
 
       if (!data || !Array.isArray(data.reminders)) {
         throw new Error('Invalid reminders response format');
@@ -411,8 +611,7 @@ class DynamicDashboardService {
 
   async getPersonalizedRecommendations(): Promise<DynamicDashboardData['personalizedRecommendations']> {
     try {
-      const response = await this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/recommendations/personalized`);
-      const data = await response.json();
+      const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/recommendations/personalized`) as any;
 
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid recommendations response format');
@@ -434,57 +633,81 @@ class DynamicDashboardService {
 
   async getDashboardData(): Promise<DynamicDashboardData> {
     try {
-      const [
-        aiPredictions,
-        recentSymptoms,
-        weeklyStats,
-        insights,
-        upcomingReminders,
-        personalizedRecommendations,
-      ] = await Promise.all([
-        this.getMLPredictions(),
-        this.getRecentSymptoms(),
-        this.getWeeklyStats(),
-        this.getPersonalizedInsights(),
-        this.getUpcomingReminders(),
-        this.getPersonalizedRecommendations(),
+      // Define fallback data for non-critical components
+      const fallbackSymptoms: DynamicDashboardData['recentSymptoms'] = [];
+      const fallbackStats: DynamicDashboardData['weeklyStats'] = {
+        avgSeverity: 0,
+        symptomFreeDays: 0,
+        totalLogs: 0,
+        adherenceRate: 0,
+        improvementTrend: 0,
+      };
+      const fallbackInsights: DynamicDashboardData['insights'] = [];
+      const fallbackReminders: DynamicDashboardData['upcomingReminders'] = [];
+      const fallbackRecommendations: DynamicDashboardData['personalizedRecommendations'] = {
+        dietary: [],
+        lifestyle: [],
+        medical: [],
+      };
+
+      // Use Promise.allSettled to handle partial failures gracefully
+      const results = await Promise.allSettled([
+        this.executeWithRetry(() => this.getMLPredictions(), 'predictions'),
+        this.executeWithRetry(() => this.getRecentSymptoms(), 'symptoms', fallbackSymptoms),
+        this.executeWithRetry(() => this.getWeeklyStats(), 'stats', fallbackStats),
+        this.executeWithRetry(() => this.getPersonalizedInsights(), 'insights', fallbackInsights),
+        this.executeWithRetry(() => this.getUpcomingReminders(), 'reminders', fallbackReminders),
+        this.executeWithRetry(() => this.getPersonalizedRecommendations(), 'recommendations', fallbackRecommendations),
       ]);
 
+      // Extract results, using fallbacks for failed non-critical components
+      const [
+        predictionsResult,
+        symptomsResult,
+        statsResult,
+        insightsResult,
+        remindersResult,
+        recommendationsResult,
+      ] = results;
+
+      // AI Predictions is critical - if it fails, the whole dashboard fails
+      if (predictionsResult.status === 'rejected') {
+        throw predictionsResult.reason;
+      }
+
       return {
-        aiPredictions,
-        recentSymptoms,
-        weeklyStats,
-        insights,
-        upcomingReminders,
-        personalizedRecommendations,
+        aiPredictions: predictionsResult.value,
+        recentSymptoms: symptomsResult.status === 'fulfilled' ? symptomsResult.value : fallbackSymptoms,
+        weeklyStats: statsResult.status === 'fulfilled' ? statsResult.value : fallbackStats,
+        insights: insightsResult.status === 'fulfilled' ? insightsResult.value : fallbackInsights,
+        upcomingReminders: remindersResult.status === 'fulfilled' ? remindersResult.value : fallbackReminders,
+        personalizedRecommendations: recommendationsResult.status === 'fulfilled' ? recommendationsResult.value : fallbackRecommendations,
       };
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
-      throw error;
+      throw this.createDashboardError(error, 'dashboard');
     }
   }
 
   // Real-time updates
   async refreshPredictions(): Promise<DynamicDashboardData['aiPredictions']> {
     try {
-      const response = await this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/ml/realtime-predictions`);
-      const data = await response.json();
+      const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/ml/realtime-predictions`) as any;
 
       // Validate required fields from ML model response
       if (!data || typeof data !== 'object') {
-        throw new Error('Invalid realtime prediction response format');
+        throw new Error('Invalid ML predictions data received');
       }
 
-      // Ensure all required fields are present and valid
       const predictions = {
-        riskLevel: this.validateRiskLevel(data.risk_level),
-        nextFlareRisk: this.validatePercentage(data.next_flare_probability),
+        riskLevel: this.validateRiskLevel(data.riskLevel),
+        nextFlareRisk: this.validatePercentage(data.nextFlareRisk),
         confidence: this.validateConfidence(data.confidence),
-        triggerFoods: this.validateStringArray(data.trigger_foods),
+        triggerFoods: this.validateStringArray(data.triggerFoods),
         recommendations: this.validateStringArray(data.recommendations),
-        keyFactors: this.validateStringArray(data.key_factors),
-        timeline: this.validateTimeline(data.timeline),
-        modelVersion: this.validateModelVersion(data.model_version),
+        keyFactors: this.validateStringArray(data.keyFactors),
+        timeline: data.timeline || 'Next 7 days',
+        modelVersion: data.modelVersion || 'v1.0'
       };
 
       console.log('Realtime predictions refreshed successfully:', predictions);
@@ -502,8 +725,7 @@ class DynamicDashboardService {
     adherenceTargets: { minimum: number; good: number; excellent: number };
   }> {
     try {
-      const response = await this.fetchWithAuth(`${API_CONFIG.BASE_URL}/api/v1/config/dashboard-thresholds`);
-      const data = await response.json();
+      const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/config/dashboard-thresholds`) as any;
 
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid thresholds configuration response format');

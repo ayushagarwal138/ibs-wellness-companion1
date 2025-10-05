@@ -154,7 +154,7 @@ export function NotificationIcon({
                 <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-sm">No notifications yet</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  We'll notify you when something important happens
+                  We&apos;ll notify you when something important happens
                 </p>
               </div>
             ) : (

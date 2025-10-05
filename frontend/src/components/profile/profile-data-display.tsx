@@ -299,7 +299,7 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
                   data.severity_level === 'severe' ? 'destructive' :
                   data.severity_level === 'moderate' ? 'secondary' : 'default'
                 }>
-                  {data.severity_level || 'Not assessed'}
+                  {data.severity_level || "Not assessed"}
                 </Badge>
               </div>
             </div>
@@ -402,10 +402,10 @@ export function ProfileDataDisplay({ className = "" }: ProfileDataDisplayProps) 
           </div>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">Doctor's Notes</label>
+              <label className="text-sm font-medium text-gray-700">Doctor&apos;s Notes</label>
               <div className="mt-2 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-900">
-                  {data.medical_notes || 'No medical notes available'}
+                  {data.medical_notes || "No medical notes available"}
                 </p>
               </div>
             </div>

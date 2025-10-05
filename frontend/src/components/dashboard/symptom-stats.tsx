@@ -178,12 +178,25 @@ export default function SymptomStats() {
     labels: Object.keys(stats?.weekly_trends || {}),
     datasets: [
       {
-        label: 'Symptom Logs',
-        data: Object.values(stats?.weekly_trends || {}),
+        label: 'Average Severity',
+        data: Object.values(stats?.weekly_trends || {}).map((week: any) => 
+          week?.average_severity || 0
+        ),
         borderColor: 'rgba(59, 130, 246, 1)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         tension: 0.4,
         fill: true,
+      },
+      {
+        label: 'Symptom Count',
+        data: Object.values(stats?.weekly_trends || {}).map((week: any) => 
+          week?.count || 0
+        ),
+        borderColor: 'rgba(239, 68, 68, 1)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'y1',
       },
     ],
   };
@@ -226,7 +239,27 @@ export default function SymptomStats() {
     },
     scales: {
       y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
         beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Average Severity',
+        },
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Symptom Count',
+        },
+        grid: {
+          drawOnChartArea: false,
+        },
       },
     },
     elements: {

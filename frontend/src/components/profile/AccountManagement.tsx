@@ -58,6 +58,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({
       }, 1000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [showDeleteModal, deleteCountdown]);
 
   // Start countdown when modal opens

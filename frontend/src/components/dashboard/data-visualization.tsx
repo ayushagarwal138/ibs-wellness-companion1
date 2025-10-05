@@ -58,36 +58,156 @@ export default function DataVisualization() {
   const fetchVisualizationData = async () => {
     setLoading(true);
     try {
-      // Mock data for now - replace with actual API calls
-      const mockData: VisualizationData = {
-        symptom_trends: Array.from({ length: 30 }, (_, i): TrendData => {
-          const date = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000);
-          const dateString: string = date.toISOString().split('T')[0] || '';
-          return {
+      const startDate = new Date(dateRange.start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+      const endDate = new Date(dateRange.end || new Date());
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+      const token = localStorage.getItem('access_token');
+
+      // Fetch real data from backend APIs
+      const [symptomLogsResponse, dietStatsResponse, foodReactionsResponse] = await Promise.all([
+        // Fetch symptom logs
+        fetch(`${apiUrl}/api/v1/symptom-logs/?days=${daysDiff}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }).catch(() => null),
+        
+        // Fetch diet stats
+        fetch(`${apiUrl}/api/v1/diet/stats/diet?days=${daysDiff}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }).catch(() => null),
+        
+        // Fetch food reactions
+        fetch(`${apiUrl}/api/v1/diet/reactions?days=${daysDiff}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }).catch(() => null),
+      ]);
+
+      // Process symptom logs data
+      let symptomTrends: TrendData[] = [];
+      if (symptomLogsResponse && symptomLogsResponse.ok) {
+        const symptomData = await symptomLogsResponse.json();
+        const logs = symptomData?.data || [];
+        
+        // Group logs by date and calculate averages
+        const dateGroups: { [key: string]: any[] } = {};
+        logs.forEach((log: any) => {
+          if (log?.logged_at) {
+            const logDate = new Date(log.logged_at).toISOString().split('T')[0];
+            if (logDate && !dateGroups[logDate]) dateGroups[logDate] = [];
+            if (logDate) dateGroups[logDate].push(log);
+          }
+        });
+
+        // Create trend data for each day in the range
+        for (let i = 0; i < daysDiff; i++) {
+          const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+          const dateString = date.toISOString().split('T')[0];
+          if (!dateString) continue;
+          const dayLogs = dateGroups[dateString] || [];
+          
+          symptomTrends.push({
             date: dateString,
-            symptom_severity: Math.floor(Math.random() * 10) + 1,
-            mood_rating: Math.floor(Math.random() * 10) + 1,
-            bristol_scale: Math.floor(Math.random() * 7) + 1,
-          };
-        }),
-        food_reaction_patterns: [
-          { food_name: 'Dairy', reaction_count: 15, avg_severity: 7.2, common_symptoms: ['Bloating', 'Cramping'] },
-          { food_name: 'Gluten', reaction_count: 12, avg_severity: 6.8, common_symptoms: ['Diarrhea', 'Fatigue'] },
-          { food_name: 'Spicy Food', reaction_count: 8, avg_severity: 5.5, common_symptoms: ['Burning', 'Urgency'] },
-          { food_name: 'Caffeine', reaction_count: 6, avg_severity: 4.2, common_symptoms: ['Anxiety', 'Cramping'] },
-          { food_name: 'Alcohol', reaction_count: 4, avg_severity: 8.1, common_symptoms: ['Diarrhea', 'Nausea'] },
-        ],
-        weekly_summary: Array.from({ length: 12 }, (_, i) => ({
-          week: `Week ${i + 1}`,
-          total_symptoms: Math.floor(Math.random() * 20) + 5,
-          avg_severity: Math.random() * 5 + 3,
-          total_meals: Math.floor(Math.random() * 15) + 15,
-          reactions: Math.floor(Math.random() * 8) + 1,
-        })),
+            symptom_severity: dayLogs.length > 0 ? 
+              dayLogs.reduce((sum: number, log: any) => sum + (log.severity || 0), 0) / dayLogs.length : 0,
+            mood_rating: dayLogs.length > 0 ? 
+              dayLogs.reduce((sum: number, log: any) => sum + (log.mood_rating || 5), 0) / dayLogs.length : 5,
+            bristol_scale: dayLogs.length > 0 ? 
+              dayLogs.reduce((sum: number, log: any) => sum + (log.bristol_stool_type || 4), 0) / dayLogs.length : 4,
+          });
+        }
+      }
+
+      // Process food reaction patterns
+      let foodReactionPatterns: FoodReactionPattern[] = [];
+      if (foodReactionsResponse && foodReactionsResponse.ok) {
+        const reactionData = await foodReactionsResponse.json();
+        const reactions = reactionData?.data || [];
+        
+        // Group reactions by food and calculate stats
+        const foodGroups: { [key: string]: any[] } = {};
+        reactions.forEach((reaction: any) => {
+          const foodName = reaction.food_name || 'Unknown';
+          if (!foodGroups[foodName]) foodGroups[foodName] = [];
+          foodGroups[foodName].push(reaction);
+        });
+
+        foodReactionPatterns = Object.entries(foodGroups).map(([foodName, reactions]) => ({
+          food_name: foodName,
+          reaction_count: reactions.length,
+          avg_severity: reactions.length > 0 ? reactions.reduce((sum: number, r: any) => sum + (r.severity || 0), 0) / reactions.length : 0,
+          common_symptoms: Array.from(new Set(reactions.flatMap((r: any) => r.symptoms || []))).slice(0, 3),
+        })).sort((a, b) => b.reaction_count - a.reaction_count).slice(0, 10);
+      }
+
+      // Process diet stats for weekly summary
+      let weeklySummary: any[] = [];
+      if (dietStatsResponse && dietStatsResponse.ok) {
+        const dietData = await dietStatsResponse.json();
+        
+        // Create weekly summary based on available data
+        const weeksCount = Math.ceil(daysDiff / 7);
+        for (let i = 0; i < weeksCount; i++) {
+          weeklySummary.push({
+            week: `Week ${i + 1}`,
+            total_symptoms: Math.floor(symptomTrends.slice(i * 7, (i + 1) * 7)
+              .reduce((sum, day) => sum + (day.symptom_severity > 0 ? 1 : 0), 0)),
+            avg_severity: symptomTrends.slice(i * 7, (i + 1) * 7)
+              .reduce((sum, day) => sum + day.symptom_severity, 0) / 7,
+            total_meals: Math.floor((dietData?.total_meals_logged || 0) / weeksCount),
+            reactions: Math.floor(foodReactionPatterns.reduce((sum, pattern) => sum + pattern.reaction_count, 0) / weeksCount),
+          });
+        }
+      }
+
+      // Fallback to empty data if no real data available
+      if (symptomTrends.length === 0) {
+        for (let i = 0; i < daysDiff; i++) {
+          const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+          const dateString = date.toISOString().split('T')[0];
+          if (dateString) {
+            symptomTrends.push({
+              date: dateString,
+              symptom_severity: 0,
+              mood_rating: 5,
+              bristol_scale: 4,
+            });
+          }
+        }
+      }
+
+      const visualizationData: VisualizationData = {
+        symptom_trends: symptomTrends,
+        food_reaction_patterns: foodReactionPatterns,
+        weekly_summary: weeklySummary.length > 0 ? weeklySummary : [{
+          week: 'Week 1',
+          total_symptoms: 0,
+          avg_severity: 0,
+          total_meals: 0,
+          reactions: 0,
+        }],
       };
-      setData(mockData);
+
+      setData(visualizationData);
     } catch (error) {
       console.error('Error fetching visualization data:', error);
+      toast.error('Failed to load analytics data. Please try again.');
+      
+      // Provide fallback empty data
+      setData({
+        symptom_trends: [],
+        food_reaction_patterns: [],
+        weekly_summary: [],
+      });
     } finally {
       setLoading(false);
     }

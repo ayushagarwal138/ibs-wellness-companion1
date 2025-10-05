@@ -132,6 +132,11 @@ class DietLogResponse(BaseModel):
         default_factory=list,
         description="List of food names for frontend compatibility",
     )
+    calories: Optional[float] = Field(
+        None, 
+        ge=0, 
+        description="Calculated calories for this meal based on portion size"
+    )
 
     class Config:
         from_attributes = True

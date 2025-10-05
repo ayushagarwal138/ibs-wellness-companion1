@@ -25,6 +25,8 @@ from .symptom_logs import router as symptom_logs_router
 from .personalization import router as personalization_router
 from .ibs_assessment import router as ibs_assessment_router
 from .real_time_training import router as real_time_training_router
+from .reminders import router as reminders_router
+from .config import router as config_router
 
 api_router = APIRouter()
 
@@ -62,5 +64,7 @@ api_router.include_router(ibs_assessment_router, tags=["ibs-assessment"])
 api_router.include_router(
     real_time_training_router, prefix="/training", tags=["real-time-training"]
 )
+api_router.include_router(reminders_router, prefix="/reminders", tags=["reminders"])
+api_router.include_router(config_router, prefix="/config", tags=["config"])
 
 __all__ = ["api_router"]

@@ -23,6 +23,9 @@ from app.models.diet import FoodReaction, ReactionSeverityEnum
 from app.models.medication import MedicationLog
 from app.schemas.chat import IBSAssessment, IBSSeverity, Recommendation
 from app.core.logging import StructuredLogger
+from app.services.personalized_threshold_service import (
+    PersonalizedThresholdService
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +35,11 @@ class MLIntegrationService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.structured_logger = StructuredLogger(__name__)
         self.models_path = Path(__file__).parent.parent.parent.parent / "ml-models"
         self.models = {}
         self.scalers = {}
+        self.threshold_service = PersonalizedThresholdService(db)
         self._load_models()
 
     def _load_models(self):
@@ -651,7 +656,9 @@ class MLIntegrationService:
             "timeline": "4-8 weeks for initial improvements",
         }
 
-    def _predict_severity_from_onboarding(self, features: List[float]) -> str:
+    def _predict_severity_from_onboarding(
+        self, features: List[float], user: User = None
+    ) -> str:
         """Predict likely severity category from onboarding features."""
         if not features or len(features) < 4:
             return "Moderate"
@@ -663,6 +670,23 @@ class MLIntegrationService:
 
         combined_score = (severity_score + stress_score + trigger_count) / 3
 
+        # Use personalized thresholds if user is provided
+        if user:
+            try:
+                thresholds = self.threshold_service.get_user_thresholds(user)
+                # Normalize combined_score to 0-10 scale for threshold comparison
+                normalized_score = min(10, max(0, combined_score))
+                severity = self.threshold_service.classify_severity(
+                    normalized_score, thresholds
+                )
+                return severity.title()
+            except Exception as e:
+                logger.warning(
+                    f"Failed to use personalized thresholds: {e}, "
+                    f"falling back to default"
+                )
+
+        # Default thresholds
         if combined_score <= 3:
             return "Mild"
         elif combined_score <= 6:
