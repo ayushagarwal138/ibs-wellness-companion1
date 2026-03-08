@@ -22,6 +22,7 @@ export interface FirebaseAuthService {
 class FirebaseAuthServiceImpl implements FirebaseAuthService {
   async signIn(email: string, password: string): Promise<FirebaseUser> {
     try {
+      if (!auth) throw new Error('Firebase auth not initialized');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return userCredential.user;
     } catch (error) {
@@ -32,17 +33,13 @@ class FirebaseAuthServiceImpl implements FirebaseAuthService {
 
   async signUp(email: string, password: string, displayName?: string): Promise<FirebaseUser> {
     try {
+      if (!auth) throw new Error('Firebase auth not initialized');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
-      // Update display name if provided
       if (displayName) {
         await updateProfile(user, { displayName });
       }
-      
-      // Send email verification
       await sendEmailVerification(user);
-      
       return user;
     } catch (error) {
       const authError = error as AuthError;
@@ -52,6 +49,7 @@ class FirebaseAuthServiceImpl implements FirebaseAuthService {
 
   async signOut(): Promise<void> {
     try {
+      if (!auth) throw new Error('Firebase auth not initialized');
       await signOut(auth);
     } catch (error) {
       const authError = error as AuthError;
@@ -61,6 +59,7 @@ class FirebaseAuthServiceImpl implements FirebaseAuthService {
 
   async resetPassword(email: string): Promise<void> {
     try {
+      if (!auth) throw new Error('Firebase auth not initialized');
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       const authError = error as AuthError;
