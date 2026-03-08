@@ -214,7 +214,7 @@ export default function ReportsPage() {
 
   const determineTrend = (predictions: any): 'improving' | 'stable' | 'worsening' => {
     if (!predictions) return 'stable';
-    const riskLevel = predictions.risk_level;
+    const riskLevel = predictions.riskLevel;
     const confidence = predictions.confidence || 0.5;
     
     if (riskLevel === 'low' && confidence > 0.7) return 'improving';
@@ -247,7 +247,7 @@ export default function ReportsPage() {
     const name = userProfile?.first_name || userProfile?.name || 'User';
     
     // Generate insights based on predictions
-    if (mlReport.predictions?.risk_level === 'low') {
+    if (mlReport.predictions?.riskLevel === 'low') {
       insights.push({
         type: 'positive' as const,
         title: `Excellent Progress, ${name}!`,
@@ -256,7 +256,7 @@ export default function ReportsPage() {
       });
     }
     
-    if (mlReport.predictions?.next_flare_probability > 0.5) {
+    if (mlReport.predictions?.nextFlareRisk > 0.5) {
       insights.push({
         type: 'warning' as const,
         title: 'Potential Flare Risk',
@@ -278,7 +278,7 @@ export default function ReportsPage() {
   // Metric calculation functions
   const calculateSymptomControl = (mlReport: any): number => {
     if (!mlReport.predictions) return 70;
-    const riskLevel = mlReport.predictions.risk_level;
+    const riskLevel = mlReport.predictions.riskLevel;
     switch (riskLevel) {
       case 'low': return 85;
       case 'medium': return 70;
@@ -348,44 +348,43 @@ export default function ReportsPage() {
           overall_trend: determineTrend(mlReport.predictions) as 'improving' | 'stable' | 'declining'
         },
         severity_assessment: {
-          current_level: mlReport.predictions?.risk_level || 'medium',
+          current_level: mlReport.predictions?.riskLevel || 'medium',
           trend: determineTrend(mlReport.predictions),
           score: mlReport.predictions?.predicted_severity || 5,
-          description: getPersonalizedSeverityDescription(mlReport.predictions?.risk_level || 'medium', userProfile)
+          description: getPersonalizedSeverityDescription(mlReport.predictions?.riskLevel || 'medium', userProfile)
         },
         ml_predictions: {
-          risk_level: mlReport.predictions?.risk_level || 'medium',
+          risk_level: mlReport.predictions?.riskLevel || 'medium',
           confidence: mlReport.predictions?.confidence || 0.78,
-          next_flare_probability: mlReport.predictions?.next_flare_probability || 0.35,
+          next_flare_probability: mlReport.predictions?.nextFlareRisk || 0.35,
           predicted_severity: mlReport.predictions?.predicted_severity || 4.25,
           timeline: mlReport.predictions?.timeline || 'Next week',
-          key_factors: mlReport.predictions?.key_factors || ['Stress levels', 'Dietary patterns']
+          key_factors: mlReport.predictions?.keyFactors || ['Stress levels', 'Dietary patterns']
         },
         recommendations: {
-          immediate_actions: mlReport.predictions?.recommendations?.immediate_actions || [
-            {
-              action: 'Continue tracking symptoms daily',
-              priority: 'high' as const,
-              explanation: 'Consistent tracking helps identify patterns',
-              expected_benefit: 'Better symptom management'
-            }
-          ],
-          dietary_suggestions: mlReport.predictions?.recommendations?.dietary_suggestions || [
+          immediate_actions: (mlReport.predictions?.recommendations || [
+            'Continue tracking symptoms daily',
+            'Practice daily meditation'
+          ]).slice(0, 3).map((rec: string) => ({
+            action: rec,
+            priority: 'high' as const,
+            explanation: 'Based on your ML predictions',
+            expected_benefit: 'Better symptom management'
+          })),
+          dietary_suggestions: [
             {
               type: 'avoid' as const,
-              foods: ['High FODMAP foods'],
+              foods: mlReport.predictions?.triggerFoods || ['High FODMAP foods'],
               reason: 'May trigger symptoms',
               timeline: '2-4 weeks'
             }
           ],
-          lifestyle_changes: mlReport.predictions?.recommendations?.lifestyle_changes || [
-            {
-              category: 'Stress Management',
-              suggestion: 'Practice daily meditation',
-              difficulty: 'easy' as const,
-              impact: 'Reduces stress-related symptoms'
-            }
-          ],
+          lifestyle_changes: (mlReport.predictions?.recommendations || []).slice(3).map((rec: string) => ({
+            category: 'Lifestyle',
+            suggestion: rec,
+            difficulty: 'easy' as const,
+            impact: 'Reduces symptoms'
+          })),
           medical_advice: {
             should_consult_doctor: false,
             urgency: 'low' as const,

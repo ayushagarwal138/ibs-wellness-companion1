@@ -1068,9 +1068,9 @@ export default function DataVisualization() {
               {mlPredictions?.risk_level?.charAt(0).toUpperCase() + mlPredictions?.risk_level?.slice(1) || 'Moderate'}
             </div>
             <div className="text-sm text-gray-500">
-              {Math.round((mlPredictions?.next_flare_probability || 0.45) * 100)}% chance of symptoms
+              {Math.round((mlPredictions?.nextFlareRisk || 0.45) * 100)}% chance of symptoms
             </div>
-            <Progress value={Math.round((mlPredictions?.next_flare_probability || 0.45) * 100)} className="mt-3" />
+            <Progress value={Math.round((mlPredictions?.nextFlareRisk || 0.45) * 100)} className="mt-3" />
           </div>
         </div>
         

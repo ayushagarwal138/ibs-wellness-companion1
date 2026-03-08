@@ -104,7 +104,7 @@ export default function DataVisualization() {
           if (log?.logged_at) {
             const logDate = new Date(log.logged_at).toISOString().split('T')[0];
             if (logDate && !dateGroups[logDate]) dateGroups[logDate] = [];
-            if (logDate) dateGroups[logDate].push(log);
+            if (logDate && dateGroups[logDate]) dateGroups[logDate].push(log);
           }
         });
 

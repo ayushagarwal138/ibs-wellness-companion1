@@ -416,14 +416,14 @@ export default function TestMLPage() {
               <CardContent>
                 {predictions ? (
                   <div className="space-y-2">
-                    <p><strong>Risk Level:</strong> {predictions.risk_level}</p>
+                    <p><strong>Risk Level:</strong> {predictions.riskLevel}</p>
                     <p><strong>Confidence:</strong> {formatConfidence(predictions.confidence)}</p>
-                    <p><strong>Next Flare Probability:</strong> {formatProbability(predictions.next_flare_probability)}</p>
+                    <p><strong>Next Flare Probability:</strong> {formatProbability(predictions.nextFlareRisk)}</p>
                     <p><strong>Timeline:</strong> {predictions.timeline}</p>
                     <div>
                       <strong>Key Factors:</strong>
                       <ul className="list-disc list-inside mt-1">
-                        {predictions.key_factors?.map((factor: string, index: number) => (
+                        {predictions.keyFactors?.map((factor: string, index: number) => (
                           <li key={index} className="text-sm">{factor}</li>
                         ))}
                       </ul>

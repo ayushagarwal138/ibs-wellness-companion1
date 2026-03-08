@@ -132,7 +132,7 @@ export function ShareReportModal({ isOpen, onClose, reportData }: ShareReportMod
           risk_level: reportData.severity_assessment.current_level,
         },
         ml_predictions: {
-          flareup_risk: reportData.ml_predictions.next_flare_probability,
+          flareup_risk: reportData.ml_predictions.risk_level === "high" ? 0.8 : reportData.ml_predictions.risk_level === "medium" ? 0.5 : 0.2,
           severity_forecast: [reportData.ml_predictions.predicted_severity],
           confidence_score: reportData.ml_predictions.confidence,
         },
@@ -181,7 +181,7 @@ export function ShareReportModal({ isOpen, onClose, reportData }: ShareReportMod
           risk_level: reportData.severity_assessment.current_level,
         },
         ml_predictions: {
-          flareup_risk: reportData.ml_predictions.next_flare_probability,
+          flareup_risk: reportData.ml_predictions.risk_level === "high" ? 0.8 : reportData.ml_predictions.risk_level === "medium" ? 0.5 : 0.2,
           severity_forecast: [reportData.ml_predictions.predicted_severity],
           confidence_score: reportData.ml_predictions.confidence,
         },

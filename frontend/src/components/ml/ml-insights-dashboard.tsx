@@ -303,13 +303,13 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                 <Target className="h-4 w-4 text-red-500 flex-shrink-0" />
               </div>
               <div className="text-lg lg:text-2xl xl:text-3xl font-bold text-red-600 mb-1 truncate">
-                {formatProbability(predictions.next_flare_probability / 100)}
+                {formatProbability(predictions.nextFlareRisk)}
               </div>
               <p className="text-xs lg:text-sm text-gray-600 mb-2 break-words">
                 in the {predictions.timeline}
               </p>
               <div className="w-full">
-                <Progress value={Math.round(predictions.next_flare_probability)} className="h-2" />
+                <Progress value={Math.round(predictions.nextFlareRisk)} className="h-2" />
               </div>
             </CardContent>
           </Card>
@@ -321,7 +321,7 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                 <TrendingUp className="h-4 w-4 text-blue-500 flex-shrink-0" />
               </div>
               <div className="text-lg lg:text-2xl xl:text-3xl font-bold text-blue-600 mb-1 truncate">
-                {formatSmartNumber(predictions.predicted_severity, false)}/10
+                {formatSmartNumber(predictions.predicted_severity ?? 0, false)}/10
               </div>
               <p className="text-xs lg:text-sm text-gray-600 break-words">
                 Predicted severity
@@ -336,7 +336,7 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                 <Zap className="h-4 w-4 text-yellow-500 flex-shrink-0" />
               </div>
               <div className="text-lg lg:text-2xl xl:text-3xl font-bold text-yellow-600 mb-1 truncate">
-                {predictions.key_factors.length}
+                {predictions.keyFactors.length}
               </div>
               <p className="text-xs lg:text-sm text-gray-600 break-words">
                 Risk factors identified
@@ -372,7 +372,7 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 gap-3 max-w-full overflow-hidden">
-                      {predictions.key_factors.map((factor, index) => (
+                      {predictions.keyFactors.map((factor, index) => (
                         <div key={index} className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
                           <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0" />
                           <span className="text-sm text-orange-800 break-words flex-1 min-w-0">{factor}</span>
@@ -383,7 +383,7 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                 </Card>
 
                 {/* Immediate Actions */}
-                {predictions.recommendations?.immediate_actions && (
+                {predictions.recommendations && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
@@ -393,19 +393,19 @@ export function MLInsightsDashboard({ userId, className }: MLInsightsDashboardPr
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {predictions.recommendations.immediate_actions.map((action, index) => (
+                        {predictions.recommendations.map((action, index) => (
                           <div key={index} className="border border-red-200 rounded-lg p-4 bg-red-50">
                             <div className="flex items-start gap-3">
-                              {getPriorityIcon(action.priority)}
+                              {getPriorityIcon("medium")}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-red-800 mb-1 break-words">{action.action}</h4>
-                                <p className="text-sm text-red-700 mb-2 break-words">{action.explanation}</p>
+                                <h4 className="font-semibold text-red-800 mb-1 break-words">{action}</h4>
+                                <p className="text-sm text-red-700 mb-2 break-words"></p>
                                 <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded break-words">
-                                  Expected benefit: {action.expected_benefit}
+                                  Expected benefit: {""}
                                 </div>
                               </div>
                               <Badge variant="outline" className="text-red-600 border-red-300 flex-shrink-0">
-                                {action.priority}
+                                "medium"
                               </Badge>
                             </div>
                           </div>
