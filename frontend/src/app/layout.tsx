@@ -4,7 +4,14 @@ import "../styles/globals.css";
 import { ClientSessionProvider } from "@/components/providers/session-provider";
 import { AuthProvider } from "@/contexts/auth-context";
 import { Toaster } from "react-hot-toast";
-import AnalyticsProvider from "@/components/analytics/AnalyticsProvider";
+import dynamicImport from "next/dynamic";  // ← 'dynamic' ki jagah 'dynamicImport'
+
+export const dynamic = 'force-dynamic'
+
+const AnalyticsProvider = dynamicImport(  // ← yahan bhi
+  () => import("@/components/analytics/AnalyticsProvider"),
+  { ssr: false }
+)
 
 const inter = Inter({ subsets: ["latin"] });
 
