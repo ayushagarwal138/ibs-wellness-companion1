@@ -1,5 +1,5 @@
-setuptools>=65.0.0
-wheel>=0.38.0
+setuptools>=68
+wheel
 
 
 # FastAPI and Web Framework
