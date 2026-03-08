@@ -1,0 +1,120 @@
+{
+  "test_run_timestamp": "2025-10-01T10:27:20.652632",
+  "total_tests": 10,
+  "passed_tests": 9,
+  "failed_tests": 1,
+  "test_results": [
+    {
+      "test_name": "Server Health Check",
+      "success": true,
+      "details": "Server is running",
+      "timestamp": "2025-10-01T10:27:19.877666",
+      "response_data": null
+    },
+    {
+      "test_name": "User Authentication",
+      "success": true,
+      "details": "Successfully authenticated",
+      "timestamp": "2025-10-01T10:27:20.320596",
+      "response_data": null
+    },
+    {
+      "test_name": "Model Info Endpoint",
+      "success": true,
+      "details": "Retrieved model info with 3 models",
+      "timestamp": "2025-10-01T10:27:20.461141",
+      "response_data": {
+        "models_loaded": {
+          "severity_model": true,
+          "flareup_model": true,
+          "recommendation_model": true
+        },
+        "model_versions": {
+          "severity_model": "enhanced_v1.0.0",
+          "flareup_model": "enhanced_v1.0.0",
+          "recommendation_model": "enhanced_v1.0.0"
+        },
+        "last_updated": {
+          "severity_model": "2025-10-01T10:27:20.460344",
+          "flareup_model": "2025-10-01T10:27:20.460344",
+          "recommendation_model": "2025-10-01T10:27:20.460344"
+        },
+        "fallback_active": {
+          "severity_model": false,
+          "flareup_model": false,
+          "recommendation_model": false
+        }
+      }
+    },
+    {
+      "test_name": "Severity Prediction",
+      "success": true,
+      "details": "Predicted severity: Medium (score: 0.41, confidence: 0.50)",
+      "timestamp": "2025-10-01T10:27:20.468046",
+      "response_data": {
+        "severity_score": 0.40746227394661555,
+        "severity_level": "Medium",
+        "confidence": 0.5,
+        "model_version": "fallback_rule_based",
+        "predicted_at": "2025-10-01T04:57:20.467582",
+        "factors": [
+          "High stress levels",
+          "Poor sleep quality",
+          "Significant bloating"
+        ]
+      }
+    },
+    {
+      "test_name": "Flareup Prediction",
+      "success": true,
+      "details": "Predicted risk: Low (score: 0.39, confidence: 0.50)",
+      "timestamp": "2025-10-01T10:27:20.486562",
+      "response_data": {
+        "risk_score": 0.3942194453629387,
+        "risk_level": "Low",
+        "days_ahead": 7,
+        "confidence": 0.5,
+        "model_version": "fallback_rule_based",
+        "predicted_at": "2025-10-01T04:57:20.480991",
+        "risk_factors": []
+      }
+    },
+    {
+      "test_name": "Recommendations Endpoint",
+      "success": false,
+      "details": "Status: 500, Error: {\"error\":\"HTTP_ERROR\",\"message\":\"Error generating recommendations\",\"status_code\":500}",
+      "timestamp": "2025-10-01T10:27:20.589573",
+      "response_data": null
+    },
+    {
+      "test_name": "Model Reload Endpoint",
+      "success": true,
+      "details": "Models reloaded: Enhanced models reloaded successfully",
+      "timestamp": "2025-10-01T10:27:20.645062",
+      "response_data": {
+        "message": "Enhanced models reloaded successfully"
+      }
+    },
+    {
+      "test_name": "Edge Case - Empty Symptoms",
+      "success": true,
+      "details": "Handled gracefully (status: 200)",
+      "timestamp": "2025-10-01T10:27:20.649834",
+      "response_data": null
+    },
+    {
+      "test_name": "Edge Case - Invalid Days Ahead",
+      "success": true,
+      "details": "Handled gracefully (status: 422)",
+      "timestamp": "2025-10-01T10:27:20.651899",
+      "response_data": null
+    },
+    {
+      "test_name": "Edge Case - No Authentication",
+      "success": true,
+      "details": "Properly rejected (status: 403)",
+      "timestamp": "2025-10-01T10:27:20.652587",
+      "response_data": null
+    }
+  ]
+}

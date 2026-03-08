@@ -1,0 +1,28 @@
+{
+  "name": "@ibs-wellness/shared-types",
+  "version": "1.0.0",
+  "description": "Shared TypeScript interfaces for IBS Wellness Companion",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "typescript",
+    "types",
+    "interfaces",
+    "ibs",
+    "wellness"
+  ],
+  "author": "IBS Wellness Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*"
+  ]
+}

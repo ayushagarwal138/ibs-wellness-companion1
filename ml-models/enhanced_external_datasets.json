@@ -1,0 +1,200 @@
+{
+  "datasets": {
+    "usda_food_data": {
+      "name": "usda_food_data",
+      "source": "usda",
+      "dataset_id": "usda-food-data-central",
+      "description": "USDA Food Data Central - comprehensive nutrition database with 300k+ foods",
+      "relevance_score": 0.95,
+      "data_quality": "high",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "description": "food_name",
+        "energy": "calories_per_100g",
+        "protein": "protein_g",
+        "total_lipid_fat": "fat_g",
+        "carbohydrate_by_difference": "carbs_g",
+        "fiber_total_dietary": "fiber_g",
+        "sugars_total_including_nlea": "sugar_g"
+      },
+      "processing_options": {
+        "normalize_per_serving": true,
+        "add_fodmap_classification": true,
+        "calculate_glycemic_index": true,
+        "filter_processed_foods": false
+      },
+      "validation_url": "https://fdc.nal.usda.gov/"
+    },
+    "nutrition5k": {
+      "name": "nutrition5k",
+      "source": "github",
+      "dataset_id": "google-research-datasets/Nutrition5k",
+      "description": "Google Research Nutrition5k dataset with visual and nutritional data for 5k realistic food plates",
+      "relevance_score": 0.85,
+      "data_quality": "high",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "total_calories": "calories_per_dish",
+        "total_mass": "dish_weight_g",
+        "total_fat": "fat_g",
+        "total_carb": "carbs_g",
+        "total_protein": "protein_g",
+        "num_ingrs": "ingredient_count"
+      },
+      "processing_options": {
+        "extract_ingredient_patterns": true,
+        "analyze_portion_sizes": true,
+        "correlate_visual_nutrition": true
+      },
+      "validation_url": "https://github.com/google-research-datasets/Nutrition5k"
+    },
+    "myfooddata_nutrition": {
+      "name": "myfooddata_nutrition",
+      "source": "kaggle",
+      "dataset_id": "shashwatwork/food-nutrition-dataset",
+      "description": "Comprehensive food nutrition dataset with macronutrients and micronutrients",
+      "relevance_score": 0.9,
+      "data_quality": "high",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "Food": "food_name",
+        "Calories": "calories_per_100g",
+        "Protein": "protein_g",
+        "Fat": "fat_g",
+        "Carbs": "carbs_g",
+        "Fiber": "fiber_g"
+      },
+      "processing_options": {
+        "standardize_portions": true,
+        "add_ibs_trigger_flags": true,
+        "calculate_nutrient_density": true
+      },
+      "validation_url": null
+    },
+    "fodmap_database": {
+      "name": "fodmap_database",
+      "source": "research",
+      "dataset_id": "monash-fodmap-database",
+      "description": "Monash University FODMAP database for IBS dietary management",
+      "relevance_score": 1.0,
+      "data_quality": "high",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "food_name": "food_item",
+        "fodmap_level": "ibs_trigger_level",
+        "serving_size": "safe_portion_g",
+        "category": "food_category"
+      },
+      "processing_options": {
+        "create_trigger_matrix": true,
+        "calculate_cumulative_load": true,
+        "personalize_thresholds": true
+      },
+      "validation_url": "https://www.monashfodmap.com/"
+    },
+    "recipe_nutrition": {
+      "name": "recipe_nutrition",
+      "source": "kaggle",
+      "dataset_id": "shuyangli94/food-com-recipes-and-user-interactions",
+      "description": "Recipe dataset with nutritional information and user interactions",
+      "relevance_score": 0.75,
+      "data_quality": "medium",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "name": "recipe_name",
+        "nutrition": "nutrition_array",
+        "ingredients": "ingredient_list",
+        "n_steps": "preparation_complexity",
+        "minutes": "prep_time"
+      },
+      "processing_options": {
+        "parse_nutrition_array": true,
+        "extract_ibs_friendly_recipes": true,
+        "analyze_ingredient_combinations": true,
+        "filter_by_prep_time": true
+      },
+      "validation_url": null
+    },
+    "microbiome_diet": {
+      "name": "microbiome_diet",
+      "source": "research",
+      "dataset_id": "american-gut-project",
+      "description": "American Gut Project data linking diet patterns to microbiome composition",
+      "relevance_score": 0.95,
+      "data_quality": "high",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "sample_id": "participant_id",
+        "diet_type": "dietary_pattern",
+        "fiber_intake": "daily_fiber_g",
+        "diversity_index": "microbiome_diversity",
+        "dominant_phyla": "bacterial_composition"
+      },
+      "processing_options": {
+        "correlate_diet_microbiome": true,
+        "identify_beneficial_patterns": true,
+        "predict_ibs_risk": true
+      },
+      "validation_url": "https://americangut.org/"
+    },
+    "symptom_food_diary": {
+      "name": "symptom_food_diary",
+      "source": "kaggle",
+      "dataset_id": "health-tracking/digestive-health-logs",
+      "description": "Synthetic but realistic digestive health and food diary data",
+      "relevance_score": 0.85,
+      "data_quality": "medium",
+      "enabled": false,
+      "cache_days": 7,
+      "columns_mapping": {
+        "date": "log_date",
+        "food_consumed": "meal_items",
+        "symptom_severity": "ibs_severity_score",
+        "mood": "stress_level",
+        "sleep_quality": "sleep_score"
+      },
+      "processing_options": {
+        "temporal_analysis": true,
+        "food_symptom_correlation": true,
+        "identify_trigger_patterns": true,
+        "stress_factor_analysis": true
+      },
+      "validation_url": null
+    },
+    "clinical_nutrition": {
+      "name": "clinical_nutrition",
+      "source": "research",
+      "dataset_id": "nhanes-nutrition-data",
+      "description": "NHANES nutrition and health examination survey data",
+      "relevance_score": 0.8,
+      "data_quality": "high",
+      "enabled": true,
+      "cache_days": 7,
+      "columns_mapping": {
+        "seqn": "participant_id",
+        "dr1tkcal": "daily_calories",
+        "dr1tprot": "daily_protein_g",
+        "dr1tcarb": "daily_carbs_g",
+        "dr1tfibe": "daily_fiber_g"
+      },
+      "processing_options": {
+        "population_dietary_patterns": true,
+        "health_outcome_correlation": true,
+        "demographic_analysis": true
+      },
+      "validation_url": "https://www.cdc.gov/nchs/nhanes/"
+    }
+  },
+  "metadata": {
+    "created_at": "2025-09-19T20:48:20.507817",
+    "total_datasets": 8,
+    "enabled_datasets": 7,
+    "high_relevance_datasets": 5
+  }
+}

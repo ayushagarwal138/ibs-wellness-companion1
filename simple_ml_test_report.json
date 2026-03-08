@@ -1,0 +1,50 @@
+{
+  "test_run_timestamp": "2025-10-02T17:21:29.022413",
+  "total_tests": 6,
+  "passed_tests": 2,
+  "failed_tests": 4,
+  "test_results": [
+    {
+      "test_name": "Server Health Check",
+      "success": true,
+      "details": "Server is running",
+      "timestamp": "2025-10-02T17:21:29.021185",
+      "response_data": null
+    },
+    {
+      "test_name": "ML Service Initialization",
+      "success": true,
+      "details": "ML service endpoints are accessible",
+      "timestamp": "2025-10-02T17:21:29.022063",
+      "response_data": null
+    },
+    {
+      "test_name": "ML Service Classes",
+      "success": false,
+      "details": "Import error: No module named 'app'",
+      "timestamp": "2025-10-02T17:21:29.022185",
+      "response_data": null
+    },
+    {
+      "test_name": "ML Model Loading",
+      "success": false,
+      "details": "Error: No module named 'app'",
+      "timestamp": "2025-10-02T17:21:29.022249",
+      "response_data": null
+    },
+    {
+      "test_name": "ML Predictions",
+      "success": false,
+      "details": "Error: No module named 'app'",
+      "timestamp": "2025-10-02T17:21:29.022315",
+      "response_data": null
+    },
+    {
+      "test_name": "Data Processing",
+      "success": false,
+      "details": "Error: No module named 'app'",
+      "timestamp": "2025-10-02T17:21:29.022373",
+      "response_data": null
+    }
+  ]
+}

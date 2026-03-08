@@ -1,0 +1,67 @@
+{
+  "timestamp": "2025-09-22T22:44:56.423583",
+  "backend_url": "http://localhost:8000",
+  "tests": {
+    "test_backend_health": {
+      "passed": true,
+      "message": "Backend API is healthy and responsive",
+      "response_time": 0.000773,
+      "status_code": 200
+    },
+    "test_ml_models_availability": {
+      "passed": true,
+      "message": "2/3 ML models available",
+      "models_status": {
+        "risk_predictor": "Available",
+        "recommendation_engine": "Available",
+        "severity_classifier": "Error: name 'SeverityClassifier' is not defined"
+      },
+      "availability_rate": 0.6666666666666666
+    },
+    "test_risk_assessment_endpoint": {
+      "passed": true,
+      "message": "Risk assessment endpoint properly requires authentication",
+      "status_code": 403,
+      "authentication_required": true
+    },
+    "test_recommendation_endpoint": {
+      "passed": true,
+      "message": "Recommendations endpoint properly requires authentication",
+      "status_code": 403,
+      "authentication_required": true
+    },
+    "test_data_transformation": {
+      "passed": false,
+      "error": "Could not import IBSAssessmentService for testing"
+    },
+    "test_error_handling": {
+      "passed": true,
+      "message": "API properly handles invalid data",
+      "status_code": 403
+    },
+    "test_performance_benchmarks": {
+      "passed": true,
+      "message": "Average response time: 0.001s",
+      "avg_response_time": 0.0012493610382080078,
+      "max_response_time": 0.0017011165618896484,
+      "min_response_time": 0.0010340213775634766,
+      "performance_threshold": 2.0,
+      "requests_tested": 5
+    },
+    "test_concurrent_requests": {
+      "passed": true,
+      "message": "5/5 concurrent requests handled",
+      "successful_requests": 5,
+      "total_requests": 5,
+      "avg_response_time": 0.0020504,
+      "success_rate": 1.0
+    }
+  },
+  "summary": {
+    "total_tests": 8,
+    "passed_tests": 7,
+    "failed_tests": 1,
+    "success_rate": 0.875,
+    "overall_status": "FAILED"
+  }
+}

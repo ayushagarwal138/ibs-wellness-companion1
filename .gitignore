@@ -274,7 +274,6 @@ checkpoints/
 data/
 datasets/
 *.csv
-*.json
 *.parquet
 
 # IDE

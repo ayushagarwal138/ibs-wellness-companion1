@@ -1,0 +1,134 @@
+{
+  "evaluation_timestamp": "2026-01-31T09:22:16.435189",
+  "dataset": {
+    "total_samples": 5000,
+    "source": "Synthetic (create_real_models.py / evaluate_accuracy_comprehensive.py)",
+    "method": "Generated using research-informed distributions (exponential for symptoms, normal for demographics, beta for adherence)",
+    "train_test_split": "80% train, 20% test",
+    "target_variables": {
+      "severity_category": "5 classes (none, mild, moderate, severe, very_severe)",
+      "will_flareup": "Binary (0/1)",
+      "recommendation_score": "Continuous 0-1"
+    },
+    "feature_count": 18,
+    "severity_distribution": {
+      "none": 2798,
+      "mild": 2004,
+      "moderate": 192,
+      "severe": 6
+    },
+    "flareup_distribution": {
+      "0": 4170,
+      "1": 830
+    }
+  },
+  "alternative_data_sources": {
+    "data_preparator_synthetic": {
+      "source": "DataPreparator (ml-models/src/training/data_preparation.py)",
+      "n_users": 200,
+      "days_per_user": 90,
+      "estimated_records": 18000,
+      "tables": [
+        "users",
+        "symptom_logs",
+        "diet_logs",
+        "food_reactions",
+        "medications"
+      ],
+      "note": "Research-informed synthetic data with microbiome, psychological, dietary features"
+    },
+    "external_datasets_configured": {
+      "gut_microbiome": "Kaggle: paultimothymooney/microbiome-data (optional)",
+      "dietary_patterns": "Kaggle: shashwatwork/food-nutrition-dataset (optional)",
+      "symptom_tracking": "Kaggle: uciml/pima-indians-diabetes-database, adapted (optional)"
+    },
+    "database_seeds": {
+      "users": 6,
+      "symptoms": 20,
+      "diet_logs": 20,
+      "food_items": "from 02_food_items.sql",
+      "symptoms_reference": "from 00_symptoms_reference.sql"
+    }
+  },
+  "models": {
+    "severity_classifier": {
+      "accuracy": 0.774,
+      "precision_weighted": 0.741260508789169,
+      "recall_weighted": 0.774,
+      "f1_weighted": 0.754219774308986,
+      "precision_macro": 0.3839065400152855,
+      "recall_macro": 0.3924441129319558,
+      "f1_macro": 0.38646786976662495,
+      "confusion_matrix": [
+        [
+          265,
+          0,
+          136,
+          0
+        ],
+        [
+          38,
+          0,
+          0,
+          0
+        ],
+        [
+          51,
+          0,
+          509,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "n_train": 4000,
+      "n_test": 1000,
+      "n_features": 19,
+      "classes": [
+        "mild",
+        "moderate",
+        "none",
+        "severe"
+      ]
+    },
+    "flareup_predictor": {
+      "accuracy": 0.834,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "roc_auc": 0.6639941059200832,
+      "confusion_matrix": [
+        [
+          834,
+          0
+        ],
+        [
+          166,
+          0
+        ]
+      ],
+      "n_train": 4000,
+      "n_test": 1000,
+      "n_positive_test": 166,
+      "n_negative_test": 834
+    },
+    "recommendation_engine": {
+      "mse": 0.0011266081202702333,
+      "rmse": 0.03356498354342265,
+      "mae": 0.027054722231312035,
+      "r2_score": 0.8776609474537191,
+      "n_train": 4000,
+      "n_test": 1000
+    }
+  },
+  "summary": {
+    "severity_classifier_accuracy": 0.774,
+    "flareup_predictor_accuracy": 0.834,
+    "flareup_predictor_roc_auc": 0.6639941059200832,
+    "recommendation_engine_r2": 0.8776609474537191
+  }
+}

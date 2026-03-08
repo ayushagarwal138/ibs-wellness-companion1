@@ -1,0 +1,49 @@
+{
+  "overall_status": "PASSED",
+  "success_rate": 0.8333333333333334,
+  "passed_tests": 5,
+  "total_tests": 6,
+  "detailed_results": {
+    "ml_models": {
+      "status": "error",
+      "error": "'IBSRecommendationEngine' object has no attribute 'generate_recommendations'",
+      "test_passed": false
+    },
+    "backend_api": {
+      "status": "success",
+      "response_time": 0.00147,
+      "test_passed": true
+    },
+    "frontend": {
+      "status": "success",
+      "has_assessment_form": true,
+      "has_react_components": true,
+      "response_time": 0.013315,
+      "test_passed": true
+    },
+    "severity_classification": {
+      "status": "success",
+      "success_rate": 1.0,
+      "passed_tests": 5,
+      "total_tests": 5,
+      "test_passed": true
+    },
+    "recommendation_quality": {
+      "status": "success",
+      "average_quality": 4.0,
+      "scenario_scores": [
+        4.5,
+        3.0,
+        4.5
+      ],
+      "test_passed": true
+    },
+    "data_flow_integrity": {
+      "status": "success",
+      "missing_fields": [],
+      "validation_errors": [],
+      "test_passed": true
+    }
+  },
+  "timestamp": "2025-09-22T22:40:27.532924"
+}

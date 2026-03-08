@@ -1,0 +1,72 @@
+{
+  "validation_timestamp": "2025-10-02T17:23:52.295142",
+  "total_tests": 8,
+  "passed_tests": 4,
+  "failed_tests": 4,
+  "success_rate": 50.0,
+  "test_results": [
+    {
+      "test": "backend_connectivity",
+      "status": "PASS",
+      "message": "Backend server is accessible"
+    },
+    {
+      "test": "ml_models_loaded",
+      "status": "PASS",
+      "message": "ML models loaded successfully with 6 features",
+      "details": {
+        "model_name": "Enhanced IBS ML Suite (random_forest)",
+        "model_version": "enhanced_v1.0.0",
+        "last_trained": "2025-10-02T17:23:52.236267",
+        "accuracy_metrics": {
+          "overall_accuracy": 0.85,
+          "precision": 0.82,
+          "recall": 0.88,
+          "f1_score": 0.85,
+          "auc_score": 0.9
+        },
+        "supported_features": [
+          "severity_prediction",
+          "flareup_risk_assessment",
+          "personalized_recommendations",
+          "dietary_analysis",
+          "lifestyle_optimization",
+          "trigger_identification"
+        ]
+      }
+    },
+    {
+      "test": "authentication",
+      "status": "PASS",
+      "message": "User authentication successful"
+    },
+    {
+      "test": "severity_prediction",
+      "status": "FAIL",
+      "message": "Severity prediction failed with status 500"
+    },
+    {
+      "test": "flareup_prediction",
+      "status": "FAIL",
+      "message": "Flareup prediction failed with status 422"
+    },
+    {
+      "test": "ml_recommendations",
+      "status": "FAIL",
+      "message": "Recommendations failed with status 422"
+    },
+    {
+      "test": "model_reload",
+      "status": "PASS",
+      "message": "Model reload successful",
+      "details": {
+        "message": "Enhanced models reloaded successfully"
+      }
+    },
+    {
+      "test": "frontend_accessibility",
+      "status": "FAIL",
+      "message": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x107678950>: Failed to establish a new connection: [Errno 61] Connection refused'))"
+    }
+  ]
+}

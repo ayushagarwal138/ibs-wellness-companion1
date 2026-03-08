@@ -1,0 +1,131 @@
+{
+  "test_run": "2025-10-01T10:34:52.862229",
+  "total_tests": 6,
+  "passed_tests": 6,
+  "results": [
+    {
+      "test_name": "User Setup",
+      "success": true,
+      "details": "Test user created successfully",
+      "timestamp": "2025-10-01T10:34:52.432437",
+      "response_data": null
+    },
+    {
+      "test_name": "Authentication",
+      "success": true,
+      "details": "Successfully authenticated",
+      "timestamp": "2025-10-01T10:34:52.815382",
+      "response_data": null
+    },
+    {
+      "test_name": "ML Predictions Endpoint",
+      "success": true,
+      "details": "Predictions received: medium risk",
+      "timestamp": "2025-10-01T10:34:52.821713",
+      "response_data": {
+        "risk_level": "medium",
+        "confidence": 0.75,
+        "next_flare_probability": 0.5,
+        "predicted_severity": 5,
+        "timeline": "Next week",
+        "key_factors": [
+          "Recent symptom patterns",
+          "Dietary factors",
+          "Stress levels",
+          "Sleep quality"
+        ],
+        "personalization_applied": true,
+        "user_learning_score": 0.5,
+        "recommendations": {
+          "immediate_actions": [
+            "Monitor symptoms closely",
+            "Stay hydrated",
+            "Avoid known trigger foods"
+          ],
+          "dietary_suggestions": [
+            "Consider a low-FODMAP diet",
+            "Eat smaller, more frequent meals",
+            "Include probiotic foods"
+          ],
+          "lifestyle_changes": [
+            "Practice stress management techniques",
+            "Maintain regular sleep schedule",
+            "Engage in gentle exercise"
+          ],
+          "personalized_tips": [
+            "Based on your profile, focus on stress reduction",
+            "Track your symptoms to identify patterns"
+          ]
+        }
+      }
+    },
+    {
+      "test_name": "Model Info Endpoint",
+      "success": true,
+      "details": "Model info received: 3 models",
+      "timestamp": "2025-10-01T10:34:52.845179",
+      "response_data": {
+        "models_loaded": {
+          "severity_model": true,
+          "flareup_model": true,
+          "recommendation_model": true
+        },
+        "model_versions": {
+          "severity_model": "enhanced_v1.0.0",
+          "flareup_model": "enhanced_v1.0.0",
+          "recommendation_model": "enhanced_v1.0.0"
+        },
+        "last_updated": {
+          "severity_model": "2025-10-01T10:34:52.844034",
+          "flareup_model": "2025-10-01T10:34:52.844034",
+          "recommendation_model": "2025-10-01T10:34:52.844034"
+        },
+        "fallback_active": {
+          "severity_model": false,
+          "flareup_model": false,
+          "recommendation_model": false
+        }
+      }
+    },
+    {
+      "test_name": "Real-time Predictions Endpoint",
+      "success": true,
+      "details": "Real-time data received: 40.61979186467619 risk",
+      "timestamp": "2025-10-01T10:34:52.850446",
+      "response_data": {
+        "current_risk": 40.61979186467619,
+        "risk_factors": [],
+        "immediate_recommendations": [
+          "Monitor your symptoms closely",
+          "Stick to safe foods",
+          "Consider light exercise"
+        ],
+        "confidence_score": 0.5
+      }
+    },
+    {
+      "test_name": "Personalized Recommendations Endpoint",
+      "success": true,
+      "details": "Recommendations received: 0 dietary, 0 lifestyle",
+      "timestamp": "2025-10-01T10:34:52.862120",
+      "response_data": {
+        "dietary_recommendations": [],
+        "lifestyle_insights": [],
+        "trigger_analysis": {
+          "primary_category": "Dietary",
+          "insights": []
+        },
+        "management_strategy": {
+          "strategy": "Personalized IBS Management",
+          "approach": "Data-driven recommendations based on your symptoms and patterns",
+          "timeline": "2-4 weeks for initial results"
+        },
+        "personalized_tips": [
+          "Review and eliminate your top 3 trigger foods",
+          "Increase stress management activities (meditation, yoga, breathing exercises)",
+          "Ensure adequate hydration with warm liquids"
+        ]
+      }
+    }
+  ]
+}

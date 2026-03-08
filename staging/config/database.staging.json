@@ -1,0 +1,22 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "ibs_wellness_staging",
+    "user": "staging_user",
+    "password": "staging_pass",
+    "pool_size": 10,
+    "max_overflow": 20
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "db": 1,
+    "password": null
+  },
+  "ml_models": {
+    "path": "./ml_models/staging",
+    "auto_reload": true,
+    "health_check_interval": 300
+  }
+}

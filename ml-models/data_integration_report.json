@@ -1,0 +1,29 @@
+{
+  "integration_timestamp": "2025-09-19T20:49:41.737168",
+  "datasets_processed": 4,
+  "successful_integrations": 4,
+  "failed_integrations": 0,
+  "total_records": 1017,
+  "dataset_details": {
+    "usda_food_data": {
+      "status": "success",
+      "records": 5
+    },
+    "nutrition5k": {
+      "status": "success",
+      "records": 3
+    },
+    "fodmap_database": {
+      "status": "success",
+      "records": 9
+    },
+    "symptom_tracking": {
+      "status": "success",
+      "records": 1000
+    }
+  },
+  "recommendations": [
+    "Regularly update external datasets to maintain model accuracy.",
+    "Validate data quality and consistency across integrated datasets."
+  ]
+}

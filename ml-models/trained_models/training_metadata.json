@@ -1,0 +1,381 @@
+{
+  "training_timestamp": "2025-10-03T12:18:35.126478",
+  "models_trained": [
+    "severity_classifier",
+    "flareup_predictor",
+    "medication_effectiveness",
+    "dietary_triggers",
+    "stress_correlation",
+    "sleep_impact",
+    "exercise_tolerance",
+    "symptom_progression",
+    "treatment_response"
+  ],
+  "training_history": {
+    "severity_classifier": {
+      "timestamp": "2025-10-03T12:18:33.426127",
+      "metrics": {
+        "accuracy": 0.9875,
+        "classification_report": {
+          "0": {
+            "precision": 0.9928825622775801,
+            "recall": 0.9893617021276596,
+            "f1-score": 0.9911190053285968,
+            "support": 282.0
+          },
+          "1": {
+            "precision": 0.9747899159663865,
+            "recall": 0.9830508474576272,
+            "f1-score": 0.9789029535864979,
+            "support": 118.0
+          },
+          "accuracy": 0.9875,
+          "macro avg": {
+            "precision": 0.9838362391219833,
+            "recall": 0.9862062747926434,
+            "f1-score": 0.9850109794575473,
+            "support": 400.0
+          },
+          "weighted avg": {
+            "precision": 0.9875452316157781,
+            "recall": 0.9875,
+            "f1-score": 0.9875152700646775,
+            "support": 400.0
+          }
+        }
+      },
+      "feature_names": [
+        "pain_level",
+        "bloating",
+        "bowel_movement_frequency",
+        "stress_level",
+        "sleep_quality"
+      ],
+      "model_type": "classification",
+      "n_samples": 2000
+    },
+    "flareup_predictor": {
+      "timestamp": "2025-10-03T12:18:33.532898",
+      "metrics": {
+        "accuracy": 0.9475,
+        "classification_report": {
+          "0": {
+            "precision": 0.9572953736654805,
+            "recall": 0.9676258992805755,
+            "f1-score": 0.962432915921288,
+            "support": 278.0
+          },
+          "1": {
+            "precision": 0.923728813559322,
+            "recall": 0.9083333333333333,
+            "f1-score": 0.9159663865546218,
+            "support": 120.0
+          },
+          "2": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1-score": 0.6666666666666666,
+            "support": 2.0
+          },
+          "accuracy": 0.9475,
+          "macro avg": {
+            "precision": 0.9603413957416008,
+            "recall": 0.791986410871303,
+            "f1-score": 0.8483553230475255,
+            "support": 400.0
+          },
+          "weighted avg": {
+            "precision": 0.9474389287653057,
+            "recall": 0.9475,
+            "f1-score": 0.9470141258650149,
+            "support": 400.0
+          }
+        }
+      },
+      "feature_names": [
+        "recent_symptoms",
+        "dietary_changes",
+        "stress_events",
+        "medication_adherence"
+      ],
+      "model_type": "classification",
+      "n_samples": 2000
+    },
+    "medication_effectiveness": {
+      "timestamp": "2025-10-03T12:18:33.751485",
+      "metrics": {
+        "mse": 6.4750704990287655,
+        "rmse": 2.5446159826246406,
+        "r2": 0.9864346500451033
+      },
+      "feature_names": [
+        "medication_type",
+        "dosage",
+        "duration",
+        "symptom_severity",
+        "adherence"
+      ],
+      "model_type": "regression",
+      "n_samples": 2000
+    },
+    "dietary_triggers": {
+      "timestamp": "2025-10-03T12:18:33.847810",
+      "metrics": {
+        "accuracy": 0.995,
+        "classification_report": {
+          "0": {
+            "precision": 0.9946236559139785,
+            "recall": 0.9946236559139785,
+            "f1-score": 0.9946236559139785,
+            "support": 186.0
+          },
+          "1": {
+            "precision": 0.9942196531791907,
+            "recall": 1.0,
+            "f1-score": 0.9971014492753624,
+            "support": 172.0
+          },
+          "2": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 1.0
+          },
+          "3": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 41.0
+          },
+          "accuracy": 0.995,
+          "macro avg": {
+            "precision": 0.7472108272732922,
+            "recall": 0.7486559139784946,
+            "f1-score": 0.7479312762973352,
+            "support": 400.0
+          },
+          "weighted avg": {
+            "precision": 0.992514450867052,
+            "recall": 0.995,
+            "f1-score": 0.9937536231884059,
+            "support": 400.0
+          }
+        }
+      },
+      "feature_names": [
+        "food_category",
+        "portion_size",
+        "preparation_method",
+        "timing"
+      ],
+      "model_type": "classification",
+      "n_samples": 2000
+    },
+    "stress_correlation": {
+      "timestamp": "2025-10-03T12:18:34.021207",
+      "metrics": {
+        "mse": 3.25385653403789e-05,
+        "rmse": 0.005704258526783205,
+        "r2": 0.9991578433788338
+      },
+      "feature_names": [
+        "stress_level",
+        "stress_duration",
+        "stress_type",
+        "coping_mechanisms"
+      ],
+      "model_type": "regression",
+      "n_samples": 2000
+    },
+    "sleep_impact": {
+      "timestamp": "2025-10-03T12:18:34.210090",
+      "metrics": {
+        "mse": 0.37944438239784434,
+        "rmse": 0.6159905700559419,
+        "r2": 0.9993014969302295
+      },
+      "feature_names": [
+        "sleep_duration",
+        "sleep_quality",
+        "bedtime_consistency",
+        "sleep_disturbances"
+      ],
+      "model_type": "regression",
+      "n_samples": 2000
+    },
+    "exercise_tolerance": {
+      "timestamp": "2025-10-03T12:18:34.464197",
+      "metrics": {
+        "mse": 0.40201304313213554,
+        "rmse": 0.6340449851013219,
+        "r2": 0.9959838946391316
+      },
+      "feature_names": [
+        "exercise_type",
+        "intensity",
+        "duration",
+        "timing",
+        "pre_exercise_symptoms"
+      ],
+      "model_type": "regression",
+      "n_samples": 2000
+    },
+    "symptom_progression": {
+      "timestamp": "2025-10-03T12:18:34.691023",
+      "metrics": {
+        "mse": 0.34788602747496855,
+        "rmse": 0.5898186394773978,
+        "r2": 0.9921786545196265
+      },
+      "feature_names": [
+        "baseline_severity",
+        "treatment_duration",
+        "lifestyle_changes",
+        "adherence"
+      ],
+      "model_type": "regression",
+      "n_samples": 2000
+    },
+    "treatment_response": {
+      "timestamp": "2025-10-03T12:18:34.856591",
+      "metrics": {
+        "mse": 0.7177650405489241,
+        "rmse": 0.8472101513490758,
+        "r2": 0.9986300342842218
+      },
+      "feature_names": [
+        "treatment_type",
+        "duration",
+        "severity_baseline",
+        "patient_characteristics"
+      ],
+      "model_type": "regression",
+      "n_samples": 2000
+    }
+  },
+  "model_configs": {
+    "severity_classifier": {
+      "type": "classification",
+      "target_classes": [
+        "mild",
+        "moderate",
+        "severe"
+      ],
+      "features": [
+        "pain_level",
+        "bloating",
+        "bowel_movement_frequency",
+        "stress_level",
+        "sleep_quality"
+      ]
+    },
+    "flareup_predictor": {
+      "type": "classification",
+      "target_classes": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "features": [
+        "recent_symptoms",
+        "dietary_changes",
+        "stress_events",
+        "medication_adherence"
+      ]
+    },
+    "medication_effectiveness": {
+      "type": "regression",
+      "target_range": [
+        0,
+        100
+      ],
+      "features": [
+        "medication_type",
+        "dosage",
+        "duration",
+        "symptom_severity",
+        "adherence"
+      ]
+    },
+    "dietary_triggers": {
+      "type": "classification",
+      "target_classes": [
+        "trigger",
+        "safe",
+        "neutral"
+      ],
+      "features": [
+        "food_category",
+        "portion_size",
+        "preparation_method",
+        "timing"
+      ]
+    },
+    "stress_correlation": {
+      "type": "regression",
+      "target_range": [
+        0,
+        1
+      ],
+      "features": [
+        "stress_level",
+        "stress_duration",
+        "stress_type",
+        "coping_mechanisms"
+      ]
+    },
+    "sleep_impact": {
+      "type": "regression",
+      "target_range": [
+        0,
+        100
+      ],
+      "features": [
+        "sleep_duration",
+        "sleep_quality",
+        "bedtime_consistency",
+        "sleep_disturbances"
+      ]
+    },
+    "exercise_tolerance": {
+      "type": "regression",
+      "target_range": [
+        0,
+        100
+      ],
+      "features": [
+        "exercise_type",
+        "intensity",
+        "duration",
+        "timing",
+        "pre_exercise_symptoms"
+      ]
+    },
+    "symptom_progression": {
+      "type": "regression",
+      "target_range": [
+        -50,
+        50
+      ],
+      "features": [
+        "baseline_severity",
+        "treatment_duration",
+        "lifestyle_changes",
+        "adherence"
+      ]
+    },
+    "treatment_response": {
+      "type": "regression",
+      "target_range": [
+        0,
+        100
+      ],
+      "features": [
+        "treatment_type",
+        "duration",
+        "severity_baseline",
+        "patient_characteristics"
+      ]
+    }
+  }
+}

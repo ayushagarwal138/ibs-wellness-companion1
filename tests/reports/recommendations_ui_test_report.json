@@ -1,0 +1,171 @@
+{
+  "success_rate": 100.0,
+  "endpoint_results": [
+    {
+      "test_case": "Basic symptoms",
+      "success": true,
+      "response": {
+        "diet_recommendations": [
+          {
+            "category": "moderate",
+            "recommendation": "Monitor Dairy products, Wheat/Gluten, Onions carefully",
+            "priority": "medium",
+            "rationale": "These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks."
+          },
+          {
+            "category": "include",
+            "recommendation": "Incorporate Rice, Bananas, Carrots, Chicken breast, Oats as staples",
+            "priority": "medium",
+            "rationale": "These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning."
+          },
+          {
+            "category": "hydration",
+            "recommendation": "Increase intake of Warm water, Herbal teas, Electrolyte solutions",
+            "priority": "medium",
+            "rationale": "Proper hydration supports digestive health and can reduce constipation. Aim for 8-10 glasses daily, warm liquids preferred."
+          }
+        ],
+        "lifestyle_recommendations": [
+          {
+            "category": "Gentle Movement",
+            "recommendation": "Try gentle yoga or stretching for 15-20 minutes",
+            "priority": "medium",
+            "rationale": "Gentle movement can help with digestion without overexertion"
+          },
+          {
+            "category": "Meal Timing",
+            "recommendation": "Eat smaller, more frequent meals (5-6 times daily)",
+            "priority": "high",
+            "rationale": "Reduces digestive burden and prevents symptom spikes"
+          },
+          {
+            "category": "Mindful Eating",
+            "recommendation": "Chew food thoroughly and eat slowly",
+            "priority": "medium",
+            "rationale": "Improves digestion and reduces gas formation"
+          }
+        ],
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "model_version": "1.0.0",
+        "generated_at": "2025-09-29T12:12:49.168156"
+      },
+      "status_code": 200
+    },
+    {
+      "test_case": "Lifestyle focus",
+      "success": true,
+      "response": {
+        "diet_recommendations": [
+          {
+            "category": "moderate",
+            "recommendation": "Monitor Dairy products, Wheat/Gluten, Onions carefully",
+            "priority": "medium",
+            "rationale": "These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks."
+          },
+          {
+            "category": "include",
+            "recommendation": "Incorporate Rice, Bananas, Carrots, Chicken breast, Oats as staples",
+            "priority": "medium",
+            "rationale": "These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning."
+          },
+          {
+            "category": "hydration",
+            "recommendation": "Increase intake of Warm water, Herbal teas, Electrolyte solutions",
+            "priority": "medium",
+            "rationale": "Proper hydration supports digestive health and can reduce constipation. Aim for 8-10 glasses daily, warm liquids preferred."
+          }
+        ],
+        "lifestyle_recommendations": [
+          {
+            "category": "Gentle Movement",
+            "recommendation": "Try gentle yoga or stretching for 15-20 minutes",
+            "priority": "medium",
+            "rationale": "Gentle movement can help with digestion without overexertion"
+          },
+          {
+            "category": "Meal Timing",
+            "recommendation": "Eat smaller, more frequent meals (5-6 times daily)",
+            "priority": "high",
+            "rationale": "Reduces digestive burden and prevents symptom spikes"
+          },
+          {
+            "category": "Mindful Eating",
+            "recommendation": "Chew food thoroughly and eat slowly",
+            "priority": "medium",
+            "rationale": "Improves digestion and reduces gas formation"
+          }
+        ],
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "model_version": "1.0.0",
+        "generated_at": "2025-09-29T12:12:49.172083"
+      },
+      "status_code": 200
+    },
+    {
+      "test_case": "General recommendations",
+      "success": true,
+      "response": {
+        "diet_recommendations": [
+          {
+            "category": "moderate",
+            "recommendation": "Monitor Dairy products, Wheat/Gluten, Onions carefully",
+            "priority": "medium",
+            "rationale": "These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks."
+          },
+          {
+            "category": "include",
+            "recommendation": "Incorporate Rice, Bananas, Carrots, Chicken breast, Oats as staples",
+            "priority": "medium",
+            "rationale": "These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning."
+          },
+          {
+            "category": "hydration",
+            "recommendation": "Increase intake of Warm water, Herbal teas, Electrolyte solutions",
+            "priority": "medium",
+            "rationale": "Proper hydration supports digestive health and can reduce constipation. Aim for 8-10 glasses daily, warm liquids preferred."
+          }
+        ],
+        "lifestyle_recommendations": [
+          {
+            "category": "Gentle Movement",
+            "recommendation": "Try gentle yoga or stretching for 15-20 minutes",
+            "priority": "medium",
+            "rationale": "Gentle movement can help with digestion without overexertion"
+          },
+          {
+            "category": "Meal Timing",
+            "recommendation": "Eat smaller, more frequent meals (5-6 times daily)",
+            "priority": "high",
+            "rationale": "Reduces digestive burden and prevents symptom spikes"
+          },
+          {
+            "category": "Mindful Eating",
+            "recommendation": "Chew food thoroughly and eat slowly",
+            "priority": "medium",
+            "rationale": "Improves digestion and reduces gas formation"
+          }
+        ],
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "model_version": "1.0.0",
+        "generated_at": "2025-09-29T12:12:49.175828"
+      },
+      "status_code": 200
+    }
+  ],
+  "quality_metrics": {
+    "consistency": true,
+    "completeness": true,
+    "relevance": true,
+    "personalization": true
+  },
+  "performance_data": {
+    "average_ms": 3.4061431884765625,
+    "min_ms": 3.0639171600341797,
+    "max_ms": 3.804922103881836,
+    "rating": "Excellent",
+    "successful_calls": 5
+  }
+}

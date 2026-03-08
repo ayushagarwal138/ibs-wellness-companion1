@@ -1,0 +1,141 @@
+{
+  "validation_timestamp": "2025-09-29T18:24:52.346785",
+  "total_tests": 8,
+  "passed_tests": 8,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "test_results": [
+    {
+      "test": "backend_connectivity",
+      "status": "PASS",
+      "message": "Backend server is accessible"
+    },
+    {
+      "test": "ml_models_loaded",
+      "status": "PASS",
+      "message": "0 ML models loaded successfully",
+      "details": {
+        "models_loaded": {
+          "severity_model": true,
+          "flareup_model": true,
+          "recommendation_model": true
+        },
+        "model_versions": {
+          "severity_model": "enhanced_v1.0.0",
+          "flareup_model": "enhanced_v1.0.0",
+          "recommendation_model": "enhanced_v1.0.0"
+        },
+        "last_updated": {
+          "severity_model": "2025-09-29T18:24:52.295902",
+          "flareup_model": "2025-09-29T18:24:52.295902",
+          "recommendation_model": "2025-09-29T18:24:52.295902"
+        },
+        "fallback_active": {
+          "severity_model": false,
+          "flareup_model": false,
+          "recommendation_model": false
+        }
+      }
+    },
+    {
+      "test": "authentication",
+      "status": "PASS",
+      "message": "User authentication successful"
+    },
+    {
+      "test": "severity_prediction",
+      "status": "PASS",
+      "message": "Severity prediction successful",
+      "details": {
+        "severity_score": 0.24038184200998344,
+        "severity_level": "Low",
+        "confidence": 0.85,
+        "model_version": "fallback_rule_based",
+        "predicted_at": "2025-09-29T12:54:52.299669",
+        "factors": [
+          "High stress levels",
+          "Poor sleep quality",
+          "Significant bloating"
+        ]
+      }
+    },
+    {
+      "test": "flareup_prediction",
+      "status": "PASS",
+      "message": "Flareup prediction successful",
+      "details": {
+        "risk_score": 0.24038184200998344,
+        "risk_level": "Low",
+        "days_ahead": 3,
+        "confidence": 0.85,
+        "model_version": "fallback_rule_based",
+        "predicted_at": "2025-09-29T12:54:52.303871",
+        "risk_factors": []
+      }
+    },
+    {
+      "test": "ml_recommendations",
+      "status": "PASS",
+      "message": "Generated 0 dietary and 3 lifestyle recommendations",
+      "details": {
+        "diet_recommendations": [
+          {
+            "category": "moderate",
+            "recommendation": "Monitor Dairy products, Wheat/Gluten, Onions carefully",
+            "priority": "medium",
+            "rationale": "These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks."
+          },
+          {
+            "category": "include",
+            "recommendation": "Incorporate Rice, Bananas, Carrots, Chicken breast, Oats as staples",
+            "priority": "medium",
+            "rationale": "These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning."
+          },
+          {
+            "category": "hydration",
+            "recommendation": "Increase intake of Warm water, Herbal teas, Electrolyte solutions",
+            "priority": "medium",
+            "rationale": "Proper hydration supports digestive health and can reduce constipation. Aim for 8-10 glasses daily, warm liquids preferred."
+          }
+        ],
+        "lifestyle_recommendations": [
+          {
+            "category": "Gentle Movement",
+            "recommendation": "Try gentle yoga or stretching for 15-20 minutes",
+            "priority": "medium",
+            "rationale": "Gentle movement can help with digestion without overexertion"
+          },
+          {
+            "category": "Meal Timing",
+            "recommendation": "Eat smaller, more frequent meals (5-6 times daily)",
+            "priority": "high",
+            "rationale": "Reduces digestive burden and prevents symptom spikes"
+          },
+          {
+            "category": "Mindful Eating",
+            "recommendation": "Chew food thoroughly and eat slowly",
+            "priority": "medium",
+            "rationale": "Improves digestion and reduces gas formation"
+          }
+        ],
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "model_version": "1.0.0",
+        "generated_at": "2025-09-29T12:54:52.308529"
+      }
+    },
+    {
+      "test": "model_reload",
+      "status": "PASS",
+      "message": "Model reload successful",
+      "details": {
+        "message": "Enhanced models reloaded successfully"
+      }
+    },
+    {
+      "test": "frontend_accessibility",
+      "status": "PASS",
+      "message": "Frontend is accessible"
+    }
+  ]
+}

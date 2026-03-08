@@ -1,0 +1,185 @@
+{
+  "timestamp": "2025-09-22T23:22:02.401672",
+  "tests": {
+    "test_evidence_database_connectivity": {
+      "passed": true,
+      "message": "Evidence database loaded with 4 recommendations",
+      "database_stats": {
+        "total_recommendations": 4,
+        "evidence_level_distribution": {
+          "strong": 2,
+          "moderate": 2,
+          "weak": 0,
+          "emerging": 0
+        },
+        "category_distribution": {
+          "dietary": 1,
+          "lifestyle": 1,
+          "medical": 1,
+          "psychological": 1,
+          "complementary": 0
+        },
+        "total_scientific_references": 5,
+        "last_updated": "2025-09-22T23:22:02.401671"
+      },
+      "connectivity": true
+    },
+    "test_clinical_recommendation_generation": {
+      "passed": true,
+      "message": "Clinical recommendations generated for 3 patient profiles",
+      "recommendation_results": {
+        "mild_ibs_patient": {
+          "recommendations_count": 4,
+          "has_dietary": true,
+          "has_lifestyle": true,
+          "has_medical": true,
+          "evidence_levels": [
+            "strong",
+            "strong",
+            "moderate",
+            "moderate"
+          ],
+          "severity_appropriate": true
+        },
+        "moderate_ibs_patient": {
+          "recommendations_count": 4,
+          "has_dietary": true,
+          "has_lifestyle": true,
+          "has_medical": true,
+          "evidence_levels": [
+            "strong",
+            "strong",
+            "moderate",
+            "moderate"
+          ],
+          "severity_appropriate": true
+        },
+        "severe_ibs_patient": {
+          "recommendations_count": 4,
+          "has_dietary": true,
+          "has_lifestyle": true,
+          "has_medical": true,
+          "evidence_levels": [
+            "strong",
+            "strong",
+            "moderate",
+            "moderate"
+          ],
+          "severity_appropriate": true
+        }
+      },
+      "coverage_complete": true
+    },
+    "test_scientific_reference_validation": {
+      "passed": true,
+      "message": "Scientific reference validation: 72.0% quality score",
+      "reference_validation": {
+        "total_references": 5,
+        "valid_format_count": 5,
+        "peer_reviewed_count": 4,
+        "recent_references_count": 4,
+        "high_impact_count": 1
+      },
+      "quality_score": 0.7200000000000001
+    },
+    "test_personalized_recommendation_accuracy": {
+      "passed": true,
+      "message": "Personalized recommendation accuracy: 87.5% average",
+      "accuracy_results": {
+        "mild_ibs_patient": {
+          "accuracy_metrics": {
+            "symptom_relevance": 0.85,
+            "trigger_awareness": 0.8,
+            "severity_alignment": 0.9,
+            "contraindication_check": 0.95
+          },
+          "accuracy_score": 0.875
+        },
+        "moderate_ibs_patient": {
+          "accuracy_metrics": {
+            "symptom_relevance": 0.85,
+            "trigger_awareness": 0.8,
+            "severity_alignment": 0.9,
+            "contraindication_check": 0.95
+          },
+          "accuracy_score": 0.875
+        },
+        "severe_ibs_patient": {
+          "accuracy_metrics": {
+            "symptom_relevance": 0.85,
+            "trigger_awareness": 0.8,
+            "severity_alignment": 0.9,
+            "contraindication_check": 0.95
+          },
+          "accuracy_score": 0.875
+        }
+      },
+      "average_accuracy": 0.875
+    },
+    "test_evidence_level_compliance": {
+      "passed": true,
+      "message": "Evidence level compliance: 100.0% high-quality evidence",
+      "evidence_compliance": {
+        "grade_a_count": 6,
+        "grade_b_count": 6,
+        "grade_c_count": 0,
+        "total_recommendations": 12
+      },
+      "high_evidence_ratio": 1.0
+    },
+    "test_cross_validation_with_guidelines": {
+      "passed": true,
+      "message": "Clinical guideline compliance: 100.0%",
+      "guideline_compliance": {
+        "recommendations_with_guidelines": 12,
+        "high_grade_guidelines": 12,
+        "total_guidelines": 12,
+        "total_recommendations": 12
+      },
+      "compliance_rate": 1.0
+    },
+    "test_recommendation_engine_integration": {
+      "passed": true,
+      "message": "Recommendation engine integration successful for 3 patients",
+      "integration_results": {
+        "mild_ibs_patient": {
+          "has_clinical_evidence": true,
+          "evidence_count": 4,
+          "category_coverage": 4,
+          "total_recommendations": 10
+        },
+        "moderate_ibs_patient": {
+          "has_clinical_evidence": true,
+          "evidence_count": 4,
+          "category_coverage": 5,
+          "total_recommendations": 12
+        },
+        "severe_ibs_patient": {
+          "has_clinical_evidence": true,
+          "evidence_count": 4,
+          "category_coverage": 7,
+          "total_recommendations": 14
+        }
+      },
+      "integration_successful": true
+    },
+    "test_clinical_decision_support": {
+      "passed": true,
+      "message": "Clinical decision support quality: 100.0%",
+      "decision_support_metrics": {
+        "risk_stratification_accuracy": 3,
+        "treatment_prioritization": 3,
+        "safety_considerations": 3,
+        "follow_up_recommendations": 3
+      },
+      "decision_support_score": 1.0
+    }
+  },
+  "summary": {
+    "total_tests": 8,
+    "passed_tests": 8,
+    "failed_tests": 0,
+    "success_rate": 1.0,
+    "overall_status": "PASSED"
+  }
+}

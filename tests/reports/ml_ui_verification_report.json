@@ -1,0 +1,31 @@
+{
+  "success_rate": 71.42857142857143,
+  "integration_results": {
+    "realtime_predictions": true,
+    "ml_predictions": true,
+    "model_info": true,
+    "data_flow": true
+  },
+  "performance_results": {
+    "/api/v1/ml/realtime-predictions": {
+      "response_time_ms": 4.843950271606445,
+      "status_code": 200,
+      "success": true
+    },
+    "/api/v1/ml/predictions": {
+      "response_time_ms": 45.44401168823242,
+      "status_code": 200,
+      "success": true
+    },
+    "/api/v1/ml/models/info": {
+      "response_time_ms": 10.386943817138672,
+      "status_code": 200,
+      "success": true
+    }
+  },
+  "error_results": {
+    "unauthorized_access": false,
+    "invalid_data": false,
+    "missing_auth": true
+  }
+}

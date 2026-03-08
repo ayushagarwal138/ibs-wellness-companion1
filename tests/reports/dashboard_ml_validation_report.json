@@ -1,0 +1,161 @@
+{
+  "timestamp": "2025-09-29T17:55:04.876605",
+  "tests": {
+    "ML Predictions Data Structure": {
+      "status": "PASS",
+      "details": {
+        "response_data": {
+          "risk_level": "Low",
+          "confidence": 0.85,
+          "next_flare_probability": 0.5,
+          "predicted_severity": 5,
+          "timeline": "Next week",
+          "key_factors": []
+        },
+        "all_required_fields_present": true
+      },
+      "issues": []
+    },
+    "Recommendations Data Structure": {
+      "status": "PASS",
+      "details": {
+        "response_time_ms": 4.428,
+        "data_structure": "Valid",
+        "sample_data": {
+          "dietary_recommendations_count": 0,
+          "lifestyle_insights_count": 0,
+          "personalized_tips_count": 3
+        }
+      },
+      "issues": []
+    },
+    "Real-time Predictions Data Structure": {
+      "status": "PASS",
+      "details": {
+        "response_time_ms": 3.634,
+        "data_structure": "Valid",
+        "sample_data": {
+          "current_risk": 24.038184200998344,
+          "confidence_score": 0.85,
+          "risk_factors_count": 0,
+          "recommendations_count": 3
+        }
+      },
+      "issues": []
+    },
+    "Data Consistency Across Endpoints": {
+      "status": "PASS",
+      "details": {
+        "predictions_data": {
+          "risk_level": "Low",
+          "confidence": 0.85,
+          "next_flare_probability": 0.5,
+          "predicted_severity": 5,
+          "timeline": "Next week",
+          "key_factors": []
+        },
+        "real_time_data": {
+          "current_risk": 24.038184200998344,
+          "risk_factors": [],
+          "immediate_recommendations": [
+            "Review and eliminate your top 3 trigger foods",
+            "Increase stress management activities (meditation, yoga, breathing exercises)",
+            "Ensure adequate hydration with warm liquids"
+          ],
+          "confidence_score": 0.85
+        },
+        "recommendations_data": {
+          "dietary_recommendations": [],
+          "lifestyle_insights": [],
+          "trigger_analysis": {
+            "primary_category": "Dietary",
+            "insights": []
+          },
+          "management_strategy": {
+            "strategy": "Personalized IBS Management",
+            "approach": "Data-driven recommendations based on your symptoms and patterns",
+            "timeline": "2-4 weeks for initial results"
+          },
+          "personalized_tips": [
+            "Review and eliminate your top 3 trigger foods",
+            "Increase stress management activities (meditation, yoga, breathing exercises)",
+            "Ensure adequate hydration with warm liquids"
+          ]
+        },
+        "risk_mapping": {
+          "predictions_risk": "low",
+          "realtime_risk_numeric": 24.038184200998344,
+          "realtime_risk_mapped": "low"
+        },
+        "consistency_status": "All endpoints show consistent data"
+      },
+      "issues": []
+    },
+    "Dashboard Visualization Data Mapping": {
+      "status": "PASS",
+      "details": {
+        "predictions_status": 200,
+        "component_mappings": {
+          "risk_indicator": {
+            "field_present": true,
+            "type_valid": true,
+            "value": "Low"
+          },
+          "confidence_meter": {
+            "field_present": true,
+            "type_valid": true,
+            "value": 0.85
+          },
+          "severity_display": {
+            "field_present": true,
+            "type_valid": true,
+            "value": 5
+          },
+          "timeline_widget": {
+            "field_present": true,
+            "type_valid": true,
+            "value": "Next week"
+          },
+          "factors_list": {
+            "field_present": true,
+            "type_valid": true,
+            "value": []
+          }
+        }
+      },
+      "issues": []
+    },
+    "Performance and Loading States": {
+      "status": "PASS",
+      "details": {
+        "performance_results": {
+          "predictions": {
+            "response_time": 0.002769947052001953,
+            "status_code": 200,
+            "success": true
+          },
+          "real-time": {
+            "response_time": 0.0036280155181884766,
+            "status_code": 200,
+            "success": true
+          },
+          "recommendations": {
+            "response_time": 0.004461765289306641,
+            "status_code": 200,
+            "success": true
+          }
+        },
+        "performance_status": "All endpoints meet dashboard performance requirements"
+      },
+      "issues": []
+    }
+  },
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 6,
+    "failed_tests": 0,
+    "success_rate": 100.0,
+    "overall_status": "PASS"
+  },
+  "issues": []
+}

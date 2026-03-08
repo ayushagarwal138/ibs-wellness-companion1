@@ -1,0 +1,272 @@
+{
+  "validation_timestamp": "2025-09-29T18:26:43.105796",
+  "summary": {
+    "total_tests": 18,
+    "passed_tests": 13,
+    "failed_tests": 5,
+    "success_rate": 72.22222222222221
+  },
+  "detailed_results": {
+    "severity_tests": [
+      {
+        "test_name": "Mild symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 1,
+          "bloating": 1,
+          "gas": 1,
+          "diarrhea": 0,
+          "constipation": 0,
+          "urgency": 1,
+          "stress_level": 3,
+          "sleep_quality": 8
+        },
+        "predicted_severity": "Low",
+        "severity_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "Low",
+        "passed": true
+      },
+      {
+        "test_name": "Moderate symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 5,
+          "bloating": 4,
+          "gas": 3,
+          "diarrhea": 3,
+          "constipation": 0,
+          "urgency": 4,
+          "stress_level": 6,
+          "sleep_quality": 5
+        },
+        "predicted_severity": "Low",
+        "severity_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "Medium",
+        "passed": false
+      },
+      {
+        "test_name": "Severe symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 8,
+          "bloating": 7,
+          "gas": 6,
+          "diarrhea": 7,
+          "constipation": 0,
+          "urgency": 8,
+          "stress_level": 9,
+          "sleep_quality": 2
+        },
+        "predicted_severity": "Low",
+        "severity_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "High",
+        "passed": false
+      },
+      {
+        "test_name": "High stress impact",
+        "input_symptoms": {
+          "abdominal_pain": 3,
+          "bloating": 3,
+          "gas": 2,
+          "diarrhea": 2,
+          "constipation": 0,
+          "urgency": 3,
+          "stress_level": 10,
+          "sleep_quality": 2
+        },
+        "predicted_severity": "Low",
+        "severity_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "Medium",
+        "passed": false
+      }
+    ],
+    "flareup_tests": [
+      {
+        "test_name": "Low risk scenario",
+        "input_symptoms": {
+          "abdominal_pain": 1,
+          "bloating": 1,
+          "stress_level": 2,
+          "sleep_quality": 8
+        },
+        "days_ahead": 7,
+        "predicted_risk": "Low",
+        "risk_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "Low",
+        "passed": true
+      },
+      {
+        "test_name": "High stress scenario",
+        "input_symptoms": {
+          "abdominal_pain": 4,
+          "bloating": 5,
+          "stress_level": 9,
+          "sleep_quality": 3
+        },
+        "days_ahead": 3,
+        "predicted_risk": "Low",
+        "risk_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "High",
+        "passed": false
+      },
+      {
+        "test_name": "Moderate symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 3,
+          "bloating": 4,
+          "stress_level": 6,
+          "sleep_quality": 5
+        },
+        "days_ahead": 14,
+        "predicted_risk": "Low",
+        "risk_score": 0.24038184200998344,
+        "confidence": 0.85,
+        "expected": "Medium",
+        "passed": false
+      }
+    ],
+    "recommendation_tests": [
+      {
+        "test_name": "High stress symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 6,
+          "bloating": 5,
+          "stress_level": 9,
+          "sleep_quality": 3
+        },
+        "focus_area": "lifestyle",
+        "diet_recommendations_count": 3,
+        "lifestyle_recommendations_count": 3,
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "total_recommendations": 6
+      },
+      {
+        "test_name": "Digestive symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 4,
+          "bloating": 7,
+          "gas": 6,
+          "diarrhea": 5,
+          "stress_level": 4,
+          "sleep_quality": 6
+        },
+        "focus_area": "diet",
+        "diet_recommendations_count": 3,
+        "lifestyle_recommendations_count": 3,
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "total_recommendations": 6
+      },
+      {
+        "test_name": "General symptoms",
+        "input_symptoms": {
+          "abdominal_pain": 3,
+          "bloating": 4,
+          "stress_level": 5,
+          "sleep_quality": 5
+        },
+        "focus_area": "both",
+        "diet_recommendations_count": 3,
+        "lifestyle_recommendations_count": 3,
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "total_recommendations": 6
+      }
+    ],
+    "performance_tests": [
+      {
+        "endpoint": "severity",
+        "avg_response_time": 0.0025787830352783205,
+        "min_response_time": 0.002396821975708008,
+        "max_response_time": 0.002833127975463867,
+        "total_requests": 5
+      },
+      {
+        "endpoint": "flareup",
+        "avg_response_time": 0.0030025959014892576,
+        "min_response_time": 0.002662181854248047,
+        "max_response_time": 0.0032739639282226562,
+        "total_requests": 5
+      },
+      {
+        "endpoint": "recommendations",
+        "avg_response_time": 0.004414558410644531,
+        "min_response_time": 0.0038347244262695312,
+        "max_response_time": 0.005083799362182617,
+        "total_requests": 5
+      }
+    ],
+    "edge_case_tests": [
+      {
+        "test_name": "Empty symptoms",
+        "endpoint": "/ml/predict/severity",
+        "input_data": {
+          "symptoms": {}
+        },
+        "expected_success": true,
+        "actual_success": true,
+        "status_code": 200,
+        "passed": true
+      },
+      {
+        "test_name": "Missing symptoms field",
+        "endpoint": "/ml/predict/severity",
+        "input_data": {},
+        "expected_success": true,
+        "actual_success": true,
+        "status_code": 200,
+        "passed": true
+      },
+      {
+        "test_name": "Invalid days_ahead (too high)",
+        "endpoint": "/ml/predict/flareup",
+        "input_data": {
+          "days_ahead": 100,
+          "symptoms": {
+            "abdominal_pain": 3
+          }
+        },
+        "expected_success": false,
+        "actual_success": false,
+        "status_code": 422,
+        "passed": true
+      },
+      {
+        "test_name": "Invalid days_ahead (negative)",
+        "endpoint": "/ml/predict/flareup",
+        "input_data": {
+          "days_ahead": -1,
+          "symptoms": {
+            "abdominal_pain": 3
+          }
+        },
+        "expected_success": false,
+        "actual_success": false,
+        "status_code": 422,
+        "passed": true
+      },
+      {
+        "test_name": "Extreme symptom values",
+        "endpoint": "/ml/predict/severity",
+        "input_data": {
+          "symptoms": {
+            "abdominal_pain": 100,
+            "bloating": -50
+          }
+        },
+        "expected_success": true,
+        "actual_success": true,
+        "status_code": 200,
+        "passed": true
+      }
+    ]
+  },
+  "recommendations": [
+    "Review severity prediction logic - 3 tests failed",
+    "Review flareup prediction logic - 2 tests failed"
+  ]
+}

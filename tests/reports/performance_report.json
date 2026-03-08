@@ -1,0 +1,235 @@
+{
+  "summary": {
+    "timestamp": "2025-09-29T18:03:00.176888",
+    "total_tests": 7,
+    "passed_tests": 7,
+    "failed_tests": 0,
+    "success_rate": 100.0,
+    "overall_status": "PASS",
+    "overall_avg_response_time": 9.552794694900513,
+    "performance_thresholds": {
+      "fast_response": 500,
+      "acceptable_response": 2000,
+      "slow_response": 5000,
+      "timeout": 10000
+    }
+  },
+  "test_results": {
+    "Frontend Performance": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "main_page_response_time": 15.666007995605469,
+        "main_page_status": 200,
+        "asset_response_times": [
+          2.0139217376708984
+        ],
+        "avg_asset_time": 2.0139217376708984
+      }
+    },
+    "Database Performance": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "/api/v1/ml/predictions": {
+          "endpoint": "/api/v1/ml/predictions",
+          "method": "GET",
+          "iterations": 3,
+          "avg_response_time": 5.379120508829753,
+          "min_response_time": 4.112005233764648,
+          "max_response_time": 6.884098052978516,
+          "median_response_time": 5.141258239746094,
+          "fast_responses": 3,
+          "acceptable_responses": 3,
+          "slow_responses": 0,
+          "success_count": 3,
+          "success_rate": 100.0,
+          "all_response_times": [
+            4.112005233764648,
+            5.141258239746094,
+            6.884098052978516
+          ],
+          "status_codes": [
+            200,
+            200,
+            200
+          ]
+        },
+        "/api/v1/recommendations/personalized": {
+          "endpoint": "/api/v1/recommendations/personalized",
+          "method": "GET",
+          "iterations": 3,
+          "avg_response_time": 9.588877360026041,
+          "min_response_time": 7.587909698486328,
+          "max_response_time": 13.522863388061523,
+          "median_response_time": 7.655858993530273,
+          "fast_responses": 3,
+          "acceptable_responses": 3,
+          "slow_responses": 0,
+          "success_count": 3,
+          "success_rate": 100.0,
+          "all_response_times": [
+            13.522863388061523,
+            7.587909698486328,
+            7.655858993530273
+          ],
+          "status_codes": [
+            200,
+            200,
+            200
+          ]
+        },
+        "/api/v1/ml/realtime-predictions": {
+          "endpoint": "/api/v1/ml/realtime-predictions",
+          "method": "GET",
+          "iterations": 3,
+          "avg_response_time": 30.763864517211914,
+          "min_response_time": 6.142854690551758,
+          "max_response_time": 79.86569404602051,
+          "median_response_time": 6.283044815063477,
+          "fast_responses": 3,
+          "acceptable_responses": 3,
+          "slow_responses": 0,
+          "success_count": 3,
+          "success_rate": 100.0,
+          "all_response_times": [
+            6.283044815063477,
+            6.142854690551758,
+            79.86569404602051
+          ],
+          "status_codes": [
+            200,
+            200,
+            200
+          ]
+        }
+      }
+    },
+    "Memory and Resource Usage": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "batch_response_times": [
+          7.684183120727539,
+          10.503983497619629,
+          11.791062355041504
+        ],
+        "total_requests": 30,
+        "performance_trend": "stable"
+      }
+    },
+    "ML Predictions Performance": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "endpoint": "/api/v1/ml/predictions",
+        "method": "GET",
+        "iterations": 5,
+        "avg_response_time": 13.192558288574219,
+        "min_response_time": 10.600805282592773,
+        "max_response_time": 14.045000076293945,
+        "median_response_time": 13.804912567138672,
+        "fast_responses": 5,
+        "acceptable_responses": 5,
+        "slow_responses": 0,
+        "success_count": 5,
+        "success_rate": 100.0,
+        "all_response_times": [
+          13.831138610839844,
+          13.68093490600586,
+          14.045000076293945,
+          13.804912567138672,
+          10.600805282592773
+        ],
+        "status_codes": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      }
+    },
+    "Recommendations Performance": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "endpoint": "/api/v1/recommendations/personalized",
+        "method": "GET",
+        "iterations": 5,
+        "avg_response_time": 8.806180953979492,
+        "min_response_time": 5.883932113647461,
+        "max_response_time": 14.281034469604492,
+        "median_response_time": 8.028984069824219,
+        "fast_responses": 5,
+        "acceptable_responses": 5,
+        "slow_responses": 0,
+        "success_count": 5,
+        "success_rate": 100.0,
+        "all_response_times": [
+          5.883932113647461,
+          9.081840515136719,
+          14.281034469604492,
+          6.75511360168457,
+          8.028984069824219
+        ],
+        "status_codes": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      }
+    },
+    "Real-time Predictions Performance": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "endpoint": "/api/v1/ml/realtime-predictions",
+        "method": "GET",
+        "iterations": 5,
+        "avg_response_time": 8.863544464111328,
+        "min_response_time": 5.425930023193359,
+        "max_response_time": 15.813112258911133,
+        "median_response_time": 8.322954177856445,
+        "fast_responses": 5,
+        "acceptable_responses": 5,
+        "slow_responses": 0,
+        "success_count": 5,
+        "success_rate": 100.0,
+        "all_response_times": [
+          5.425930023193359,
+          8.322954177856445,
+          15.813112258911133,
+          9.015798568725586,
+          5.739927291870117
+        ],
+        "status_codes": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      }
+    },
+    "Concurrent Load Test": {
+      "status": "PASS",
+      "issues": [],
+      "data": {
+        "endpoint": "/api/v1/ml/predictions",
+        "concurrent_users": 3,
+        "requests_per_user": 2,
+        "total_requests": 6,
+        "successful_requests": 6,
+        "success_rate": 100.0,
+        "avg_response_time": 7.348895072937012,
+        "max_response_time": 8.35108757019043,
+        "total_test_time": 15.588998794555664,
+        "errors": [],
+        "error_count": 0
+      }
+    }
+  }
+}

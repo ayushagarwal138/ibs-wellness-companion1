@@ -1,0 +1,165 @@
+{
+  "test_run_timestamp": "2025-10-01T10:31:58.140664",
+  "total_tests": 10,
+  "passed_tests": 10,
+  "failed_tests": 0,
+  "test_results": [
+    {
+      "test_name": "Server Health Check",
+      "success": true,
+      "details": "Server is running",
+      "timestamp": "2025-10-01T10:31:57.562030",
+      "response_data": null
+    },
+    {
+      "test_name": "User Authentication",
+      "success": true,
+      "details": "Successfully authenticated",
+      "timestamp": "2025-10-01T10:31:57.992638",
+      "response_data": null
+    },
+    {
+      "test_name": "Model Info Endpoint",
+      "success": true,
+      "details": "Retrieved model info with 3 models",
+      "timestamp": "2025-10-01T10:31:57.995323",
+      "response_data": {
+        "models_loaded": {
+          "severity_model": true,
+          "flareup_model": true,
+          "recommendation_model": true
+        },
+        "model_versions": {
+          "severity_model": "enhanced_v1.0.0",
+          "flareup_model": "enhanced_v1.0.0",
+          "recommendation_model": "enhanced_v1.0.0"
+        },
+        "last_updated": {
+          "severity_model": "2025-10-01T10:31:57.994830",
+          "flareup_model": "2025-10-01T10:31:57.994830",
+          "recommendation_model": "2025-10-01T10:31:57.994830"
+        },
+        "fallback_active": {
+          "severity_model": false,
+          "flareup_model": false,
+          "recommendation_model": false
+        }
+      }
+    },
+    {
+      "test_name": "Severity Prediction",
+      "success": true,
+      "details": "Predicted severity: Low (score: 0.37, confidence: 0.50)",
+      "timestamp": "2025-10-01T10:31:58.000847",
+      "response_data": {
+        "severity_score": 0.36803888016297265,
+        "severity_level": "Low",
+        "confidence": 0.5,
+        "model_version": "fallback_rule_based",
+        "predicted_at": "2025-10-01T05:01:58.000260",
+        "factors": [
+          "High stress levels",
+          "Poor sleep quality",
+          "Significant bloating"
+        ]
+      }
+    },
+    {
+      "test_name": "Flareup Prediction",
+      "success": true,
+      "details": "Predicted risk: Low (score: 0.34, confidence: 0.50)",
+      "timestamp": "2025-10-01T10:31:58.004063",
+      "response_data": {
+        "risk_score": 0.33957708500535,
+        "risk_level": "Low",
+        "days_ahead": 7,
+        "confidence": 0.5,
+        "model_version": "fallback_rule_based",
+        "predicted_at": "2025-10-01T05:01:58.003625",
+        "risk_factors": []
+      }
+    },
+    {
+      "test_name": "Recommendations Endpoint",
+      "success": true,
+      "details": "Generated 3 diet and 3 lifestyle recommendations (scores: 30.0, 0.0)",
+      "timestamp": "2025-10-01T10:31:58.077242",
+      "response_data": {
+        "diet_recommendations": [
+          {
+            "category": "moderate",
+            "recommendation": "Monitor Dairy products, Wheat/Gluten, Onions carefully",
+            "priority": "medium",
+            "rationale": "These foods may contribute to your symptoms. Reduce portion sizes and frequency over 2-3 weeks."
+          },
+          {
+            "category": "include",
+            "recommendation": "Incorporate Rice, Bananas, Carrots, Chicken breast, Oats as staples",
+            "priority": "medium",
+            "rationale": "These foods have shown to be well-tolerated in your diet history. Incorporate as staples in your meal planning."
+          },
+          {
+            "category": "hydration",
+            "recommendation": "Increase intake of Warm water, Herbal teas, Electrolyte solutions",
+            "priority": "medium",
+            "rationale": "Proper hydration supports digestive health and can reduce constipation. Aim for 8-10 glasses daily, warm liquids preferred."
+          }
+        ],
+        "lifestyle_recommendations": [
+          {
+            "category": "Gentle Movement",
+            "recommendation": "Try gentle yoga or stretching for 15-20 minutes",
+            "priority": "medium",
+            "rationale": "Gentle movement can help with digestion without overexertion"
+          },
+          {
+            "category": "Meal Timing",
+            "recommendation": "Eat smaller, more frequent meals (5-6 times daily)",
+            "priority": "high",
+            "rationale": "Reduces digestive burden and prevents symptom spikes"
+          },
+          {
+            "category": "Mindful Eating",
+            "recommendation": "Chew food thoroughly and eat slowly",
+            "priority": "medium",
+            "rationale": "Improves digestion and reduces gas formation"
+          }
+        ],
+        "diet_score": 30.0,
+        "lifestyle_score": 0.0,
+        "model_version": "1.0.0",
+        "generated_at": "2025-10-01T05:01:58.076380"
+      }
+    },
+    {
+      "test_name": "Model Reload Endpoint",
+      "success": true,
+      "details": "Models reloaded: Enhanced models reloaded successfully",
+      "timestamp": "2025-10-01T10:31:58.134360",
+      "response_data": {
+        "message": "Enhanced models reloaded successfully"
+      }
+    },
+    {
+      "test_name": "Edge Case - Empty Symptoms",
+      "success": true,
+      "details": "Handled gracefully (status: 200)",
+      "timestamp": "2025-10-01T10:31:58.137764",
+      "response_data": null
+    },
+    {
+      "test_name": "Edge Case - Invalid Days Ahead",
+      "success": true,
+      "details": "Handled gracefully (status: 422)",
+      "timestamp": "2025-10-01T10:31:58.139859",
+      "response_data": null
+    },
+    {
+      "test_name": "Edge Case - No Authentication",
+      "success": true,
+      "details": "Properly rejected (status: 403)",
+      "timestamp": "2025-10-01T10:31:58.140614",
+      "response_data": null
+    }
+  ]
+}
