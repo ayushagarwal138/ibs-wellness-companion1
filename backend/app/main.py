@@ -38,6 +38,15 @@ async def lifespan(app: FastAPI):
     # Initialize ML models (if needed)
     # await load_ml_models()
 
+    # Seed initial data
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from app.seed_data import seed
+        await seed()
+    except Exception as e:
+        logger.warning(f"Seeding skipped: {e}")
+
     logger.info("Application startup complete")
 
     yield
