@@ -154,7 +154,7 @@ class FoodReaction(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     food_id = Column(Integer, ForeignKey("foods.id"), nullable=False, index=True)
     diet_log_id = Column(
-        UUID(as_uuid=True), ForeignKey("diet_logs.id"), nullable=True, index=True
+        Integer, ForeignKey("diet_logs.id"), nullable=True, index=True
     )  # Optional link to specific consumption
 
     # Reaction details
