@@ -263,7 +263,6 @@ dmypy.json
 *.h5
 *.pt
 *.pth
-models/
 checkpoints/
 
 # Data files
