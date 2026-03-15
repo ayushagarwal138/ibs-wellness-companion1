@@ -530,8 +530,9 @@ class DynamicDashboardService {
         new Date(s.logged_at).toDateString()
       )).size;
 
-      const avgSeverity = symptoms.length > 0 
-        ? symptoms.reduce((sum: number, s: any) => sum + (s.severity || 0), 0) / symptoms.length
+      const sevMap: Record<string, number> = {none:0, mild:2, moderate:5, severe:8, very_severe:10};
+      const avgSeverity = symptoms.length > 0
+        ? symptoms.reduce((sum: number, s: any) => sum + (sevMap[String(s.severity).toLowerCase()] ?? 0), 0) / symptoms.length
         : 0;
 
       // Validate analytics data
