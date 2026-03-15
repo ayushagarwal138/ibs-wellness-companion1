@@ -231,6 +231,18 @@ async def create_diet_log(
             db.add(food)
             await db.flush()  # Get the ID without committing
 
+        # Try to get calories from FoodItem table
+        food_item_result = await db.execute(
+            select(FoodItem).where(func.lower(FoodItem.name) == func.lower(food_name)).limit(1)
+        )
+        food_item = food_item_result.scalar_one_or_none()
+        if food_item and food_item.calories_per_100g and not food.calories_per_100g:
+            food.calories_per_100g = food_item.calories_per_100g
+            food.protein_g = food_item.protein_per_100g
+            food.carbs_g = food_item.carbs_per_100g
+            food.fat_g = food_item.fat_per_100g
+            food.fiber_g = food_item.fiber_per_100g
+
         # Create diet log entry for this food
         diet_log = DietLog(
             user_id=current_user.id,
