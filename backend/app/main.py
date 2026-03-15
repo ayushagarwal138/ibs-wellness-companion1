@@ -42,8 +42,8 @@ async def lifespan(app: FastAPI):
     try:
         import sys, os
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from app.seed_data import seed
-        await seed()
+        # from app.seed_data import seed  # Disabled - data already seeded
+        # await seed()  # Disabled - data already seeded
     except Exception as e:
         logger.warning(f"Seeding skipped: {e}")
 
