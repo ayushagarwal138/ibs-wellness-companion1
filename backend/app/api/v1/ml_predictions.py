@@ -399,41 +399,107 @@ async def get_predictions(
         # Apply personalized thresholds to user data
         user_data["personalized_thresholds"] = personalized_thresholds
 
-        # Generate basic prediction (simplified without full ML service)
-        # This provides a working endpoint while the full ML service is being developed
-        severity_prediction = {
-            "risk_level": "medium",
-            "confidence": 0.75,
-            "risk_score": 0.5,
-            "severity_score": 5,
-        }
+        # Calculate real predictions from user data
+        from sqlalchemy import func as sqlfunc
+        from app.models.diet import DietLog, Food
+        from app.models.symptom import SymptomLog
 
-        # Prepare response in the format expected by the frontend
+        cutoff = datetime.utcnow() - timedelta(days=days_back)
+
+        # Get recent symptom logs
+        sym_result = await db.execute(
+            select(SymptomLog)
+            .where(SymptomLog.user_id == current_user.id)
+            .where(SymptomLog.logged_at >= cutoff)
+            .order_by(SymptomLog.logged_at.desc())
+        )
+        recent_symptoms = sym_result.scalars().all()
+
+        # Calculate risk level from real symptom data
+        if recent_symptoms:
+            severities = []
+            for s in recent_symptoms:
+                sev_map = {"none": 0, "mild": 2, "moderate": 5, "severe": 8, "very_severe": 10}
+                severities.append(sev_map.get(str(s.severity).lower(), 5))
+            avg_severity = sum(severities) / len(severities)
+            if avg_severity >= 7:
+                risk_level = "high"
+                risk_score = 0.8
+            elif avg_severity >= 4:
+                risk_level = "medium"
+                risk_score = 0.5
+            else:
+                risk_level = "low"
+                risk_score = 0.2
+            confidence = min(0.5 + len(recent_symptoms) * 0.05, 0.95)
+        else:
+            risk_level = "low"
+            risk_score = 0.2
+            confidence = 0.3
+            avg_severity = 0
+
+        # Get real trigger foods from diet logs
+        diet_result = await db.execute(
+            select(Food.name, Food.fodmap_level, Food.common_triggers)
+            .join(DietLog, DietLog.food_id == Food.id)
+            .where(DietLog.user_id == current_user.id)
+            .where(DietLog.consumed_at >= cutoff)
+            .distinct()
+        )
+        diet_rows = diet_result.all()
+        trigger_foods = []
+        for name, fodmap, is_trigger in diet_rows:
+            if is_trigger or (fodmap and str(fodmap).lower() == "high"):
+                trigger_foods.append(name)
+        if not trigger_foods:
+            trigger_foods = ["Log more meals to identify your trigger foods"]
+
+        # Real recommendations based on data
+        recommendations = []
+        if recent_symptoms:
+            stress_levels = [s.stress_level for s in recent_symptoms if s.stress_level]
+            sleep_levels = [s.sleep_quality for s in recent_symptoms if s.sleep_quality]
+            if stress_levels and sum(stress_levels)/len(stress_levels) > 6:
+                recommendations.append("High stress detected - try relaxation techniques")
+            if sleep_levels and sum(sleep_levels)/len(sleep_levels) < 5:
+                recommendations.append("Poor sleep detected - maintain consistent sleep schedule")
+            if avg_severity > 5:
+                recommendations.append("High symptom severity - consider consulting your doctor")
+            if trigger_foods and "Log more" not in trigger_foods[0]:
+                recommendations.append(f"Avoid recent trigger foods: {', '.join(trigger_foods[:2])}")
+        if not recommendations:
+            recommendations = [
+                "Keep logging daily symptoms for personalized insights",
+                "Stay hydrated throughout the day",
+                "Log your meals to identify food triggers",
+            ]
+
+        # Key factors from real data
+        key_factors = []
+        if recent_symptoms:
+            key_factors.append(f"{len(recent_symptoms)} symptoms logged this period")
+        if diet_rows:
+            key_factors.append(f"{len(diet_rows)} unique foods consumed")
+        stress_vals = [s.stress_level for s in recent_symptoms if s.stress_level]
+        if stress_vals:
+            key_factors.append(f"Avg stress: {sum(stress_vals)/len(stress_vals):.1f}/10")
+        sleep_vals = [s.sleep_quality for s in recent_symptoms if s.sleep_quality]
+        if sleep_vals:
+            key_factors.append(f"Avg sleep: {sum(sleep_vals)/len(sleep_vals):.1f}/10")
+        if not key_factors:
+            key_factors = ["Start logging symptoms and meals for AI insights"]
+
         response = {
-            "riskLevel": severity_prediction.get("risk_level", "medium"),
-            "nextFlareRisk": severity_prediction.get("risk_score", 0.5),
-            "confidence": severity_prediction.get("confidence", 0.75),
-            "triggerFoods": [
-                "High-FODMAP foods",
-                "Dairy products",
-                "Spicy foods",
-                "Caffeine"
-            ],
-            "recommendations": [
-                "Monitor symptoms closely",
-                "Stay hydrated",
-                "Avoid known trigger foods",
-                "Practice stress management techniques",
-                "Maintain regular sleep schedule"
-            ],
-            "keyFactors": [
-                "Recent symptom patterns",
-                "Dietary factors",
-                "Stress levels",
-                "Sleep quality",
-            ],
+            "riskLevel": risk_level,
+            "nextFlareRisk": round(risk_score, 2),
+            "confidence": round(confidence, 2),
+            "triggerFoods": trigger_foods[:5],
+            "recommendations": recommendations[:5],
+            "keyFactors": key_factors[:4],
             "timeline": f"Next {timeframe}",
-            "modelVersion": "v1.2.0"
+            "modelVersion": "v2.0.0-realdata"
+        }
+        return response
         }
 
         return response
