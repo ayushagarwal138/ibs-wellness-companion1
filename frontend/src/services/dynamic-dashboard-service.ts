@@ -499,10 +499,16 @@ class DynamicDashboardService {
     try {
       const data = await apiService.get(`${API_CONFIG.BASE_URL}/api/v1/symptom-logs?limit=10`) as any;
 
-      return (data.items || []).map((log: any) => ({
+      const logs = data.data || data.items || [];
+      return logs.map((log: any) => ({
         date: new Date(log.logged_at).toLocaleDateString(),
-        severity: log.severity || 0,
-        symptoms: log.symptoms || [],
+        severity_score: log.severity === 'mild' ? 2 : log.severity === 'moderate' ? 5 : log.severity === 'severe' ? 8 : log.severity === 'very_severe' ? 10 : 0,
+        severity: log.severity || 'none',
+        symptom_name: log.symptom_name || 'Unknown',
+        symptoms: log.symptom_name ? [log.symptom_name] : [],
+        stress_level: log.stress_level || 0,
+        sleep_quality: log.sleep_quality || 0,
+        logged_at: log.logged_at,
         notes: log.notes,
       }));
     } catch (error) {
@@ -518,7 +524,7 @@ class DynamicDashboardService {
         apiService.get(`${API_CONFIG.BASE_URL}/api/v1/analytics/weekly-summary`),
       ]);
 
-      const symptoms = (symptomsData as any).items || [];
+      const symptoms = (symptomsData as any).data || (symptomsData as any).items || [];
       const totalDays = 7;
       const symptomFreeDays = totalDays - new Set(symptoms.map((s: any) => 
         new Date(s.logged_at).toDateString()
