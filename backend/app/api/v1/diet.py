@@ -432,17 +432,15 @@ async def delete_diet_log(
     current_user: User = Depends(get_current_active_user),
 ):
     """Delete a diet log entry."""
-    diet_log = (
-        db.query(DietLog)
-        .filter(and_(DietLog.id == log_id, DietLog.user_id == current_user.id))
-        .first()
+    result = await db.execute(
+        select(DietLog).where(and_(DietLog.id == log_id, DietLog.user_id == current_user.id))
     )
-
+    diet_log = result.scalar_one_or_none()
     if not diet_log:
         raise HTTPException(status_code=404, detail="Diet log not found")
+    await db.delete(diet_log)
+    await db.commit()
 
-    db.delete(diet_log)
-    db.commit()
 
     return {"message": "Diet log deleted successfully"}
 
