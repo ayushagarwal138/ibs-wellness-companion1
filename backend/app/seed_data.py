@@ -59,7 +59,7 @@ async def seed():
     
     async with async_session() as session:
         # Seed symptoms
-        from sqlalchemy import select
+        from sqlalchemy import select, func
         result = await session.execute(select(Symptom).limit(1))
         if not result.scalar():
             for s in SYMPTOMS:
@@ -148,11 +148,15 @@ async def seed():
                 {"id": str(uuid.uuid4()), "name": "Ghee", "category": "fats_oils", "fodmap_level": "low", "calories_per_100g": 900, "protein_per_100g": 0, "carbs_per_100g": 0, "fat_per_100g": 99.5, "fiber_per_100g": 0, "common_triggers": False},
                 {"id": str(uuid.uuid4()), "name": "Coconut Milk", "category": "dairy", "fodmap_level": "moderate", "calories_per_100g": 230, "protein_per_100g": 2.3, "carbs_per_100g": 6, "fat_per_100g": 24, "fiber_per_100g": 2.2, "common_triggers": False},
             ]
+            added = 0
             for fi in food_items_data:
-                session.add(FoodItem(**fi))
-            print(f"Added {len(food_items_data)} food items")
-        else:
-            print("Food items already seeded")
+                exists = await session.execute(
+                    select(FoodItem).where(func.lower(FoodItem.name) == func.lower(fi["name"])).limit(1)
+                )
+                if not exists.scalar():
+                    session.add(FoodItem(**fi))
+                    added += 1
+            print(f"Added {added} new food items")
 
         await session.commit()
         print("Seeding complete!")
