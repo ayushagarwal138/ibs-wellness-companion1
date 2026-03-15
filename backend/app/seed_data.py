@@ -79,7 +79,7 @@ async def seed():
         
         # Seed food_items table
         result = await session.execute(select(FoodItem).limit(1))
-        if not result.scalar():
+        if True:  # Always check missing items
             import uuid
             food_items_data = [
                 {"id": str(uuid.uuid4()), "name": "Chicken breast", "category": "proteins", "fodmap_level": "low", "calories_per_100g": 165, "protein_per_100g": 31, "carbs_per_100g": 0, "fat_per_100g": 3.6, "fiber_per_100g": 0, "common_triggers": False},
