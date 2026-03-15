@@ -500,9 +500,6 @@ async def get_predictions(
             "modelVersion": "v2.0.0-realdata"
         }
         return response
-        }
-
-        return response
 
     except Exception as e:
         logger.error(f"Error getting predictions: {e}")
