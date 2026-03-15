@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { LineChart as ReLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -540,12 +541,31 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                    <div className="text-center">
-                      <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-500">Chart visualization would go here</p>
-                      <p className="text-xs text-gray-400">Showing symptom severity over time</p>
-                    </div>
+                  <div className="h-64">
+                    {data.recentSymptoms && data.recentSymptoms.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ReLineChart data={data.recentSymptoms.slice().reverse().map((s: any, i: number) => ({
+                          name: new Date(s.logged_at).toLocaleDateString('en-IN', {day:'2-digit', month:'short'}),
+                          severity: s.severity_score || 0,
+                          stress: s.stress_level || 0,
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" tick={{fontSize: 10}} />
+                          <YAxis domain={[0, 10]} tick={{fontSize: 10}} />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="severity" stroke="#ef4444" name="Severity" strokeWidth={2} dot={{r:3}} />
+                          <Line type="monotone" dataKey="stress" stroke="#f97316" name="Stress" strokeWidth={2} dot={{r:3}} />
+                        </ReLineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                        <div className="text-center">
+                          <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                          <p className="text-gray-500">Log symptoms to see trends</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -558,12 +578,32 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                    <div className="text-center">
-                      <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-500">Chart visualization would go here</p>
-                      <p className="text-xs text-gray-400">Showing food impact on symptoms</p>
-                    </div>
+                  <div className="h-64">
+                    {data.aiPredictions && data.aiPredictions.triggerFoods && data.aiPredictions.triggerFoods.length > 0 && data.aiPredictions.triggerFoods[0] !== 'Log more meals to identify your trigger foods' ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RePieChart>
+                          <Pie
+                            data={data.aiPredictions.triggerFoods.map((food: string, i: number) => ({
+                              name: food, value: 1
+                            }))}
+                            cx="50%" cy="50%" outerRadius={80}
+                            dataKey="value" label={({name}: any) => name}
+                          >
+                            {data.aiPredictions.triggerFoods.map((_: any, i: number) => (
+                              <Cell key={i} fill={['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'][i % 5]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </RePieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                        <div className="text-center">
+                          <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                          <p className="text-gray-500">Log meals to see food impact</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
