@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from app.models.symptom import Symptom
 from app.models.diet import Food, FoodCategoryEnum, FODMAPLevelEnum
+from app.models.food_item import FoodItem
 
 SYMPTOMS = [
     {"name": "Abdominal Pain", "category": "pain", "description": "Pain or cramping in the abdomen"},
@@ -76,6 +77,47 @@ async def seed():
         else:
             print("Foods already seeded")
         
+        # Seed food_items table
+        result = await session.execute(select(FoodItem).limit(1))
+        if not result.scalar():
+            import uuid
+            food_items_data = [
+                {"id": str(uuid.uuid4()), "name": "Chicken breast", "category": "proteins", "fodmap_level": "low", "calories_per_100g": 165, "protein_per_100g": 31, "carbs_per_100g": 0, "fat_per_100g": 3.6, "fiber_per_100g": 0, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Brown rice", "category": "grains", "fodmap_level": "low", "calories_per_100g": 216, "protein_per_100g": 5, "carbs_per_100g": 45, "fat_per_100g": 1.8, "fiber_per_100g": 1.8, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "White rice", "category": "grains", "fodmap_level": "low", "calories_per_100g": 206, "protein_per_100g": 4.3, "carbs_per_100g": 45, "fat_per_100g": 0.4, "fiber_per_100g": 0.4, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Salmon", "category": "proteins", "fodmap_level": "low", "calories_per_100g": 208, "protein_per_100g": 20, "carbs_per_100g": 0, "fat_per_100g": 13, "fiber_per_100g": 0, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Eggs", "category": "proteins", "fodmap_level": "low", "calories_per_100g": 155, "protein_per_100g": 13, "carbs_per_100g": 1.1, "fat_per_100g": 11, "fiber_per_100g": 0, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Banana", "category": "fruits", "fodmap_level": "moderate", "calories_per_100g": 89, "protein_per_100g": 1.1, "carbs_per_100g": 23, "fat_per_100g": 0.3, "fiber_per_100g": 2.6, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Blueberries", "category": "fruits", "fodmap_level": "low", "calories_per_100g": 57, "protein_per_100g": 0.7, "carbs_per_100g": 14, "fat_per_100g": 0.3, "fiber_per_100g": 2.4, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Spinach", "category": "vegetables", "fodmap_level": "low", "calories_per_100g": 23, "protein_per_100g": 2.9, "carbs_per_100g": 3.6, "fat_per_100g": 0.4, "fiber_per_100g": 2.2, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Carrots", "category": "vegetables", "fodmap_level": "low", "calories_per_100g": 41, "protein_per_100g": 0.9, "carbs_per_100g": 10, "fat_per_100g": 0.2, "fiber_per_100g": 2.8, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Broccoli", "category": "vegetables", "fodmap_level": "moderate", "calories_per_100g": 34, "protein_per_100g": 2.8, "carbs_per_100g": 7, "fat_per_100g": 0.4, "fiber_per_100g": 2.6, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Oats", "category": "grains", "fodmap_level": "moderate", "calories_per_100g": 389, "protein_per_100g": 17, "carbs_per_100g": 66, "fat_per_100g": 7, "fiber_per_100g": 10.6, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Greek yogurt", "category": "dairy", "fodmap_level": "moderate", "calories_per_100g": 59, "protein_per_100g": 10, "carbs_per_100g": 3.6, "fat_per_100g": 0.4, "fiber_per_100g": 0, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Almonds", "category": "proteins", "fodmap_level": "moderate", "calories_per_100g": 579, "protein_per_100g": 21, "carbs_per_100g": 22, "fat_per_100g": 50, "fiber_per_100g": 12.5, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Olive oil", "category": "fats_oils", "fodmap_level": "low", "calories_per_100g": 884, "protein_per_100g": 0, "carbs_per_100g": 0, "fat_per_100g": 100, "fiber_per_100g": 0, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Sweet potato", "category": "vegetables", "fodmap_level": "moderate", "calories_per_100g": 86, "protein_per_100g": 1.6, "carbs_per_100g": 20, "fat_per_100g": 0.1, "fiber_per_100g": 3, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Apple", "category": "fruits", "fodmap_level": "high", "calories_per_100g": 52, "protein_per_100g": 0.3, "carbs_per_100g": 14, "fat_per_100g": 0.2, "fiber_per_100g": 2.4, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Wheat bread", "category": "grains", "fodmap_level": "high", "calories_per_100g": 265, "protein_per_100g": 9, "carbs_per_100g": 49, "fat_per_100g": 3.2, "fiber_per_100g": 2.7, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Milk", "category": "dairy", "fodmap_level": "high", "calories_per_100g": 61, "protein_per_100g": 3.2, "carbs_per_100g": 4.8, "fat_per_100g": 3.3, "fiber_per_100g": 0, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Green tea", "category": "beverages", "fodmap_level": "low", "calories_per_100g": 1, "protein_per_100g": 0.2, "carbs_per_100g": 0.2, "fat_per_100g": 0, "fiber_per_100g": 0, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Coffee", "category": "beverages", "fodmap_level": "low", "calories_per_100g": 2, "protein_per_100g": 0.3, "carbs_per_100g": 0, "fat_per_100g": 0, "fiber_per_100g": 0, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Tofu", "category": "proteins", "fodmap_level": "low", "calories_per_100g": 76, "protein_per_100g": 8, "carbs_per_100g": 1.9, "fat_per_100g": 4.8, "fiber_per_100g": 0.3, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Quinoa", "category": "grains", "fodmap_level": "low", "calories_per_100g": 120, "protein_per_100g": 4.4, "carbs_per_100g": 21, "fat_per_100g": 1.9, "fiber_per_100g": 2.8, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Cucumber", "category": "vegetables", "fodmap_level": "low", "calories_per_100g": 16, "protein_per_100g": 0.7, "carbs_per_100g": 3.6, "fat_per_100g": 0.1, "fiber_per_100g": 0.5, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Tomato", "category": "vegetables", "fodmap_level": "low", "calories_per_100g": 18, "protein_per_100g": 0.9, "carbs_per_100g": 3.9, "fat_per_100g": 0.2, "fiber_per_100g": 1.2, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Dal (Lentils)", "category": "proteins", "fodmap_level": "moderate", "calories_per_100g": 116, "protein_per_100g": 9, "carbs_per_100g": 20, "fat_per_100g": 0.4, "fiber_per_100g": 7.9, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Roti (Wheat)", "category": "grains", "fodmap_level": "high", "calories_per_100g": 297, "protein_per_100g": 9.9, "carbs_per_100g": 55, "fat_per_100g": 3.7, "fiber_per_100g": 2.7, "common_triggers": True},
+                {"id": str(uuid.uuid4()), "name": "Paneer", "category": "dairy", "fodmap_level": "moderate", "calories_per_100g": 265, "protein_per_100g": 18, "carbs_per_100g": 1.2, "fat_per_100g": 21, "fiber_per_100g": 0, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Basmati rice", "category": "grains", "fodmap_level": "low", "calories_per_100g": 210, "protein_per_100g": 4.4, "carbs_per_100g": 46, "fat_per_100g": 0.5, "fiber_per_100g": 0.6, "common_triggers": False},
+                {"id": str(uuid.uuid4()), "name": "Curd (Yogurt)", "category": "dairy", "fodmap_level": "moderate", "calories_per_100g": 61, "protein_per_100g": 3.5, "carbs_per_100g": 4.7, "fat_per_100g": 3.3, "fiber_per_100g": 0, "common_triggers": True},
+            ]
+            for fi in food_items_data:
+                session.add(FoodItem(**fi))
+            print(f"Added {len(food_items_data)} food items")
+        else:
+            print("Food items already seeded")
+
         await session.commit()
         print("Seeding complete!")
 
