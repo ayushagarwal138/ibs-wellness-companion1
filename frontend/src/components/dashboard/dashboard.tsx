@@ -579,31 +579,42 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    {data.aiPredictions && data.aiPredictions.triggerFoods && data.aiPredictions.triggerFoods.length > 0 && data.aiPredictions.triggerFoods[0] !== 'Log more meals to identify your trigger foods' ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RePieChart>
-                          <Pie
-                            data={data.aiPredictions.triggerFoods.map((food: string, i: number) => ({
-                              name: food, value: 1
-                            }))}
-                            cx="50%" cy="50%" outerRadius={80}
-                            dataKey="value" label={({name}: any) => name}
-                          >
-                            {data.aiPredictions.triggerFoods.map((_: any, i: number) => (
-                              <Cell key={i} fill={['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'][i % 5]} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </RePieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                        <div className="text-center">
-                          <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-gray-500">Log meals to see food impact</p>
+                    {(() => {
+                      const mealData = data.recentSymptoms && (data as any).dietLogs
+                        ? (() => {
+                            const counts: Record<string, number> = {};
+                            ((data as any).dietLogs || []).forEach((log: any) => {
+                              const type = log.meal_type || 'other';
+                              counts[type] = (counts[type] || 0) + 1;
+                            });
+                            return Object.entries(counts).map(([name, value]) => ({ name, value }));
+                          })()
+                        : data.aiPredictions?.triggerFoods?.length > 0 && data.aiPredictions.triggerFoods[0] !== 'Log more meals to identify your trigger foods'
+                        ? data.aiPredictions.triggerFoods.map((food: string) => ({ name: food, value: 1 }))
+                        : null;
+                      return mealData && mealData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RePieChart>
+                            <Pie data={mealData} cx="50%" cy="50%" outerRadius={75} dataKey="value"
+                              label={({name, percent}: any) => `${name} ${(percent*100).toFixed(0)}%`}
+                              labelLine={false}>
+                              {mealData.map((_: any, i: number) => (
+                                <Cell key={i} fill={['#3b82f6','#22c55e','#f97316','#8b5cf6','#ef4444'][i % 5]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </RePieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                          <div className="text-center">
+                            <PieChart className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                            <p className="text-gray-500">Log meals to see food impact</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
