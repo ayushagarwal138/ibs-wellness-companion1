@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
     DATABASE_TIMEOUT: int = 30
 
-    # CORS
+    # CORS — set CORS_ORIGINS env var on Render to include your frontend URL
     CORS_ORIGINS: str = os.getenv(
         "CORS_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000,"
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
         "http://localhost:8000,http://127.0.0.1:8000,"
         "http://localhost:8001,http://127.0.0.1:8001"
     )
-    ALLOWED_HOSTS: str = "localhost,127.0.0.1"
+    ALLOWED_HOSTS: str = os.getenv("ALLOWED_HOSTS", "*")
 
     @property
     def BACKEND_CORS_ORIGINS(self) -> list[str]:

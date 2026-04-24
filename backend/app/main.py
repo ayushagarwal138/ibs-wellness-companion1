@@ -71,10 +71,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Security middleware
+# Security middleware — allow all hosts so Render/Vercel/custom domains work
+# Specific host restriction can be re-enabled once a custom domain is set
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=settings.ALLOWED_HOSTS.split(","),  # Convert string to list
+    allowed_hosts=["*"],
 )
 
 # CORS middleware
@@ -163,7 +164,8 @@ async def root():
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(real_time_predictions.router, prefix="/api/v1")
 app.include_router(firebase.router, prefix="/api/v1")
-app.include_router(oauth.router, prefix="/api/v1")
+# Mount OAuth under /auth so frontend can call /api/v1/auth/oauth
+app.include_router(oauth.router, prefix="/api/v1/auth")
 
 # Static files (if needed)
 static_dir = Path("static")
