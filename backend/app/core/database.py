@@ -7,16 +7,29 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import MetaData
 from typing import AsyncGenerator
 import logging
+import ssl
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Strip any query params from the URL (e.g. ?sslmode=require from Neon)
+# since asyncpg handles SSL via connect_args, not URL params
+_db_url = settings.DATABASE_URL.split("?")[0]
+
+# Enable SSL for non-localhost connections (required for Neon, Render, Supabase, etc.)
+_is_local = any(h in _db_url for h in ["localhost", "127.0.0.1"])
+_connect_args = {}
+if not _is_local:
+    _ssl_ctx = ssl.create_default_context()
+    _connect_args = {"ssl": _ssl_ctx}
+
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _db_url,
     echo=settings.DATABASE_ECHO,
     future=True,
+    connect_args=_connect_args,
 )
 
 # Create async session factory
