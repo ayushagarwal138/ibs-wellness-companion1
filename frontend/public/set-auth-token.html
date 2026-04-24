@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Auth Token</title>
+</head>
+<body>
+    <h1>Setting Authentication Token</h1>
+    <p>Setting the access token in localStorage...</p>
+    
+    <script>
+        // Set the access token from our successful login
+        const accessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlZjBmMjg3OC1mOTg3LTRlZmQtYmMwMC04MDc0NzM0YzM0ZGUiLCJleHAiOjE3NTk2MDIzODJ9.Qpq_i4FktYEH7lBD37IG9sAGe2pqRP5fq_gsFbwPWXQ";
+        const refreshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlZjBmMjg3OC1mOTg3LTRlZmQtYmMwMC04MDc0NzM0YzM0ZGUiLCJleHAiOjE3NjAyMDUzODIsInR5cGUiOiJyZWZyZXNoIn0.Q_R5jbG3U3hn1Dekb8g8at6UX1PYPgL-cTgz6O-15Lk";
+        
+        localStorage.setItem('access_token', accessToken);
+        localStorage.setItem('refresh_token', refreshToken);
+        
+        console.log('Tokens set in localStorage');
+        console.log('access_token:', localStorage.getItem('access_token'));
+        console.log('refresh_token:', localStorage.getItem('refresh_token'));
+        
+        document.body.innerHTML += '<p style="color: green;">✅ Tokens have been set in localStorage!</p>';
+        document.body.innerHTML += '<p><a href="/analytics" style="color: blue; text-decoration: underline;">Go to Analytics Page</a></p>';
+        document.body.innerHTML += '<p><a href="/dashboard" style="color: blue; text-decoration: underline;">Go to Dashboard</a></p>';
+    </script>
+</body>
+</html>

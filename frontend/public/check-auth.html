@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Check</title>
+</head>
+<body>
+    <h1>Authentication Token Check</h1>
+    <div id="results"></div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        const accessToken = localStorage.getItem('access_token');
+        const authToken = localStorage.getItem('authToken');
+        const allKeys = Object.keys(localStorage);
+        
+        results.innerHTML = `
+            <p><strong>access_token:</strong> ${accessToken ? 'Found' : 'Not found'}</p>
+            <p><strong>authToken:</strong> ${authToken ? 'Found' : 'Not found'}</p>
+            <p><strong>All localStorage keys:</strong> ${allKeys.join(', ')}</p>
+            <p><strong>Token value (first 50 chars):</strong> ${accessToken ? accessToken.substring(0, 50) + '...' : 'N/A'}</p>
+        `;
+    </script>
+</body>
+</html>

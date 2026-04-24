@@ -296,3 +296,12 @@ tmp/
 temp/
 uploads/
 /ibs_wellness.db
+# Process ID files
+*.pid
+staging/backend.pid
+staging/frontend.pid
+
+# ML processed/generated data CSVs
+ml-models/processed/
+ml-models/enhanced_training_features.csv
+ml-models/src/models/__pycache__/
