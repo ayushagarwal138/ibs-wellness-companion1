@@ -29,23 +29,26 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
+    import asyncio
+
     # Startup
     logger.info("Starting IBS Wellness Companion API...")
 
-    # Create database tables
+    # Create database tables (required before app is ready)
     await create_tables()
 
-    # Initialize ML models (if needed)
-    # await load_ml_models()
+    # Run seeding in background so port is available immediately for Render's health check
+    async def seed_in_background():
+        try:
+            import sys, os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from app.seed_data import seed
+            await seed()
+            logger.info("Background seeding complete")
+        except Exception as e:
+            logger.warning(f"Seeding skipped: {e}")
 
-    # Seed initial data
-    try:
-        import sys, os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from app.seed_data import seed
-        await seed()
-    except Exception as e:
-        logger.warning(f"Seeding skipped: {e}")
+    asyncio.create_task(seed_in_background())
 
     logger.info("Application startup complete")
 
