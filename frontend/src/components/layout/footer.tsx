@@ -59,8 +59,8 @@ export function Footer({ variant = 'default' }: FooterProps) {
 
   const contactInfo = [
     { icon: Mail, text: 'support@ibswellness.com', href: 'mailto:support@ibswellness.com' },
-    { icon: Phone, text: '+1 (555) 123-4567', href: 'tel:+15551234567' },
-    { icon: MapPin, text: 'San Francisco, CA', href: '#' },
+    { icon: Phone, text: '+91 800-009-8311', href: 'tel:+918000098311' },
+    { icon: MapPin, text: 'Ghaziabad, Uttar Pradesh, India', href: '#' },
   ];
 
   const trustSignals = [
