@@ -318,7 +318,8 @@ export default function ReportsPage() {
       try {
         const token = localStorage.getItem('access_token');
         if (token) {
-          const response = await fetch('http://localhost:8000/api/v1/profile', {
+          const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+          const response = await fetch(`${apiUrl}/api/v1/profile`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -522,35 +523,89 @@ export default function ReportsPage() {
     fetchReportData();
   }, [selectedTimeframe]);
 
-  const handleExportPDF = () => {
-    // Transform the report data to match the PDF generator interface
-    const pdfReportData = {
-      user_summary: {
-        name: reportData.user_summary.name,
-        ibs_type: "Mixed IBS", // Default value
-        diagnosis_date: "2023-01-01", // Default value
-        last_updated: reportData.user_summary.last_updated,
-        overall_trend: reportData.user_summary.overall_trend
-      },
-      severity_assessment: {
-        current_score: reportData.severity_assessment.score,
-        trend: reportData.severity_assessment.trend,
-        risk_level: reportData.severity_assessment.current_level
-      },
-      ml_predictions: {
-        flareup_risk: reportData.ml_predictions.next_flare_probability,
-        severity_forecast: [reportData.ml_predictions.predicted_severity],
-        confidence_score: reportData.ml_predictions.confidence
-      },
-      progress_metrics: {
-        symptom_control: reportData.progress_metrics.symptom_control,
-        quality_of_life: reportData.progress_metrics.quality_of_life,
-        goal_achievement: reportData.progress_metrics.goal_achievement,
-        consistency_score: reportData.progress_metrics.consistency_score
-      }
-    };
-    
-    downloadPDFReport(pdfReportData);
+  const handleExportPDF = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const apiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:8000';
+
+      // Fetch user profile
+      let userProfile: any = null;
+      try {
+        const profileRes = await fetch(`${apiUrl}/api/v1/profile`, { headers });
+        if (profileRes.ok) userProfile = await profileRes.json();
+      } catch {}
+
+      // Fetch symptom stats
+      let symptomStats: any = null;
+      try {
+        const statsRes = await fetch(`${apiUrl}/api/v1/symptom-logs/stats/summary?days=30`, { headers });
+        if (statsRes.ok) {
+          const statsJson = await statsRes.json();
+          symptomStats = statsJson.data ?? statsJson;
+        }
+      } catch {}
+
+      // Fetch recent symptom logs
+      let recentLogs: any[] = [];
+      try {
+        const logsRes = await fetch(`${apiUrl}/api/v1/symptom-logs?days=30&limit=10`, { headers });
+        if (logsRes.ok) {
+          const logsJson = await logsRes.json();
+          recentLogs = logsJson.data ?? logsJson ?? [];
+        }
+      } catch {}
+
+      const pdfData = {
+        user_summary: {
+          name: userProfile?.full_name || userProfile?.first_name || reportData.user_summary.name || 'Patient',
+          ibs_type: userProfile?.medical_history?.ibs_type || undefined,
+          diagnosis_date: userProfile?.medical_history?.diagnosis_date || undefined,
+          last_updated: reportData.user_summary.last_updated,
+          overall_trend: reportData.user_summary.overall_trend,
+          age: userProfile?.age || undefined,
+          gender: userProfile?.gender || undefined,
+          email: userProfile?.email || undefined,
+          height_cm: userProfile?.height_cm || undefined,
+          weight_kg: userProfile?.weight_kg || undefined,
+          bmi: userProfile?.bmi || undefined,
+        },
+        severity_assessment: {
+          current_score: reportData.severity_assessment.score,
+          trend: reportData.severity_assessment.trend,
+          risk_level: reportData.severity_assessment.current_level,
+          description: reportData.severity_assessment.description,
+        },
+        ml_predictions: {
+          flareup_risk: reportData.ml_predictions.next_flare_probability,
+          severity_forecast: [reportData.ml_predictions.predicted_severity],
+          confidence_score: reportData.ml_predictions.confidence,
+          key_factors: reportData.ml_predictions.key_factors,
+          timeline: reportData.ml_predictions.timeline,
+        },
+        recommendations: {
+          immediate_actions: reportData.recommendations.immediate_actions,
+          dietary_suggestions: reportData.recommendations.dietary_suggestions,
+          lifestyle_changes: reportData.recommendations.lifestyle_changes,
+          medical_advice: reportData.recommendations.medical_advice,
+        },
+        progress_metrics: {
+          symptom_control: reportData.progress_metrics.symptom_control,
+          quality_of_life: reportData.progress_metrics.quality_of_life,
+          goal_achievement: reportData.progress_metrics.goal_achievement,
+          consistency_score: reportData.progress_metrics.consistency_score,
+        },
+        symptom_logs: recentLogs,
+        symptom_stats: symptomStats,
+      };
+
+      await downloadPDFReport(pdfData as any, `ibs-report-${userProfile?.first_name ?? 'patient'}-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      alert('Failed to generate report. Please try again.');
+    }
   };
 
   const getSuggestedSpecialists = (riskLevel: string, userProfile: any): string[] => {

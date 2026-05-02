@@ -20,6 +20,7 @@ export function DashboardHeader({
   backHref = "/dashboard" 
 }: DashboardHeaderProps) {
   const pathname = usePathname();
+  const currentPath = pathname || '';
   
   // Initialize notification state
   const {
@@ -34,49 +35,49 @@ export function DashboardHeader({
       name: 'Dashboard',
       href: '/dashboard',
       icon: BarChart3,
-      active: pathname === '/dashboard',
+      active: currentPath === '/dashboard',
     },
     {
       name: 'Profile',
       href: '/profile',
       icon: User,
-      active: pathname === '/profile' || pathname.startsWith('/profile/'),
+      active: currentPath === '/profile' || currentPath.startsWith('/profile/'),
     },
     {
       name: 'Log Symptoms',
       href: '/dashboard/log-symptoms',
       icon: PlusCircle,
-      active: pathname === '/dashboard/log-symptoms',
+      active: currentPath === '/dashboard/log-symptoms',
     },
     {
       name: 'Diet History',
       href: '/diet-history',
       icon: Calendar,
-      active: pathname === '/diet-history',
+      active: currentPath === '/diet-history',
     },
     {
       name: 'Chat Assistant',
       href: '/chat',
       icon: MessageCircle,
-      active: pathname === '/chat',
+      active: currentPath === '/chat',
     },
     {
       name: 'Analytics',
       href: '/dashboard/analytics',
       icon: BarChart3,
-      active: pathname === '/dashboard/analytics',
+      active: currentPath === '/dashboard/analytics',
     },
     {
       name: 'Financial',
       href: '/financial',
       icon: DollarSign,
-      active: pathname === '/financial',
+      active: currentPath === '/financial',
     },
     {
       name: 'Reports',
       href: '/reports',
       icon: FileText,
-      active: pathname === '/reports',
+      active: currentPath === '/reports',
     },
   ];
 
