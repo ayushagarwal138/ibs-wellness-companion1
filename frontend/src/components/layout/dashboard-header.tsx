@@ -67,12 +67,12 @@ export function DashboardHeader({
       icon: BarChart3,
       active: currentPath === '/dashboard/analytics',
     },
-    {
-      name: 'Financial',
-      href: '/financial',
-      icon: DollarSign,
-      active: currentPath === '/financial',
-    },
+    // {
+    //   name: 'Financial',
+    //   href: '/financial',
+    //   icon: DollarSign,
+    //   active: currentPath === '/financial',
+    // },
     {
       name: 'Reports',
       href: '/reports',
